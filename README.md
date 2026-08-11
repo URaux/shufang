@@ -11,7 +11,7 @@
 按 `Win` 键，输入 `powershell`，打开「Windows PowerShell」，把下面这行整个粘进去回车：
 
 ```powershell
-irm https://raw.githubusercontent.com/URaux/shufang/master/installer/install.ps1 | iex
+$f="$env:TEMP\shufang-install.ps1";iwr https://raw.githubusercontent.com/URaux/shufang/master/installer/install.ps1 -OutFile $f -UseBasicParsing;powershell -NoProfile -ExecutionPolicy Bypass -File $f
 ```
 
 按提示走：中途会问要不要 PDF 支持（要读 PDF 书就输 y），然后粘贴 API key。装完桌面上出现「启动书房」。
