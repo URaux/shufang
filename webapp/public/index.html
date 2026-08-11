@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>书房</title>
+<style>
+  :root {
+    --paper: #faf7f0; --card: #ffffff; --ink: #2b2820; --ink-soft: #57503f;
+    --ink-mute: #8a8170; --line: #e5dfd0; --accent: #8c6a2d; --accent-soft: #c89a4a;
+    --chat-bg: #f3efe5; --user-bubble: #e9e0c8; --bot-bubble: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Noto Serif SC", "Source Han Serif SC", Georgia, serif;
+    background: var(--paper); color: var(--ink); display: flex; flex-direction: column;
+  }
+  button { font-family: inherit; cursor: pointer; border: 0; background: none; color: inherit; }
+
+  header {
+    display: flex; align-items: center; gap: .6rem; padding: .55rem .9rem;
+    border-bottom: 1px solid var(--line); background: var(--card); flex-shrink: 0;
+  }
+  header h1 { font-size: 1.05rem; font-weight: 600; letter-spacing: .1em; }
+  header .crumb { color: var(--ink-mute); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .spacer { flex: 1; }
+  .tabs { display: none; gap: .3rem; }
+  .tabs button { padding: .3rem .8rem; border-radius: 999px; font-size: .85rem; color: var(--ink-mute); }
+  .tabs button.on { background: var(--accent); color: #fff; }
+
+  main { flex: 1; display: flex; min-height: 0; }
+
+  /* 书架 + 章节列表 */
+  #sidebar {
+    width: 240px; flex-shrink: 0; border-right: 1px solid var(--line);
+    overflow-y: auto; background: var(--card); padding: .8rem .6rem;
+  }
+  .side-h { font-size: .78rem; letter-spacing: .15em; color: var(--ink-mute); margin: .8rem .4rem .35rem; }
+  .side-item {
+    display: block; width: 100%; text-align: left; padding: .42rem .55rem;
+    border-radius: 6px; font-size: .92rem; line-height: 1.4; color: var(--ink-soft);
+  }
+  .side-item:hover { background: var(--paper); }
+  .side-item.on { background: var(--user-bubble); color: var(--ink); }
+  .side-item small { color: var(--ink-mute); display: block; font-size: .75rem; }
+  .side-item .done { color: var(--accent); }
+
+  /* 阅读区 */
+  #reader { flex: 1; overflow-y: auto; min-width: 0; }
+  #reader .page { max-width: 46rem; margin: 0 auto; padding: 2.2rem 1.4rem 5rem; }
+  #reader h1, #reader h2, #reader h3 { line-height: 1.4; margin: 1.6em 0 .6em; font-weight: 600; }
+  #reader h1 { font-size: 1.55rem; } #reader h2 { font-size: 1.25rem; } #reader h3 { font-size: 1.05rem; }
+  #reader p { line-height: 2; margin: .9em 0; font-size: 1.02rem; }
+  #reader blockquote { border-left: 3px solid var(--accent-soft); padding-left: 1em; color: var(--ink-soft); margin: 1em 0; }
+  #reader li { line-height: 1.9; margin: .3em 0 .3em 1.4em; }
+  #reader code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: #f0ead9; padding: .1em .3em; border-radius: 3px; }
+  #reader table { border-collapse: collapse; margin: 1em 0; width: 100%; }
+  #reader th, #reader td { border: 1px solid var(--line); padding: .4em .7em; font-size: .92rem; }
+  .pager { display: flex; justify-content: space-between; margin-top: 3rem; gap: 1rem; }
+  .pager button { color: var(--accent); font-size: .95rem; padding: .5rem .8rem; border: 1px solid var(--line); border-radius: 6px; background: var(--card); }
+  .pager button:disabled { opacity: .35; cursor: default; }
+  .empty { color: var(--ink-mute); text-align: center; padding: 5rem 1rem; line-height: 2; }
+
+  /* 聊天区 */
+  #chat {
+    width: 380px; flex-shrink: 0; border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; background: var(--chat-bg); min-height: 0;
+  }
+  #msgs { flex: 1; overflow-y: auto; padding: 1rem .9rem; display: flex; flex-direction: column; gap: .7rem; }
+  .msg { max-width: 92%; padding: .55rem .8rem; border-radius: 10px; font-size: .93rem; line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: var(--user-bubble); border-bottom-right-radius: 3px; }
+  .msg.bot { align-self: flex-start; background: var(--bot-bubble); border-bottom-left-radius: 3px; box-shadow: 0 1px 2px rgba(90,70,30,.08); }
+  .msg.status { align-self: flex-start; background: none; color: var(--ink-mute); font-size: .8rem; padding: 0 .3rem; }
+  #composer { display: flex; gap: .5rem; padding: .7rem; border-top: 1px solid var(--line); background: var(--card); }
+  #composer textarea {
+    flex: 1; resize: none; border: 1px solid var(--line); border-radius: 8px;
+    padding: .55rem .7rem; font-family: inherit; font-size: .95rem; line-height: 1.5;
+    background: var(--paper); color: var(--ink); max-height: 7.5rem;
+  }
+  #composer textarea:focus { outline: 2px solid var(--accent-soft); }
+  #sendBtn { background: var(--accent); color: #fff; border-radius: 8px; padding: 0 1.1rem; font-size: .95rem; flex-shrink: 0; }
+  #sendBtn:disabled { opacity: .5; cursor: default; }
+
+  /* 手机布局：单栏 + tab 切换 */
+  @media (max-width: 860px) {
+    .tabs { display: flex; }
+    #sidebar { position: fixed; inset: 49px 0 0 0; width: 100%; z-index: 20; display: none; }
+    #sidebar.open { display: block; }
+    #chat { width: 100%; border-left: 0; display: none; }
+    body.tab-chat #chat { display: flex; }
+    body.tab-chat #reader { display: none; }
+    #reader .page { padding: 1.4rem 1.1rem 4rem; }
+    #menuBtn { display: block; }
+  }
+  #menuBtn { display: none; font-size: 1.2rem; padding: .2rem .4rem; }
+  @media (min-width: 861px) { body.tab-chat #reader { display: block; } }
+</style>
+</head>
+<body class="tab-read">
+  <header>
+    <button id="menuBtn" title="书架">☰</button>
+    <h1>书房</h1>
+    <span class="crumb" id="crumb"></span>
+    <span class="spacer"></span>
+    <nav class="tabs">
+      <button id="tabRead" class="on">看书</button>
+      <button id="tabChat">聊天</button>
+    </nav>
+  </header>
+  <main>
+    <aside id="sidebar"></aside>
+    <section id="reader"><div class="page"><div class="empty">📚<br/>左边选一本书开始看<br/>还没有书的话，去聊天窗把书的文件拖给助手</div></div></section>
+    <section id="chat">
+      <div id="msgs"></div>
+      <div id="composer">
+        <textarea id="input" rows="2" placeholder="跟书房助手说话，比如「翻第 3 章」"></textarea>
+        <button id="sendBtn">发送</button>
+      </div>
+    </section>
+  </main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const sidebar = $("sidebar"), reader = $("reader"), msgs = $("msgs");
+  const input = $("input"), sendBtn = $("sendBtn"), crumb = $("crumb");
+
+  let currentBook = null;      // { name, original: [], translated: [], ... }
+  let currentFile = null;      // vault-relative path of the open chapter
+
+  // ------------------------------------------------------------------ 书架
+  async function loadShelf() {
+    const r = await fetch("/api/books").then(r => r.json()).catch(() => ({ books: [] }));
+    const parts = ['<div class="side-h">书架</div>'];
+    if (!r.books.length) parts.push('<div class="side-item" style="cursor:default;color:var(--ink-mute)">还没有书</div>');
+    for (const b of r.books) {
+      parts.push(`<button class="side-item" data-book="${encodeURIComponent(b.name)}">${b.name}<small>${b.chapters} 章 · <span class="done">已翻 ${b.translated}</span></small></button>`);
+    }
+    sidebar.innerHTML = parts.join("");
+    if (currentBook) renderBookMenu();
+  }
+
+  async function openBook(name) {
+    currentBook = await fetch("/api/book?name=" + encodeURIComponent(name)).then(r => r.json());
+    renderBookMenu();
+    // 默认打开梗概；没有就开第一章译文；再没有就第一章原文
+    if (currentBook.outline) openFile(`Library/${name}/01-全书梗概.md`, "全书梗概");
+    else if (currentBook.translated[0]) openFile(`Library/${name}/译文/${currentBook.translated[0]}`, currentBook.translated[0]);
+    else if (currentBook.original[0]) openFile(`Library/${name}/00-原书/${currentBook.original[0]}`, currentBook.original[0]);
+  }
+
+  function renderBookMenu() {
+    const b = currentBook;
+    const enc = encodeURIComponent(b.name);
+    const parts = [
+      `<button class="side-item" id="backShelf">← 书架</button>`,
+      `<div class="side-h">${b.name}</div>`,
+    ];
+    if (b.outline) parts.push(item(`Library/${b.name}/01-全书梗概.md`, "📖 全书梗概"));
+    if (b.summary) parts.push(item(`Library/${b.name}/02-逐章摘要.md`, "🗂 逐章摘要"));
+    if (b.translated.length) {
+      parts.push('<div class="side-h">译文</div>');
+      for (const f of b.translated) parts.push(item(`Library/${b.name}/译文/${f}`, f.replace(/\.md$/, "")));
+    }
+    if (b.original.length) {
+      parts.push('<div class="side-h">原文</div>');
+      for (const f of b.original) parts.push(item(`Library/${b.name}/00-原书/${f}`, f.replace(/\.md$/, "")));
+    }
+    for (const [dir, label] of [["笔记", "笔记"], ["讨论", "讨论"]]) {
+      const files = b[dir === "笔记" ? "notes" : "discussions"];
+      if (files.length) {
+        parts.push(`<div class="side-h">${label}</div>`);
+        for (const f of files) parts.push(item(`Library/${b.name}/${dir}/${f}`, f.replace(/\.md$/, "")));
+      }
+    }
+    sidebar.innerHTML = parts.join("");
+    function item(p, label) {
+      const on = p === currentFile ? " on" : "";
+      return `<button class="side-item${on}" data-file="${encodeURIComponent(p)}">${label}</button>`;
+    }
+  }
+
+  async function openFile(rel, label) {
+    const r = await fetch("/api/file?path=" + encodeURIComponent(rel)).then(r => r.json());
+    if (r.error) return;
+    currentFile = rel;
+    crumb.textContent = (currentBook ? currentBook.name + " · " : "") + (label || rel.split("/").pop());
+    const nav = chapterNav(rel);
+    reader.innerHTML = `<div class="page">${r.html}${nav}</div>`;
+    reader.scrollTop = 0;
+    if (currentBook) renderBookMenu();
+    sidebar.classList.remove("open");
+    document.body.className = "tab-read";
+    setTab("read");
+    bindPager();
+  }
+
+  // 上一章/下一章：在当前文件所属列表(译文或原文)里找邻居
+  function chapterNav(rel) {
+    if (!currentBook) return "";
+    const inTrans = rel.includes("/译文/"), inOrig = rel.includes("/00-原书/");
+    if (!inTrans && !inOrig) return "";
+    const list = inTrans ? currentBook.translated : currentBook.original;
+    const fname = rel.split("/").pop();
+    const i = list.indexOf(fname);
+    if (i < 0) return "";
+    const dir = inTrans ? "译文" : "00-原书";
+    const mk = (f, t) => f ? `<button data-nav="${encodeURIComponent(`Library/${currentBook.name}/${dir}/${f}`)}">${t}</button>` : `<button disabled>${t}</button>`;
+    return `<div class="pager">${mk(list[i - 1], "← 上一章")}${mk(list[i + 1], "下一章 →")}</div>`;
+  }
+  function bindPager() {
+    reader.querySelectorAll("[data-nav]").forEach(b =>
+      b.addEventListener("click", () => openFile(decodeURIComponent(b.dataset.nav))));
+  }
+
+  sidebar.addEventListener("click", e => {
+    const el = e.target.closest("[data-book],[data-file],#backShelf");
+    if (!el) return;
+    if (el.id === "backShelf") { currentBook = null; currentFile = null; loadShelf(); return; }
+    if (el.dataset.book) openBook(decodeURIComponent(el.dataset.book));
+    else openFile(decodeURIComponent(el.dataset.file));
+  });
+
+  // ------------------------------------------------------------------ 聊天
+  function addMsg(cls, text) {
+    const div = document.createElement("div");
+    div.className = "msg " + cls;
+    div.textContent = text;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    return div;
+  }
+
+  let streaming = false;
+  async function send() {
+    const text = input.value.trim();
+    if (!text || streaming) return;
+    input.value = "";
+    addMsg("user", text);
+    streaming = true; sendBtn.disabled = true;
+
+    let bot = null, statusEl = null;
+    const ensureBot = () => bot || (bot = addMsg("bot", ""));
+
+    try {
+      const resp = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+      if (resp.status === 429) { addMsg("status", "助手还在忙上一件事，稍等再发。"); return; }
+      if (!resp.ok || !resp.body) { addMsg("status", "连不上助手，检查「书房」窗口还开着没。"); return; }
+
+      const rd = resp.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await rd.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let idx;
+        while ((idx = buf.indexOf("\n\n")) >= 0) {
+          const raw = buf.slice(0, idx); buf = buf.slice(idx + 2);
+          const evm = raw.match(/^event: (\S+)\ndata: (.*)$/s);
+          if (!evm) continue;
+          const [_, ev, dataStr] = evm;
+          let data = {}; try { data = JSON.parse(dataStr); } catch { }
+          if (ev === "delta") {
+            if (statusEl) { statusEl.remove(); statusEl = null; }
+            ensureBot().textContent += data.text;
+            msgs.scrollTop = msgs.scrollHeight;
+          } else if (ev === "status") {
+            if (!statusEl) statusEl = addMsg("status", "");
+            statusEl.textContent = "⏳ " + data.text + "…";
+          } else if (ev === "turn") {
+            bot = null;                  // 工具调用之后新起一个气泡
+          } else if (ev === "error") {
+            addMsg("status", "⚠️ " + data.text);
+          }
+        }
+      }
+    } catch {
+      addMsg("status", "网络断了，稍后重试。");
+    } finally {
+      if (statusEl) statusEl.remove();
+      streaming = false; sendBtn.disabled = false;
+      loadShelf();                        // 助手可能新建/翻完了章节，刷新书架
+      if (currentBook) openBook(currentBook.name).catch(() => {});
+    }
+  }
+
+  sendBtn.addEventListener("click", send);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+  });
+
+  // ------------------------------------------------------------------ 标签/菜单
+  function setTab(which) {
+    document.body.className = which === "chat" ? "tab-chat" : "tab-read";
+    $("tabRead").classList.toggle("on", which === "read");
+    $("tabChat").classList.toggle("on", which === "chat");
+  }
+  $("tabRead").addEventListener("click", () => setTab("read"));
+  $("tabChat").addEventListener("click", () => setTab("chat"));
+  $("menuBtn").addEventListener("click", () => sidebar.classList.toggle("open"));
+
+  addMsg("bot", "你好，我是书房助手。把书的文件路径发给我（或直接把文件放进书库文件夹再告诉我），我来整理概要；想看哪章就说「翻第几章」。");
+  loadShelf();
+})();
+</script>
+</body>
+</html>
