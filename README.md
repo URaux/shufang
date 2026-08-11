@@ -4,10 +4,29 @@
 
 ## 安装（只做一次，约 10 分钟）
 
-1. 去 [platform.deepseek.com](https://platform.deepseek.com) 注册，充几块钱，创建一个 API key（`sk-` 开头的一串，复制好）。
-2. 双击安装包里的 `installer\install.bat`。
-3. 按提示走：中途会问你要不要 PDF 支持（要读 PDF 书就输 y），然后粘贴刚才的 API key。
-4. 装完桌面上会出现「启动书房」。
+先去 [platform.deepseek.com](https://platform.deepseek.com) 注册，充几块钱，创建一个 API key（`sk-` 开头的一串，复制好）。
+
+### Windows
+
+按 `Win` 键，输入 `powershell`，打开「Windows PowerShell」，把下面这行整个粘进去回车：
+
+```powershell
+irm https://raw.githubusercontent.com/URaux/shufang/master/installer/install.ps1 | iex
+```
+
+按提示走：中途会问要不要 PDF 支持（要读 PDF 书就输 y），然后粘贴 API key。装完桌面上出现「启动书房」。
+
+> ⚠️ 不要在 GitHub 网页上单独下载 install.bat——它一个人干不了活。要么用上面这行命令，要么下载**完整压缩包**解压后再双击 installer 里的 install.bat（离线安装用）。
+
+### Mac
+
+按 `Cmd+空格`，输入「终端」打开 Terminal，把下面这行整个粘进去回车：
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/URaux/shufang/master/installer/install-mac.sh)"
+```
+
+中途会要你输一次开机密码（装 Homebrew 用，输入时屏幕不显示是正常的）。装完桌面上出现「启动书房.command」，第一次运行若被系统拦，右键它选「打开」一次即可。
 
 ## 日常使用
 
@@ -31,6 +50,7 @@
 
 ## 常见问题
 
+- **双击 install.bat 窗口一闪就没了** — 你多半只下载了 bat 这一个文件，或者还在压缩包里没解压。用安装章节里的「粘一行命令」方式最省事。
 - **黑窗口关了网页就打不开了** — 正常，重新双击「启动书房」。
 - **助手说额度不够** — DeepSeek 余额用完了，去 platform.deepseek.com 充值。翻一整本书一般也就几块钱。
 - **书是扫描版 PDF（每页是图片）** — 暂时啃不动，需要先用别的工具 OCR 成文字。

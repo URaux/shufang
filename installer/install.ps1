@@ -3,8 +3,21 @@
 
 $ErrorActionPreference = "Stop"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+# 全程留日志：闪退/报错时让用户把这个文件发回来即可远程诊断
+try { Start-Transcript -Path (Join-Path $env:TEMP "shufang-install.log") -Force | Out-Null } catch {}
+# 任何未捕获错误：显示人话 + 停住窗口，绝不闪退
+trap {
+  Write-Host ""
+  Write-Host "[X] 安装中途出错了: $($_.Exception.Message)" -ForegroundColor Red
+  Write-Host "    日志在 $env:TEMP\shufang-install.log，可以把它发给帮你装的人。" -ForegroundColor Yellow
+  try { Stop-Transcript | Out-Null } catch {}
+  Read-Host "按回车关闭"
+  exit 1
+}
 
-$PkgRoot = Split-Path -Parent $PSScriptRoot   # installer\ 的上一级 = 安装包根目录
+# 支持两种跑法：解压后双击 install.bat（$PSScriptRoot 有值，附带离线文件），
+# 或者终端一行 irm ... | iex（$PSScriptRoot 为空，纯在线安装）。
+$PkgRoot = if ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { $null }
 $RepoUrl  = "https://github.com/URaux/shufang.git"
 $Vault    = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "书房"
 $AppDir   = Join-Path $env:USERPROFILE ".shufang"
@@ -90,9 +103,16 @@ if (-not (Test-Path (Join-Path $AppRepo ".git"))) {
   $cloned = $true; Ok "已有安装，拉取了最新版"
 }
 if (-not $cloned) {
-  # 离线兜底：用安装包里自带的文件（以后联网了启动器会自动接管更新）
-  Copy-Item -Recurse $PkgRoot $AppRepo
-  Ok "网络不通，先用安装包内置版本（联网后会自动更新）"
+  if ($PkgRoot -and (Test-Path (Join-Path $PkgRoot "webapp"))) {
+    # 离线兜底：用安装包里自带的文件（以后联网了启动器会自动接管更新）
+    Copy-Item -Recurse $PkgRoot $AppRepo
+    Ok "网络不通，先用安装包内置版本（联网后会自动更新）"
+  } else {
+    Write-Host "连不上 GitHub，而且当前是在线安装模式没有本地文件可用。" -ForegroundColor Red
+    Write-Host "检查一下网络（或者网络代理），然后重跑这条安装命令。" -ForegroundColor Red
+    Read-Host "按回车关闭"
+    exit 1
+  }
 }
 
 $VaultSrc = Join-Path $AppRepo "vault-template"
@@ -159,4 +179,5 @@ Write-Host "  安装完成！" -ForegroundColor Green
 Write-Host "  双击桌面「启动书房」开始用。" -ForegroundColor Green
 Write-Host "  第一次 Obsidian 打开时选「信任此仓库」即可。" -ForegroundColor Green
 Write-Host "==============================================" -ForegroundColor Green
+try { Stop-Transcript | Out-Null } catch {}
 Read-Host "按回车关闭本窗口"
