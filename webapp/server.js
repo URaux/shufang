@@ -190,9 +190,21 @@ app.post("/api/chat", (req, res) => {
   });
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
-  const args = ["-p", message, "--output-format", "stream-json", "--verbose",
+  // The message rides in argv, not stdin: claude's stdin decoding on Windows
+  // follows the local codepage, which turns UTF-8 Chinese into mojibake
+  // (verified live), while argv arrives via the Unicode CreateProcess path
+  // intact. But argv + shell:true means cmd.exe re-parses the line, and its
+  // quoting is not injection-safe (CVE-2024-27980). Since the message is prose
+  // for an LLM, we neutralise every character cmd treats specially by swapping
+  // it for its fullwidth twin — visually identical to the model, inert to cmd.
+  // Newlines become spaces (a bare newline would terminate the cmd command).
+  const CMD_META = { '"': "＂", "%": "％", "&": "＆", "|": "｜", "<": "＜", ">": "＞", "^": "＾", "(": "（", ")": "）", "!": "！" };
+  const safeMessage = process.platform === "win32"
+    ? message.replace(/["%&|<>^()!]/g, c => CMD_META[c]).replace(/\r?\n/g, " ")
+    : message;
+  const args = ["-p", safeMessage, "--output-format", "stream-json", "--verbose",
     "--include-partial-messages", "--dangerously-skip-permissions"];
-  if (fs.existsSync(SESSION_FLAG)) args.splice(2, 0, "--continue");
+  if (fs.existsSync(SESSION_FLAG)) args.splice(1, 0, "--continue");
 
   const child = spawn(process.platform === "win32" ? "claude.cmd" : "claude", args, {
     cwd: VAULT,
