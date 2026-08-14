@@ -1,5 +1,5 @@
 #!/bin/bash
-# 书房 macOS 安装器 — 零环境友好版
+# 群星阅览室 macOS 安装器 — 零环境友好版
 #
 # 特点：不用 Homebrew、不用 Xcode 命令行工具、全程不要管理员密码。
 # 所有东西都装进你自己的用户目录（~/.shufang 和 ~/Applications）。
@@ -24,7 +24,7 @@ ok()   { printf '\033[32m   OK: %s\033[0m\n' "$1"; }
 die()  { printf '\n\033[31m[X] %s\033[0m\n检查一下网络（GitHub 要能访问），然后重跑安装命令。\n日志在 %s，可以发给帮你装的人。\n' "$1" "$LOG"; exit 1; }
 
 echo "=============================================="
-echo "  书房 · 本地啃书翻译器 安装程序 (macOS)"
+echo "  群星阅览室 · 本地啃书翻译器 安装程序 (macOS)"
 echo "  不动系统、不要密码，全装在你自己目录里"
 echo "=============================================="
 
@@ -63,7 +63,7 @@ fi
 ok "Pandoc 就绪"
 
 # ---------------------------------------------------------------- Obsidian（可选）
-# 装不上不能让整个安装失败——书房自带网页界面，没有 Obsidian 一样能用。
+# 装不上不能让整个安装失败——群星阅览室自带网页界面，没有 Obsidian 一样能用。
 HAS_OBSIDIAN=0
 if [ -d "/Applications/Obsidian.app" ] || [ -d "$HOME/Applications/Obsidian.app" ]; then
   HAS_OBSIDIAN=1
@@ -71,7 +71,7 @@ if [ -d "/Applications/Obsidian.app" ] || [ -d "$HOME/Applications/Obsidian.app"
 else
   echo ""
   printf '\033[36m>> 可选组件\033[0m\n'
-  echo "   书房自带网页界面，看书+对话已经够用。"
+  echo "   群星阅览室自带网页界面，看书+对话已经够用。"
   echo "   Obsidian 是给想把书库当笔记库深度整理的人用的（约 100MB，可跳过）。"
   printf '   要顺便装 Obsidian 吗 (y/N): '
   read -r WANT_OBS </dev/tty
@@ -122,7 +122,7 @@ while [[ ! "$KEY" =~ ^sk- ]]; do
 done
 
 # ---------------------------------------------------------------- 程序本体
-step "获取书房程序（之后每次启动自动检查更新）"
+step "获取群星阅览室程序（之后每次启动自动检查更新）"
 fetch_app() {
   local sha
   sha=$(curl -fsSL "https://api.github.com/repos/$OWNER/$REPO/commits/master" 2>/dev/null | grep -m1 '"sha"' | cut -d'"' -f4)
@@ -171,7 +171,7 @@ ok "配置写好了"
 
 # ---------------------------------------------------------------- 启动器
 step "创建桌面启动器"
-LAUNCHER="$HOME/Desktop/启动书房.command"
+LAUNCHER="$HOME/Desktop/启动群星阅览室.command"
 cat > "$LAUNCHER" <<'LAUNCH_EOF'
 #!/bin/bash
 APP_DIR="$HOME/.shufang"
@@ -235,12 +235,12 @@ cd "$APP_REPO/webapp" || exit 1
 exec node server.js
 LAUNCH_EOF
 chmod +x "$LAUNCHER"
-ok "桌面上有「启动书房.command」了"
+ok "桌面上有「启动群星阅览室.command」了"
 
 echo ""
 echo "=============================================="
 echo "  安装完成！"
-echo "  双击桌面「启动书房.command」开始用。"
+echo "  双击桌面「启动群星阅览室.command」开始用。"
 echo "  第一次系统若拦截，右键它选「打开」一次即可。"
 if [ "$HAS_OBSIDIAN" = "1" ]; then
   echo "  第一次 Obsidian 打开时选「信任此仓库」。"

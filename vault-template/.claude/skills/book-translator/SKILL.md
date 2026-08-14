@@ -3,7 +3,7 @@ name: book-translator
 description: 啃书全流程——书籍入库(转格式/切章/梳理概要)、逐章翻译(译名一致)、讨论与笔记沉淀。Use when the user provides a book file, asks to read/ingest a book, requests chapter translation (单章/范围/全部), or discusses book content.
 ---
 
-# 书房 · 啃书流程
+# 群星阅览室 · 啃书流程
 
 ## 目录约定
 

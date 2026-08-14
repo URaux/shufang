@@ -2,7 +2,7 @@
   "name": "shufang",
   "version": "0.2.0",
   "private": true,
-  "description": "书房 — 本地啃书翻译器的网页前端（聊天 + 阅读）",
+  "description": "群星阅览室 — 本地啃书翻译器的网页前端（聊天 + 阅读）",
   "type": "commonjs",
   "main": "server.js",
   "scripts": {

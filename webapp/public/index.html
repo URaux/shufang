@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>书房</title>
+<title>群星阅览室</title>
 <style>
   :root {
     --paper: #faf7f0; --card: #ffffff; --ink: #2b2820; --ink-soft: #57503f;
@@ -100,7 +100,7 @@
 <body class="tab-read">
   <header>
     <button id="menuBtn" title="书架">☰</button>
-    <h1>书房</h1>
+    <h1>群星阅览室</h1>
     <span class="crumb" id="crumb"></span>
     <span class="spacer"></span>
     <nav class="tabs">
@@ -114,7 +114,7 @@
     <section id="chat">
       <div id="msgs"></div>
       <div id="composer">
-        <textarea id="input" rows="2" placeholder="跟书房助手说话，比如「翻第 3 章」"></textarea>
+        <textarea id="input" rows="2" placeholder="跟群星阅览室助手说话，比如「翻第 3 章」"></textarea>
         <button id="sendBtn">发送</button>
       </div>
     </section>
@@ -250,7 +250,7 @@
         body: JSON.stringify({ message: text }),
       });
       if (resp.status === 429) { addMsg("status", "助手还在忙上一件事，稍等再发。"); return; }
-      if (!resp.ok || !resp.body) { addMsg("status", "连不上助手，检查「书房」窗口还开着没。"); return; }
+      if (!resp.ok || !resp.body) { addMsg("status", "连不上助手，检查「群星阅览室」窗口还开着没。"); return; }
 
       const rd = resp.body.getReader();
       const dec = new TextDecoder();
@@ -305,7 +305,7 @@
   $("tabChat").addEventListener("click", () => setTab("chat"));
   $("menuBtn").addEventListener("click", () => sidebar.classList.toggle("open"));
 
-  addMsg("bot", "你好，我是书房助手。把书的文件路径发给我（或直接把文件放进书库文件夹再告诉我），我来整理概要；想看哪章就说「翻第几章」。");
+  addMsg("bot", "你好，我是群星阅览室助手。把书的文件路径发给我（或直接把文件放进书库文件夹再告诉我），我来整理概要；想看哪章就说「翻第几章」。");
   loadShelf();
 })();
 </script>

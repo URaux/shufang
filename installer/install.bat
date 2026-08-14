@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title 书房安装器
+title 群星阅览室安装器
 
 rem 最常见的翻车：在压缩包预览里直接双击了 bat，此时 install.ps1 根本不在旁边
 if not exist "%~dp0install.ps1" (

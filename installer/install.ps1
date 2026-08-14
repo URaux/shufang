@@ -1,4 +1,4 @@
-﻿# 书房 一键安装器（零依赖版）
+﻿# 群星阅览室 一键安装器（零依赖版）
 # 不用 winget、不用 git、不要管理员权限。所有东西装进用户目录 ~\.shufang。
 # 既可编译成 exe 双击运行，也可 powershell -File 运行。
 
@@ -59,7 +59,7 @@ function Expand($archive, $dest) {
 }
 
 Write-Host "=============================================="
-Write-Host "  书房 · 本地啃书翻译器 安装程序"
+Write-Host "  群星阅览室 · 本地啃书翻译器 安装程序"
 Write-Host "  零依赖：不用管理员、不改系统、都装你自己目录里"
 Write-Host "=============================================="
 
@@ -109,8 +109,8 @@ if (-not (Test-Path (Join-Path $NodeDir "claude.cmd"))) {
 }
 Ok "Claude Code 就绪"
 
-# ---------------------------------------------------------------- 书房程序
-Step "获取书房程序"
+# ---------------------------------------------------------------- 群星阅览室程序
+Step "获取群星阅览室程序"
 Fetch "https://codeload.github.com/$Owner/$Repo/tar.gz/refs/heads/master" "$env:TEMP\sf-app.tgz"
 Expand "$env:TEMP\sf-app.tgz" "$env:TEMP\sf-app"
 $appInner = Get-ChildItem "$env:TEMP\sf-app" -Directory | Select-Object -First 1
@@ -140,7 +140,7 @@ $ObsidianInstalled = Test-Path (Join-Path $env:LOCALAPPDATA "Obsidian\Obsidian.e
 
 Write-Host ""
 Write-Host ">> 可选组件" -ForegroundColor Cyan
-Write-Host "   书房自带网页界面，看书+对话已经够用。"
+Write-Host "   群星阅览室自带网页界面，看书+对话已经够用。"
 Write-Host "   Obsidian 是给想把书库当笔记库深度整理的人用的（约 100MB，可跳过）。"
 $wantObs = Read-Host "   要顺便装 Obsidian 吗 (y/N)"
 if ($wantObs -match "^[Yy]") {
@@ -225,7 +225,7 @@ Ok "配置写好了"
 Step "安装自动更新器"
 $UpdaterPath = Join-Path $AppDir "update.ps1"
 $updaterText = @"
-# 书房自动更新器 —— 每次启动时比对 GitHub 上 master 的 commit sha，变了就整份换掉 app\。
+# 群星阅览室自动更新器 —— 每次启动时比对 GitHub 上 master 的 commit sha，变了就整份换掉 app\。
 # 由安装器生成，不随仓库更新。失败一律静默放行，绝不能挡住用户启动。
 `$ErrorActionPreference = "Stop"
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
@@ -280,7 +280,7 @@ Ok "自动更新器就绪"
 # ---------------------------------------------------------------- 启动器
 Step "创建桌面启动器"
 $Desktop = [Environment]::GetFolderPath("Desktop")
-$launcher = Join-Path $Desktop "启动书房.bat"
+$launcher = Join-Path $Desktop "启动群星阅览室.bat"
 $obsLine = if ($ObsidianInstalled) {
   'start "" "obsidian://open?path=' + [uri]::EscapeDataString($Vault) + '"'
 } else {
@@ -289,7 +289,7 @@ $obsLine = if ($ObsidianInstalled) {
 $launcherText = @"
 @echo off
 chcp 65001 >nul
-title 书房
+title 群星阅览室
 set "PATH=$NodeDir;$BinDir;%PATH%"
 echo 检查更新中...
 powershell -NoProfile -ExecutionPolicy Bypass -File "$UpdaterPath"
@@ -304,12 +304,12 @@ node server.js
 pause
 "@
 [System.IO.File]::WriteAllText($launcher, $launcherText, (New-Object System.Text.UTF8Encoding($false)))
-Ok "桌面上有「启动书房」了"
+Ok "桌面上有「启动群星阅览室」了"
 
 Write-Host ""
 Write-Host "==============================================" -ForegroundColor Green
 Write-Host "  安装完成！" -ForegroundColor Green
-Write-Host "  双击桌面「启动书房」开始用。" -ForegroundColor Green
+Write-Host "  双击桌面「启动群星阅览室」开始用。" -ForegroundColor Green
 Write-Host "==============================================" -ForegroundColor Green
 try { Stop-Transcript | Out-Null } catch {}
 Read-Host "按回车关闭本窗口"

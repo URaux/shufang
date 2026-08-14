@@ -1,4 +1,4 @@
-# 书房 · Book Translation Vault
+# 群星阅览室 · Book Translation Vault
 
 这是一个「啃书」工作区。你的职责：接收用户丢进来的书，整理概要和章节摘要，在用户需要时逐章翻译成中文，并陪用户讨论书的内容。
 

@@ -1,4 +1,4 @@
-// 书房 server — chat (wraps Claude Code headless) + vault markdown reader.
+// 群星阅览室 server — chat (wraps Claude Code headless) + vault markdown reader.
 //
 // Config lives in ~/.shufang/config.json:
 //   {
@@ -63,8 +63,8 @@ const LIBRARY = path.join(VAULT, "Library");
 const SESSION_FLAG = path.join(VAULT, ".shufang-session-started");
 
 if (!fs.existsSync(VAULT)) {
-  console.error(`[书房] 找不到书库文件夹: ${VAULT}`);
-  console.error(`[书房] 请检查 ${CONFIG_PATH} 里的 vaultPath，或重跑安装器。`);
+  console.error(`[群星阅览室] 找不到书库文件夹: ${VAULT}`);
+  console.error(`[群星阅览室] 请检查 ${CONFIG_PATH} 里的 vaultPath，或重跑安装器。`);
   process.exit(1);
 }
 fs.mkdirSync(LIBRARY, { recursive: true });
@@ -273,7 +273,7 @@ app.post("/api/chat", (req, res) => {
       send("error", {
         text: noConvo
           ? "会话记录对不上了，请把刚才那句再发一次。"
-          : "助手没回应。可能是网络或额度问题，稍等重试；一直不行就重启一下「书房」。",
+          : "助手没回应。可能是网络或额度问题，稍等重试；一直不行就重启一下「群星阅览室」。",
       });
     }
     send("done", { ok: code === 0 });
@@ -319,7 +319,7 @@ app.listen(cfg.port, "0.0.0.0", () => {
   const lanUrl = lan ? `http://${lan}:${cfg.port}/?t=${cfg.token}` : null;
   console.log("");
   console.log("  ┌──────────────────────────────────────────────┐");
-  console.log("  │  书房已启动 📚                                │");
+  console.log("  │  群星阅览室已启动 📚                          │");
   console.log("  └──────────────────────────────────────────────┘");
   console.log("");
   console.log(`  电脑上用:  http://localhost:${cfg.port}/`);
