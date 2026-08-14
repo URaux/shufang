@@ -21,14 +21,9 @@ trap {
 }
 
 $Owner  = "URaux"; $Repo = "shufang"
-$AppDir  = Join-Path $env:USERPROFILE ".shufang"
-$AppRepo = Join-Path $AppDir "app"
-$NodeDir = Join-Path $AppDir "node"
-$BinDir  = Join-Path $AppDir "bin"
-$Vault   = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "书房"
-$ConfigPath = Join-Path $AppDir "config.json"
-
-New-Item -ItemType Directory -Force $AppDir, $BinDir | Out-Null
+# 配置文件固定在 ~\.shufang（几 KB，程序按这个位置找配置）；大东西装哪由用户选
+$ConfigDir  = Join-Path $env:USERPROFILE ".shufang"
+$ConfigPath = Join-Path $ConfigDir "config.json"
 
 function Step($m) { Write-Host ""; Write-Host ">> $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "   OK: $m" -ForegroundColor Green }
@@ -62,6 +57,27 @@ Write-Host "=============================================="
 Write-Host "  群星阅览室 · 本地啃书翻译器 安装程序"
 Write-Host "  零依赖：不用管理员、不改系统、都装你自己目录里"
 Write-Host "=============================================="
+
+# ---------------------------------------------------------------- 位置选择
+$DefaultApp = Join-Path $env:USERPROFILE ".shufang"
+Write-Host ""
+Write-Host "程序装到哪？（程序 + 运行环境，约 400MB）"
+Write-Host "直接回车用默认: $DefaultApp"
+Write-Host "C 盘不够就输入别的地方，比如 D:\群星阅览室"
+$AppDir = (Read-Host "安装位置").Trim().Trim('"')
+if (-not $AppDir) { $AppDir = $DefaultApp }
+$AppRepo = Join-Path $AppDir "app"
+$NodeDir = Join-Path $AppDir "node"
+$BinDir  = Join-Path $AppDir "bin"
+
+$DefaultVault = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "书房"
+Write-Host ""
+Write-Host "书库放到哪？（你的书、译文、笔记，会越来越大）"
+Write-Host "直接回车用默认: $DefaultVault"
+$Vault = (Read-Host "书库位置").Trim().Trim('"')
+if (-not $Vault) { $Vault = $DefaultVault }
+
+New-Item -ItemType Directory -Force $AppDir, $BinDir, $ConfigDir | Out-Null
 
 # ---------------------------------------------------------------- Node
 Step "安装 Node（网页程序的运行环境）"
