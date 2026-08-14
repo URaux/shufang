@@ -62,21 +62,44 @@ if [ ! -x "$BIN_DIR/pandoc" ]; then
 fi
 ok "Pandoc 就绪"
 
-# ---------------------------------------------------------------- Obsidian
-step "安装 Obsidian（看书和笔记的界面）"
-if [ ! -d "/Applications/Obsidian.app" ] && [ ! -d "$HOME/Applications/Obsidian.app" ]; then
-  DMG_URL=$(curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest | grep -o 'https://[^"]*universal.dmg' | head -1)
-  [ -n "$DMG_URL" ] || die "取不到 Obsidian 下载地址"
-  curl -fL --progress-bar "$DMG_URL" -o /tmp/shufang-obsidian.dmg || die "Obsidian 下载失败"
-  MNT=$(hdiutil attach -nobrowse -readonly /tmp/shufang-obsidian.dmg | grep -o '/Volumes/.*' | head -1)
-  [ -n "$MNT" ] || die "Obsidian 安装包打不开"
-  cp -R "$MNT/Obsidian.app" "$HOME/Applications/" || { hdiutil detach "$MNT" >/dev/null 2>&1; die "Obsidian 复制失败"; }
-  hdiutil detach "$MNT" >/dev/null 2>&1
-  rm -f /tmp/shufang-obsidian.dmg
-  # 先启动一次，让系统记住 obsidian:// 链接归它管
-  open -a "$HOME/Applications/Obsidian.app" --hide 2>/dev/null || true
+# ---------------------------------------------------------------- Obsidian（可选）
+# 装不上不能让整个安装失败——书房自带网页界面，没有 Obsidian 一样能用。
+HAS_OBSIDIAN=0
+if [ -d "/Applications/Obsidian.app" ] || [ -d "$HOME/Applications/Obsidian.app" ]; then
+  HAS_OBSIDIAN=1
+  ok "已装过 Obsidian"
+else
+  echo ""
+  printf '\033[36m>> 可选组件\033[0m\n'
+  echo "   书房自带网页界面，看书+对话已经够用。"
+  echo "   Obsidian 是给想把书库当笔记库深度整理的人用的（约 100MB，可跳过）。"
+  printf '   要顺便装 Obsidian 吗 (y/N): '
+  read -r WANT_OBS </dev/tty
+  if [[ "$WANT_OBS" =~ ^[Yy] ]]; then
+    step "安装 Obsidian"
+    install_obsidian() {
+      local dmg_url mnt
+      dmg_url=$(curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest | grep -o 'https://[^"]*universal.dmg' | head -1)
+      [ -n "$dmg_url" ] || return 1
+      curl -fL --progress-bar "$dmg_url" -o /tmp/shufang-obsidian.dmg || return 1
+      mnt=$(hdiutil attach -nobrowse -readonly /tmp/shufang-obsidian.dmg | grep -o '/Volumes/.*' | head -1)
+      [ -n "$mnt" ] || return 1
+      cp -R "$mnt/Obsidian.app" "$HOME/Applications/" || { hdiutil detach "$mnt" >/dev/null 2>&1; return 1; }
+      hdiutil detach "$mnt" >/dev/null 2>&1
+      rm -f /tmp/shufang-obsidian.dmg
+      # 先启动一次，让系统记住 obsidian:// 链接归它管
+      open -a "$HOME/Applications/Obsidian.app" --hide 2>/dev/null || true
+      return 0
+    }
+    if install_obsidian; then
+      HAS_OBSIDIAN=1
+      ok "Obsidian 装好了"
+    else
+      printf '\033[33m   Obsidian 没装成，跳过（不影响用网页界面）。\033[0m\n'
+      rm -f /tmp/shufang-obsidian.dmg
+    fi
+  fi
 fi
-ok "Obsidian 就绪"
 
 # ---------------------------------------------------------------- Claude Code
 step "安装 Claude Code（翻译助手的大脑）"
@@ -88,10 +111,13 @@ ok "Claude Code 就绪"
 # ---------------------------------------------------------------- API key
 step "配置 DeepSeek"
 echo "   需要一个 DeepSeek API key（在 platform.deepseek.com 注册后创建，sk- 开头）。"
+echo "   粘贴时屏幕上不会显示，这是正常的——粘完直接回车。"
 KEY=""
 while [[ ! "$KEY" =~ ^sk- ]]; do
   printf '   粘贴你的 DeepSeek API key: '
-  read -r KEY </dev/tty
+  # -s 不回显：整个安装过程在 tee 抄录日志，key 绝不能落进 /tmp/shufang-install.log
+  read -rs KEY </dev/tty
+  echo ""
   [[ "$KEY" =~ ^sk- ]] || echo "   看起来不太对，应该是 sk- 开头的一串。再试一次。"
 done
 
@@ -122,7 +148,8 @@ fi
 ( cd "$APP_REPO/webapp" && "$NODE_DIR/bin/npm" install --omit=dev --silent ) || die "网页程序依赖安装失败"
 ok "网页程序就绪"
 
-TOKEN=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 12)
+# /dev/urandom 在 macOS 上就是加密随机源，取 24 位十六进制
+TOKEN=$(LC_ALL=C tr -dc 'a-f0-9' < /dev/urandom | head -c 24)
 cat > "$CONFIG" <<EOF
 {
   "vaultPath": "$VAULT",
@@ -160,15 +187,26 @@ if [ -n "$LATEST" ] && [ "$LATEST" != "$CURRENT" ]; then
   echo "发现新版本，更新中..."
   if curl -fsSL --max-time 60 "https://codeload.github.com/URaux/shufang/tar.gz/master" -o /tmp/shufang-up.tgz; then
     rm -rf /tmp/shufang-up && mkdir -p /tmp/shufang-up
-    if tar -xzf /tmp/shufang-up.tgz -C /tmp/shufang-up 2>/dev/null; then
-      rm -rf "$APP_REPO"
-      mv /tmp/shufang-up/shufang-master "$APP_REPO"
-      printf '%s' "$LATEST" > "$APP_DIR/.app-sha"
-      ( cd "$APP_REPO/webapp" && npm install --omit=dev --silent >/dev/null 2>&1 )
-      # 同步助手的说明书到书库（你自己的书和笔记不会被动）
-      cp -R "$APP_REPO/vault-template/.claude" "$VAULT/" 2>/dev/null
-      cp "$APP_REPO/vault-template/CLAUDE.md" "$VAULT/" 2>/dev/null
-      echo "已更新到最新版。"
+    if tar -xzf /tmp/shufang-up.tgz -C /tmp/shufang-up 2>/dev/null && [ -d /tmp/shufang-up/shufang-master ]; then
+      # 先把旧版挪到旁边再换新的，中途失败还能滚回来
+      rm -rf "$APP_DIR/app.old"
+      mv "$APP_REPO" "$APP_DIR/app.old" 2>/dev/null
+      if mv /tmp/shufang-up/shufang-master "$APP_REPO"; then
+        # node_modules 不在仓库里，从旧版搬过来，省一次 npm install
+        if [ -d "$APP_DIR/app.old/webapp/node_modules" ] && [ ! -d "$APP_REPO/webapp/node_modules" ]; then
+          mv "$APP_DIR/app.old/webapp/node_modules" "$APP_REPO/webapp/node_modules"
+        fi
+        printf '%s' "$LATEST" > "$APP_DIR/.app-sha"
+        ( cd "$APP_REPO/webapp" && npm install --omit=dev --silent >/dev/null 2>&1 )
+        # 同步助手的说明书到书库（你自己的书和笔记不会被动）
+        cp -R "$APP_REPO/vault-template/.claude" "$VAULT/" 2>/dev/null
+        cp "$APP_REPO/vault-template/CLAUDE.md" "$VAULT/" 2>/dev/null
+        rm -rf "$APP_DIR/app.old"
+        echo "已更新到最新版。"
+      else
+        mv "$APP_DIR/app.old" "$APP_REPO" 2>/dev/null
+        echo "更新失败，继续用当前版本。"
+      fi
     fi
     rm -rf /tmp/shufang-up.tgz /tmp/shufang-up
   fi
@@ -188,7 +226,10 @@ urlencode() {
   done
   printf '%s' "$out"
 }
-open "obsidian://open?path=$(urlencode "$VAULT")" 2>/dev/null || open -a Obsidian 2>/dev/null || true
+# 装了 Obsidian 才唤起；没装就只开网页界面
+if [ -d "/Applications/Obsidian.app" ] || [ -d "$HOME/Applications/Obsidian.app" ]; then
+  open "obsidian://open?path=$(urlencode "$VAULT")" 2>/dev/null || open -a Obsidian 2>/dev/null || true
+fi
 ( sleep 2; open "http://localhost:7787/" ) &
 cd "$APP_REPO/webapp" || exit 1
 exec node server.js
@@ -201,5 +242,7 @@ echo "=============================================="
 echo "  安装完成！"
 echo "  双击桌面「启动书房.command」开始用。"
 echo "  第一次系统若拦截，右键它选「打开」一次即可。"
-echo "  第一次 Obsidian 打开时选「信任此仓库」。"
+if [ "$HAS_OBSIDIAN" = "1" ]; then
+  echo "  第一次 Obsidian 打开时选「信任此仓库」。"
+fi
 echo "=============================================="
