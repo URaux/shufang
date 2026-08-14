@@ -14,7 +14,9 @@
 $f="$env:TEMP\shufang-install.ps1";iwr https://raw.githubusercontent.com/URaux/shufang/master/installer/install.ps1 -OutFile $f -UseBasicParsing;powershell -NoProfile -ExecutionPolicy Bypass -File $f
 ```
 
-按提示走：中途会问要不要 PDF 支持（要读 PDF 书就输 y），然后粘贴 API key。装完桌面上出现「启动书房」。
+不用管理员权限、不用装 winget，Node 和 Pandoc 都下载到你自己的 `~\.shufang` 目录里，不改系统。
+
+按提示走：中途会问要不要顺便装 Obsidian（不装也能用）、要不要 PDF 支持（要读 PDF 书就输 y），然后粘贴 API key（粘的时候屏幕上不显示，这是正常的）。装完桌面上出现「启动书房」。
 
 > ⚠️ 不要在 GitHub 网页上单独下载 install.bat——它一个人干不了活。要么用上面这行命令，要么下载**完整压缩包**解压后再双击 installer 里的 install.bat（离线安装用）。
 
@@ -26,11 +28,11 @@ $f="$env:TEMP\shufang-install.ps1";iwr https://raw.githubusercontent.com/URaux/s
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/URaux/shufang/master/installer/install-mac.sh)"
 ```
 
-中途会要你输一次开机密码（装 Homebrew 用，输入时屏幕不显示是正常的）。装完桌面上出现「启动书房.command」，第一次运行若被系统拦，右键它选「打开」一次即可。
+不用输开机密码、不用装 Homebrew，所有东西都装在你自己的用户目录里。装完桌面上出现「启动书房.command」，第一次运行若被系统拦，右键它选「打开」一次即可。
 
 ## 日常使用
 
-1. 双击「启动书房」→ 会弹出一个黑色小窗口（**别关它，最小化就行**）+ 浏览器页面 + Obsidian。
+1. 双击「启动书房」→ 会弹出一个黑色小窗口（**别关它，最小化就行**）+ 浏览器页面（装了 Obsidian 的话它也会一起打开）。窗口里会先花几秒检查更新，有新版就自动装上。
 2. 在网页右边的聊天框里告诉助手你要读的书，比如：
    - 把书的文件（epub / txt / docx / pdf）放到 `文档\书房` 文件夹里，然后说「我放了一本书进来，帮我整理一下」
    - 或者直接说文件在哪：「桌面上有本 The Stranger.epub，我想读」
