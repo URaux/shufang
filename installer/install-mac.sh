@@ -101,12 +101,12 @@ else
   fi
 fi
 
-# ---------------------------------------------------------------- Claude Code
-step "安装 Claude Code（翻译助手的大脑）"
-if [ ! -x "$NODE_DIR/bin/claude" ]; then
-  "$NODE_DIR/bin/npm" install -g @anthropic-ai/claude-code || die "Claude Code 安装失败"
+# ---------------------------------------------------------------- dsh（DeepSeek Harness）
+step "安装 dsh（翻译助手的大脑，DeepSeek 官方）"
+if [ ! -x "$NODE_DIR/bin/dsh" ]; then
+  "$NODE_DIR/bin/npm" install -g @deepseek-ai/dsh || die "dsh 安装失败"
 fi
-ok "Claude Code 就绪"
+ok "dsh 就绪"
 
 # ---------------------------------------------------------------- API key
 step "配置 DeepSeek"
@@ -155,15 +155,9 @@ cat > "$CONFIG" <<EOF
   "vaultPath": "$VAULT",
   "port": 7787,
   "token": "$TOKEN",
+  "brain": "dsh",
   "env": {
-    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
-    "ANTHROPIC_AUTH_TOKEN": "$KEY",
-    "ANTHROPIC_MODEL": "deepseek-v4-pro",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-v4-pro",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-v4-flash",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-flash",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-v4-flash",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+    "DEEPSEEK_API_KEY": "$KEY"
   }
 }
 EOF

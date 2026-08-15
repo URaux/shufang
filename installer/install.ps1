@@ -117,13 +117,13 @@ if (-not (Test-Path (Join-Path $BinDir "pandoc.exe"))) {
 }
 Ok "Pandoc 就绪"
 
-# ---------------------------------------------------------------- Claude Code
-Step "安装 Claude Code（翻译助手的大脑）"
-if (-not (Test-Path (Join-Path $NodeDir "claude.cmd"))) {
-  & (Join-Path $NodeDir "npm.cmd") install -g @anthropic-ai/claude-code --silent
-  if ($LASTEXITCODE -ne 0) { throw "Claude Code 安装失败" }
+# ---------------------------------------------------------------- dsh（DeepSeek Harness）
+Step "安装 dsh（翻译助手的大脑，DeepSeek 官方）"
+if (-not (Test-Path (Join-Path $NodeDir "dsh.cmd"))) {
+  & (Join-Path $NodeDir "npm.cmd") install -g "@deepseek-ai/dsh" --silent
+  if ($LASTEXITCODE -ne 0) { throw "dsh 安装失败" }
 }
-Ok "Claude Code 就绪"
+Ok "dsh 就绪"
 
 # ---------------------------------------------------------------- 群星阅览室程序
 Step "获取群星阅览室程序"
@@ -216,15 +216,9 @@ $config = [ordered]@{
   vaultPath = $Vault
   port      = 7787
   token     = $token
+  brain     = "dsh"
   env       = [ordered]@{
-    ANTHROPIC_BASE_URL              = "https://api.deepseek.com/anthropic"
-    ANTHROPIC_AUTH_TOKEN            = $key
-    ANTHROPIC_MODEL                 = "deepseek-v4-pro"
-    ANTHROPIC_DEFAULT_OPUS_MODEL    = "deepseek-v4-pro"
-    ANTHROPIC_DEFAULT_SONNET_MODEL  = "deepseek-v4-flash"
-    ANTHROPIC_DEFAULT_HAIKU_MODEL   = "deepseek-v4-flash"
-    CLAUDE_CODE_SUBAGENT_MODEL      = "deepseek-v4-flash"
-    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
+    DEEPSEEK_API_KEY = $key
   }
 }
 # 必须写成不带 BOM 的 UTF-8：server.js 用 JSON.parse 读它，BOM 会让解析直接抛异常，

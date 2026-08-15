@@ -190,6 +190,28 @@ app.get("/api/file", (req, res) => {
 // concurrent `claude --continue` runs would race on it.
 let chatBusy = false;
 
+// dsh 模式的轻量会话记忆：一行一条 {t:"user"|"bot", x:"..."}，存 vault 根。
+// claude 模式用自己的 --continue，不碰这个文件。
+const CHAT_LOG = path.join(VAULT, ".shufang-chat.jsonl");
+
+function appendChat(role, text) {
+  try {
+    fs.appendFileSync(CHAT_LOG, JSON.stringify({ t: role, x: String(text).slice(0, 4000) }) + "\n");
+  } catch { }
+}
+
+function readChatHistory(turns) {
+  try {
+    const lines = fs.readFileSync(CHAT_LOG, "utf8").trim().split("\n");
+    return lines.slice(-turns * 2).map(l => {
+      try {
+        const { t, x } = JSON.parse(l);
+        return (t === "user" ? "用户：" : "助手：") + x;
+      } catch { return ""; }
+    }).filter(Boolean).join("\n");
+  } catch { return ""; }
+}
+
 const TOOL_LABELS = {
   Read: "读文件", Write: "写文件", Edit: "改文件", Bash: "处理文件",
   Glob: "找文件", Grep: "搜内容", WebSearch: "联网搜索", WebFetch: "查网页",
@@ -208,6 +230,9 @@ app.post("/api/chat", (req, res) => {
     "Connection": "keep-alive",
     "X-Accel-Buffering": "no",
   });
+  // 立刻把响应头推出去：dsh 模式在完成前没有任何 body 写入，
+  // 不冲的话头会一直攒在缓冲里，客户端等 5 分钟就 headers timeout。
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
   // The message rides in argv, not stdin: claude's stdin decoding on Windows
@@ -219,25 +244,56 @@ app.post("/api/chat", (req, res) => {
   // it for its fullwidth twin — visually identical to the model, inert to cmd.
   // Newlines become spaces (a bare newline would terminate the cmd command).
   const CMD_META = { '"': "＂", "%": "％", "&": "＆", "|": "｜", "<": "＜", ">": "＞", "^": "＾", "(": "（", ")": "）", "!": "！" };
-  const safeMessage = process.platform === "win32"
-    ? message.replace(/["%&|<>^()!]/g, c => CMD_META[c]).replace(/\r?\n/g, " ")
-    : message;
-  const args = ["-p", safeMessage, "--output-format", "stream-json", "--verbose",
-    "--include-partial-messages", "--dangerously-skip-permissions"];
-  if (fs.existsSync(SESSION_FLAG)) args.splice(1, 0, "--continue");
+  const sanitize = (s) => process.platform === "win32"
+    ? s.replace(/["%&|<>^()!]/g, c => CMD_META[c]).replace(/\r?\n/g, " ")
+    : s;
 
-  const child = spawn(process.platform === "win32" ? "claude.cmd" : "claude", args, {
-    cwd: VAULT,
-    env: { ...process.env, ...cfg.env },
-    shell: process.platform === "win32",
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],   // no stdin: skips claude's 3s stdin wait
-  });
+  // 大脑可切换：claude（Claude Code CLI，默认）或 dsh（DeepSeek Harness）。
+  // dsh 的 headless 是单发无续接，会话记忆靠把最近几轮对话拼进任务文本
+  //（真实状态本来就在 vault 文件里，这层只是让"刚才说的那本"能接得上）。
+  const brain = cfg.brain === "dsh" ? "dsh" : "claude";
+  let child;
+  if (brain === "dsh") {
+    const history = readChatHistory(6);
+    const task = history
+      ? `【此前对话，供衔接语境】\n${history}\n【本轮用户消息】\n${message}`
+      : message;
+    // DeepSeek key：dsh 读 DEEPSEEK_API_KEY；沿用配置里已有的 sk- key（同一把）
+    const dskey = cfg.env.DEEPSEEK_API_KEY || cfg.env.ANTHROPIC_AUTH_TOKEN || "";
+    const dshArgs = ["--profile", "headless"];
+    if (fs.existsSync(path.join(__dirname, "dsh-model.yml"))) {
+      dshArgs.push("--patch", path.join(__dirname, "dsh-model.yml"));
+    }
+    dshArgs.push(sanitize(task));
+    child = spawn(process.platform === "win32" ? "dsh.cmd" : "dsh", dshArgs, {
+      cwd: VAULT,
+      env: {
+        ...process.env,
+        DEEPSEEK_API_KEY: dskey,
+        DSH_PERMISSION_MODE: "danger-full-access",   // 等价 --dangerously-skip-permissions
+        DSH_TELEMETRY_MODE: "DISABLED",
+      },
+      shell: process.platform === "win32",
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } else {
+    const args = ["-p", sanitize(message), "--output-format", "stream-json", "--verbose",
+      "--include-partial-messages", "--dangerously-skip-permissions"];
+    if (fs.existsSync(SESSION_FLAG)) args.splice(1, 0, "--continue");
+    child = spawn(process.platform === "win32" ? "claude.cmd" : "claude", args, {
+      cwd: VAULT,
+      env: { ...process.env, ...cfg.env },
+      shell: process.platform === "win32",
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],   // no stdin: skips claude's 3s stdin wait
+    });
+  }
 
   child.on("error", err => {
     console.error("[chat] spawn failed:", err.message);
     chatBusy = false;
-    send("error", { text: "启动助手失败（找不到 claude 命令）。重跑一次安装器应该能修好。" });
+    send("error", { text: `启动助手失败（找不到 ${brain} 命令）。重跑一次安装器应该能修好。` });
     send("done", { ok: false });
     res.end();
   });
@@ -245,8 +301,21 @@ app.post("/api/chat", (req, res) => {
   let sawDelta = false;       // partial deltas arrived → skip duplicate full messages
   let stderrTail = "";
   let buffer = "";
+  let dshOut = "";            // dsh 模式：stdout 是纯文本最终答案，攒起来一次发
+
+  // dsh 干长活（翻一整章十几分钟）时全程无输出——每 15 秒发一个心跳
+  // status，既防代理/客户端超时，也让用户知道它还活着。
+  let heartbeat = null;
+  if (brain === "dsh") {
+    let beats = 0;
+    heartbeat = setInterval(() => {
+      beats++;
+      send("status", { text: beats < 3 ? "处理中" : `还在干活（已 ${Math.round(beats * 15 / 60)} 分钟，翻整章会比较久）`, tool: "dsh" });
+    }, 15000);
+  }
 
   child.stdout.on("data", chunk => {
+    if (brain === "dsh") { dshOut += chunk.toString("utf8"); return; }
     buffer += chunk.toString("utf8");
     let nl;
     while ((nl = buffer.indexOf("\n")) >= 0) {
@@ -282,11 +351,21 @@ app.post("/api/chat", (req, res) => {
 
   child.on("close", code => {
     chatBusy = false;
-    if (code !== 0) console.error(`[chat] claude exited ${code}. stderr tail:\n${stderrTail}`);
+    if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
+    if (code !== 0) console.error(`[chat] ${brain} exited ${code}. stderr tail:\n${stderrTail}`);
     if (code === 0) {
-      try { fs.writeFileSync(SESSION_FLAG, String(Date.now())); } catch { }
+      if (brain === "dsh") {
+        const reply = dshOut.trim();
+        send("delta", { text: reply || "（助手没有输出内容）" });
+        appendChat("user", message);
+        if (reply) appendChat("bot", reply);
+      } else {
+        try { fs.writeFileSync(SESSION_FLAG, String(Date.now())); } catch { }
+      }
       // 大脑可能改了译文/笔记——共享书跟着同步一轮（静默）
       syncAllShared({ quiet: true });
+    } else if (brain === "dsh") {
+      send("error", { text: "助手没回应。可能是网络或额度问题，稍等重试；一直不行就重启一下「群星阅览室」。" });
     } else {
       // First-ever message with --continue and no prior session is the one
       // recoverable failure worth auto-retrying without the flag.
@@ -307,6 +386,7 @@ app.post("/api/chat", (req, res) => {
   // writableEnded=false is the real client-disconnect signal.
   res.on("close", () => {
     if (!res.writableEnded) {
+      if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
       try { child.kill(); } catch { }
       chatBusy = false;
     }

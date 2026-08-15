@@ -79,7 +79,7 @@ $BinDir  = Join-Path $AppDir "bin"
 $AppRepo = Join-Path $AppDir "app"
 
 # ---------------------------------------------------------------- 落料
-Step "安放运行环境（Node + Pandoc + Claude Code，已内置）"
+Step "安放运行环境（Node + Pandoc + dsh，已内置）"
 foreach ($piece in @("node", "bin")) {
   $dest = Join-Path $AppDir $piece
   if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
@@ -127,15 +127,9 @@ $config = [ordered]@{
   vaultPath = $Vault
   port      = 7787
   token     = $token
+  brain     = "dsh"
   env       = [ordered]@{
-    ANTHROPIC_BASE_URL              = "https://api.deepseek.com/anthropic"
-    ANTHROPIC_AUTH_TOKEN            = $key
-    ANTHROPIC_MODEL                 = "deepseek-v4-pro"
-    ANTHROPIC_DEFAULT_OPUS_MODEL    = "deepseek-v4-pro"
-    ANTHROPIC_DEFAULT_SONNET_MODEL  = "deepseek-v4-flash"
-    ANTHROPIC_DEFAULT_HAIKU_MODEL   = "deepseek-v4-flash"
-    CLAUDE_CODE_SUBAGENT_MODEL      = "deepseek-v4-flash"
-    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
+    DEEPSEEK_API_KEY = $key
   }
 }
 # 无 BOM UTF-8：server.js 的 JSON.parse 见到 BOM 会当首次运行，key 就"丢"了

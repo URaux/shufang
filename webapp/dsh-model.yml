@@ -1,0 +1,6 @@
+# dsh 大脑的模型覆盖：主模型对齐 claude 路径用的 deepseek-v4-pro
+# （dsh 默认 profile 是 v4-flash；翻译质量要 pro）
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-pro
