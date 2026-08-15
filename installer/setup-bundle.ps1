@@ -155,20 +155,20 @@ try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::
 `$AppRepo = "$AppRepo"
 `$ShaFile = Join-Path `$AppDir ".app-sha"
 try {
-  `$latest = (curl.exe -fsSL --max-time 10 "https://api.github.com/repos/$Owner/$Repo/commits/master" 2>`$null | ConvertFrom-Json).sha
+  `$latest = ((curl.exe -fsSL --max-time 10 -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$Owner/$Repo/commits/master") -join "").Trim()
+  if (`$latest -notmatch '^[0-9a-f]{40}$') { return }
   if (-not `$latest) { return }
   `$current = ""
   if (Test-Path `$ShaFile) { `$current = (Get-Content `$ShaFile -Raw).Trim() }
   if (`$latest -eq `$current) { Write-Host "已是最新版" -ForegroundColor DarkGray; return }
   Write-Host "发现新版本，更新中..." -ForegroundColor Cyan
-  `$tgz = Join-Path `$env:TEMP "sf-up.tgz"
+  `$zip = Join-Path `$env:TEMP "sf-up.zip"
   `$tmp = Join-Path `$env:TEMP "sf-up"
-  curl.exe -fL --max-time 120 -o "`$tgz" "https://codeload.github.com/$Owner/$Repo/tar.gz/refs/heads/master" 2>`$null
+  curl.exe -fsSL --max-time 120 -o "`$zip" "https://codeload.github.com/$Owner/$Repo/zip/refs/heads/master"
   if (`$LASTEXITCODE -ne 0) { return }
   if (Test-Path `$tmp) { Remove-Item -Recurse -Force `$tmp }
-  New-Item -ItemType Directory -Force `$tmp | Out-Null
-  tar.exe -xf "`$tgz" -C "`$tmp"
-  if (`$LASTEXITCODE -ne 0) { return }
+  # 用 zip + Expand-Archive：仓库有中文文件名，tar.exe 解 tar.gz 会炸
+  Expand-Archive -Path `$zip -DestinationPath `$tmp -Force
   `$inner = Get-ChildItem `$tmp -Directory | Select-Object -First 1
   if (-not `$inner) { return }
   `$backup = Join-Path `$AppDir "app.old"
@@ -187,7 +187,7 @@ try {
     if (Test-Path `$backup) { Move-Item `$backup `$AppRepo }
     Write-Host "更新失败，继续用当前版本" -ForegroundColor Yellow
   }
-  Remove-Item -Recurse -Force `$tgz, `$tmp -ErrorAction SilentlyContinue
+  Remove-Item -Recurse -Force `$zip, `$tmp -ErrorAction SilentlyContinue
 } catch {
   Write-Host "检查更新时出了点问题，跳过，直接启动。" -ForegroundColor DarkGray
 }
