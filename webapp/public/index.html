@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>群星阅览室</title>
+<style>
+  /* 全站一套米纸色配色；组件只认变量。 */
+  :root {
+    --paper: #faf7f0; --card: #ffffff; --ink: #2b2820; --ink-soft: #57503f;
+    --ink-mute: #8a8170; --line: #e5dfd0; --accent: #8c6a2d; --accent-soft: #c89a4a;
+    --chat-bg: #f3efe5; --user-bubble: #e9e0c8; --bot-bubble: #ffffff;
+    --bubble-shadow: 0 1px 2px rgba(90,70,30,.08);
+  }
+  /* 全站一套配色。切视图只换布局（三栏 ↔ 居中单列），不换颜色——
+     换主题看着像跳到了另一个软件里。 */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Noto Serif SC", "Source Han Serif SC", Georgia, serif;
+    background: var(--paper); color: var(--ink); display: flex; flex-direction: column;
+    transition: background .22s ease, color .22s ease;
+  }
+  button { font-family: inherit; cursor: pointer; border: 0; background: none; color: inherit; }
+
+  header {
+    display: flex; align-items: center; gap: .6rem; padding: .55rem .9rem;
+    border-bottom: 1px solid var(--line); background: var(--card); flex-shrink: 0;
+    transition: background .22s ease, border-color .22s ease;
+  }
+  header h1 { font-size: 1.05rem; font-weight: 600; letter-spacing: .1em; }
+  header .crumb { color: var(--ink-mute); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .spacer { flex: 1; }
+  .tabs { display: flex; gap: .3rem; flex-shrink: 0; }
+  .tabs button { padding: .3rem .8rem; border-radius: 999px; font-size: .85rem; color: var(--ink-mute); white-space: nowrap; }
+  .tabs button.on { background: var(--accent); color: #fff; }
+  .tabs .dot { display: none; width: 6px; height: 6px; border-radius: 50%; background: #c25549; margin-left: .3rem; vertical-align: middle; }
+  .tabs button.has-new .dot { display: inline-block; }
+
+  main { flex: 1; display: flex; min-height: 0; }
+
+  /* 书架 + 章节列表 */
+  #sidebar {
+    width: 240px; flex-shrink: 0; border-right: 1px solid var(--line);
+    overflow-y: auto; background: var(--card); padding: .8rem .6rem;
+  }
+  .side-h { font-size: .78rem; letter-spacing: .15em; color: var(--ink-mute); margin: .8rem .4rem .35rem; }
+  .side-item {
+    display: block; width: 100%; text-align: left; padding: .42rem .55rem;
+    border-radius: 6px; font-size: .92rem; line-height: 1.4; color: var(--ink-soft);
+  }
+  .side-item:hover { background: var(--paper); }
+  .side-item.on { background: var(--user-bubble); color: var(--ink); }
+  .side-item small { color: var(--ink-mute); display: block; font-size: .75rem; }
+  .side-item .done { color: var(--accent); }
+
+  /* 阅读区 */
+  #reader { flex: 1; overflow-y: auto; min-width: 0; }
+  #reader .page { max-width: 46rem; margin: 0 auto; padding: 2.2rem 1.4rem 5rem; }
+  #reader h1, #reader h2, #reader h3 { line-height: 1.4; margin: 1.6em 0 .6em; font-weight: 600; }
+  #reader h1 { font-size: 1.55rem; } #reader h2 { font-size: 1.25rem; } #reader h3 { font-size: 1.05rem; }
+  #reader p { line-height: 2; margin: .9em 0; font-size: 1.02rem; }
+  #reader blockquote { border-left: 3px solid var(--accent-soft); padding-left: 1em; color: var(--ink-soft); margin: 1em 0; }
+  #reader li { line-height: 1.9; margin: .3em 0 .3em 1.4em; }
+  #reader code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: #f0ead9; padding: .1em .3em; border-radius: 3px; }
+  #reader table { border-collapse: collapse; margin: 1em 0; width: 100%; }
+  #reader th, #reader td { border: 1px solid var(--line); padding: .4em .7em; font-size: .92rem; }
+  .pager { display: flex; justify-content: space-between; margin-top: 3rem; gap: 1rem; }
+  .pager button { color: var(--accent); font-size: .95rem; padding: .5rem .8rem; border: 1px solid var(--line); border-radius: 6px; background: var(--card); }
+  .pager button:disabled { opacity: .35; cursor: default; }
+  .empty { color: var(--ink-mute); text-align: center; padding: 5rem 1rem; line-height: 2; }
+
+  /* 侧栏聊天（读书视图里的那条） */
+  #chat {
+    width: 380px; flex-shrink: 0; border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; background: var(--chat-bg); min-height: 0;
+  }
+  #msgs { flex: 1; overflow-y: auto; padding: 1rem .9rem; display: flex; flex-direction: column; gap: .7rem; }
+  .msg { max-width: 92%; padding: .55rem .8rem; border-radius: 10px; font-size: .93rem; line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: var(--user-bubble); border-bottom-right-radius: 3px; }
+  .msg.bot { align-self: flex-start; background: var(--bot-bubble); border-bottom-left-radius: 3px; box-shadow: var(--bubble-shadow); }
+  .msg.status { align-self: flex-start; background: none; color: var(--ink-mute); font-size: .8rem; padding: 0 .3rem; box-shadow: none; }
+  #composer { display: flex; gap: .5rem; padding: .7rem; border-top: 1px solid var(--line); background: var(--card); }
+  #composer textarea {
+    flex: 1; resize: none; border: 1px solid var(--line); border-radius: 8px;
+    padding: .55rem .7rem; font-family: inherit; font-size: .95rem; line-height: 1.5;
+    background: var(--paper); color: var(--ink); max-height: 7.5rem;
+  }
+  #composer textarea:focus { outline: 2px solid var(--accent-soft); }
+  #sendBtn, #sendBtn2 { background: var(--accent); color: #fff; border-radius: 8px; padding: 0 1.1rem; font-size: .95rem; flex-shrink: 0; }
+  #sendBtn:disabled, #sendBtn2:disabled { opacity: .5; cursor: default; }
+
+  /* 对话视图：居中单列（与读书的三栏区分靠布局，不靠配色） */
+  #chatview { flex: 1; min-width: 0; flex-direction: column; background: var(--paper); }
+  #chatScroll { flex: 1; overflow-y: auto; }
+  .col { max-width: 880px; margin: 0 auto; padding: 0 1.2rem; }
+  #chatBody { display: flex; flex-direction: column; gap: 1rem; padding-top: 1.8rem; padding-bottom: 2.5rem; }
+  #chatBody .msg { max-width: 88%; padding: .75rem 1.05rem; border-radius: 14px; font-size: 1rem; line-height: 1.9; }
+  #chatBody .msg.bot { border: 1px solid var(--line); }
+  #chatBody .msg.status { border: 0; padding: 0 .4rem; font-size: .85rem; }
+  #chatBody .msg.md { white-space: normal; }
+  #chatBody .msg.md > *:first-child { margin-top: 0; }
+  #chatBody .msg.md > *:last-child { margin-bottom: 0; }
+  #chatBody .msg.md p { margin: .7em 0; }
+  #chatBody .msg.md h1, #chatBody .msg.md h2, #chatBody .msg.md h3 { font-size: 1.08rem; margin: 1.1em 0 .5em; font-weight: 600; }
+  #chatBody .msg.md ul, #chatBody .msg.md ol { margin: .6em 0 .6em 1.3em; }
+  #chatBody .msg.md li { margin: .25em 0; }
+  #chatBody .msg.md code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: #f0ead9; border: 1px solid var(--line); padding: .08em .35em; border-radius: 4px; }
+  #chatBody .msg.md pre { background: #f6f1e4; border: 1px solid var(--line); border-radius: 8px; padding: .7rem .85rem; overflow-x: auto; margin: .8em 0; }
+  #chatBody .msg.md pre code { background: none; border: 0; padding: 0; font-size: .85em; line-height: 1.7; }
+  #chatBody .msg.md blockquote { border-left: 3px solid var(--accent-soft); padding-left: .9em; color: var(--ink-soft); margin: .8em 0; }
+  #chatBody .msg.md a { color: var(--accent); }
+  #chatBody .msg.md table { border-collapse: collapse; margin: .8em 0; width: 100%; }
+  #chatBody .msg.md th, #chatBody .msg.md td { border: 1px solid var(--line); padding: .35em .6em; font-size: .92em; }
+  #chatBody .msg.md hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
+  #chatComposer { border-top: 1px solid var(--line); background: var(--card); padding: .9rem 0 1.1rem; flex-shrink: 0; }
+  #chatComposer .col { display: flex; gap: .6rem; align-items: flex-end; }
+  #chatComposer textarea {
+    flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px;
+    padding: .7rem .9rem; font-family: inherit; font-size: 1rem; line-height: 1.7;
+    background: var(--paper); color: var(--ink); max-height: 12rem; min-height: 5.4rem;
+  }
+  #chatComposer textarea:focus { outline: 2px solid var(--accent-soft); }
+  #sendBtn2 { height: 2.6rem; }
+  .chat-hint { color: var(--ink-mute); font-size: .78rem; padding: .45rem 0 0; text-align: right; }
+
+  /* 工坊视图 */
+  #workshop { flex: 1; overflow-y: auto; min-width: 0; }
+  .wk-page { max-width: 900px; margin: 0 auto; padding: 2rem 1.3rem 4rem; }
+  .wk-page h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: .4rem; }
+  .wk-page .lead { color: var(--ink-soft); font-size: .92rem; line-height: 1.9; margin-bottom: 1.6rem; }
+  .wk-entries { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .wk-entry {
+    flex: 1 1 260px; text-align: left; background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 1.1rem 1.2rem; line-height: 1.7;
+  }
+  .wk-entry:hover { border-color: var(--accent-soft); }
+  .wk-entry b { display: block; font-size: 1rem; margin-bottom: .25rem; }
+  .wk-entry span { color: var(--ink-mute); font-size: .85rem; }
+  .wk-bar { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin-bottom: 1.3rem; }
+  .wk-bar .title { font-size: .95rem; color: var(--ink-soft); display: flex; align-items: center; gap: .45rem; }
+  .wk-bar .spacer { flex: 1; }
+  .wk-bar button { border: 1px solid var(--line); border-radius: 8px; padding: .38rem .85rem; font-size: .86rem; color: var(--ink-soft); background: var(--card); }
+  .wk-bar button:hover { border-color: var(--accent-soft); }
+  .wk-bar button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .wk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+  .wk-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.05rem; display: flex; flex-direction: column; }
+  .wk-name { font-size: 1rem; font-weight: 600; line-height: 1.5; word-break: break-word; }
+  .wk-ver { font-size: .72rem; color: var(--ink-mute); font-weight: 400; margin-left: .35rem; }
+  .wk-by { color: var(--ink-mute); font-size: .78rem; margin: .2rem 0 .5rem; }
+  .wk-desc { color: var(--ink-soft); font-size: .88rem; line-height: 1.8; flex: 1; word-break: break-word; white-space: pre-wrap; }
+  .wk-act { display: flex; gap: .5rem; margin-top: .9rem; flex-wrap: wrap; }
+  .wk-act button { border-radius: 8px; padding: .32rem .8rem; font-size: .84rem; border: 1px solid var(--line); color: var(--ink-soft); }
+  .wk-act button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .wk-act button.on { color: var(--accent); border-color: var(--accent-soft); }
+  .wk-act button.danger { color: #a3453a; border-color: #c9a09a; }
+  .wk-empty { color: var(--ink-mute); text-align: center; padding: 3.5rem 1rem; line-height: 2; }
+
+  /* 视图切换：谁显示谁不显示 */
+  #chatview, #workshop { display: none; }
+  body.view-chat #sidebar, body.view-chat #reader, body.view-chat #chat,
+  body.view-workshop #sidebar, body.view-workshop #reader, body.view-workshop #chat { display: none; }
+  body.view-chat #chatview { display: flex; }
+  body.view-workshop #workshop { display: block; }
+
+  /* 手机布局：读书视图单栏（侧栏聊天让位给「对话」视图） */
+  /* 注意：这条要放在 media query 前面。同是 #menuBtn、同权重，写在后面的赢——
+     原来它在后面，等于把手机里的 display:block 又盖回 none，☰ 一直点不动。 */
+  #menuBtn { display: none; font-size: 1.2rem; padding: .2rem .4rem; }
+  @media (max-width: 860px) {
+    #sidebar { position: fixed; inset: 49px 0 0 0; width: 100%; z-index: 20; display: none; }
+    body.view-read #sidebar.open { display: block; }
+    #chat { display: none; }
+    #reader .page { padding: 1.4rem 1.1rem 4rem; }
+    #menuBtn { display: block; }
+    header h1 { display: none; }
+    .tabs button { padding: .3rem .6rem; }
+    #chatBody .msg { max-width: 94%; }
+    .col { padding: 0 .9rem; }
+  }
+
+  /* 校对协作 */
+  .sync-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .sync-dot.green { background: #7aa45e; } .sync-dot.yellow { background: #d6a545; }
+  .sync-dot.gray { background: #b8b0a0; } .sync-dot.auth { background: #c25549; }
+  .side-item .sug-meta { color: var(--ink-mute); font-size: .75rem; display: block; }
+  .side-item.sug-done { opacity: .55; }
+
+  #suggestBtn {
+    position: fixed; z-index: 40; background: var(--accent); color: #fff;
+    border-radius: 999px; padding: .35rem .9rem; font-size: .85rem;
+    box-shadow: 0 2px 8px rgba(60,45,15,.3); display: none;
+  }
+
+  .modal-wrap { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .modal-back { position: absolute; inset: 0; background: rgba(43,40,32,.45); }
+  .modal {
+    position: relative; background: var(--card); border-radius: 12px; width: min(480px, calc(100vw - 2rem));
+    max-height: 86vh; overflow-y: auto; padding: 1.3rem 1.4rem; box-shadow: 0 12px 40px rgba(43,40,32,.25);
+  }
+  .modal h3 { font-size: 1.05rem; margin-bottom: .9rem; }
+  .modal p { font-size: .9rem; line-height: 1.8; color: var(--ink-soft); margin: .5em 0; }
+  .modal label { display: block; font-size: .82rem; color: var(--ink-mute); margin: .8em 0 .25em; }
+  .modal textarea, .modal input, .modal select {
+    width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: .5rem .65rem;
+    font-family: inherit; font-size: .92rem; background: var(--paper); color: var(--ink); resize: vertical;
+  }
+  .modal .quote { background: var(--paper); border-left: 3px solid var(--accent-soft); padding: .5rem .8rem; border-radius: 0 6px 6px 0; font-size: .9rem; line-height: 1.7; margin: .4em 0; word-break: break-word; }
+  .modal .row { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.1rem; flex-wrap: wrap; }
+  .modal .row button { padding: .45rem 1rem; border-radius: 8px; font-size: .9rem; }
+  .modal .primary { background: var(--accent); color: #fff; }
+  .modal .plain { border: 1px solid var(--line); color: var(--ink-soft); }
+  .modal .danger { border: 1px solid #c9a09a; color: #a3453a; }
+  .modal .hint { font-size: .8rem; color: var(--ink-mute); line-height: 1.7; }
+  .modal .invite-box { font-family: ui-monospace, Consolas, monospace; font-size: .78rem; word-break: break-all; background: var(--paper); border: 1px dashed var(--line); border-radius: 8px; padding: .6rem .7rem; margin: .5em 0; max-height: 7em; overflow-y: auto; }
+  .modal .steps { counter-reset: st; }
+  .modal .steps p { padding-left: 1.6em; position: relative; }
+  .modal .steps p::before { counter-increment: st; content: counter(st); position: absolute; left: 0; top: .35em; width: 1.15em; height: 1.15em; border-radius: 50%; background: var(--user-bubble); font-size: .75em; display: flex; align-items: center; justify-content: center; }
+
+  /* 上传 */
+  .side-item.upload { color: var(--accent); font-weight: 600; }
+  .prog { height: 9px; background: var(--line); border-radius: 999px; overflow: hidden; margin: 1rem 0 .5rem; }
+  .prog i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
+  /* 后台作业卡片：入库在后台跑，聊天区只留这一张安静的卡，不刷过程气泡 */
+  .job-dock { display: flex; flex-direction: column; gap: .7rem; }
+  .job-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: .7rem .85rem; display: flex; gap: .65rem; align-items: flex-start;
+    box-shadow: var(--bubble-shadow); white-space: normal;
+  }
+  .job-card .jicon { flex-shrink: 0; width: 16px; height: 16px; margin-top: .22rem; text-align: center; line-height: 16px; font-size: .95rem; }
+  .job-card .jicon.ok { color: var(--accent); font-weight: 700; }
+  .job-card .jicon.spin {
+    border: 2px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; animation: jspin .9s linear infinite;
+  }
+  @keyframes jspin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .job-card .jicon.spin { animation-duration: 3s; } }
+  .job-card .jmain { min-width: 0; flex: 1; }
+  .job-card .jt { font-size: .93rem; line-height: 1.65; word-break: break-word; }
+  .job-card .js { font-size: .78rem; color: var(--ink-mute); line-height: 1.7; margin-top: .1rem; word-break: break-word; }
+  .job-card .ja { display: flex; gap: .5rem; margin-top: .6rem; flex-wrap: wrap; }
+  .job-card .ja button { border: 1px solid var(--line); border-radius: 8px; padding: .26rem .75rem; font-size: .83rem; color: var(--ink-soft); }
+  .job-card .ja button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .job-card .ja button:hover { border-color: var(--accent-soft); }
+
+  #clipBtn {
+    flex-shrink: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--paper);
+    color: var(--ink-soft); font-size: 1.15rem; width: 2.6rem; height: 2.6rem; line-height: 1;
+  }
+  #clipBtn:hover { border-color: var(--accent-soft); color: var(--accent); }
+  #clipBtn:disabled { opacity: .5; cursor: default; }
+</style>
+</head>
+<body class="view-read">
+  <header>
+    <button id="menuBtn" title="书架">☰</button>
+    <h1>群星阅览室</h1>
+    <span class="crumb" id="crumb"></span>
+    <span class="spacer"></span>
+    <nav class="tabs">
+      <button id="tabRead" class="on">读书</button>
+      <button id="tabChat">对话</button>
+      <button id="tabShop">工坊<span class="dot"></span></button>
+    </nav>
+  </header>
+  <main>
+    <aside id="sidebar"></aside>
+    <section id="reader"><div class="page"><div class="empty">📚<br/>左边选一本书开始看<br/>还没有书的话，去对话窗把书的文件拖给助手</div></div></section>
+    <section id="chat">
+      <div id="msgs"></div>
+      <div id="composer">
+        <textarea id="input" rows="2" placeholder="跟群星阅览室助手说话，比如「翻第 3 章」"></textarea>
+        <button id="sendBtn">发送</button>
+      </div>
+    </section>
+
+    <section id="chatview">
+      <div id="chatScroll"><div id="chatBody" class="col"></div></div>
+      <div id="chatComposer">
+        <div class="col">
+          <button id="clipBtn" title="传一本书">📎</button>
+          <textarea id="input2" rows="3" placeholder="说点什么…（回车发送，Shift+回车换行）"></textarea>
+          <button id="sendBtn2">发送</button>
+        </div>
+        <div class="col chat-hint" id="chatHint"></div>
+      </div>
+    </section>
+
+    <section id="workshop"><div class="wk-page" id="wkBody"></div></section>
+  </main>
+
+  <button id="suggestBtn">✏️ 提个建议</button>
+  <input type="file" id="fileInput" accept=".epub,.txt,.docx,.pdf,.md" style="display:none" />
+  <div id="modalHost"></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const sidebar = $("sidebar"), reader = $("reader"), msgs = $("msgs");
+  const input = $("input"), sendBtn = $("sendBtn"), crumb = $("crumb");
+  const chatBody = $("chatBody"), chatScroll = $("chatScroll");
+  const input2 = $("input2"), sendBtn2 = $("sendBtn2"), wkBody = $("wkBody");
+
+  let currentBook = null;      // { name, original: [], translated: [], ... }
+  let currentFile = null;      // vault-relative path of the open chapter
+  let collabState = null;      // /api/collab/state 的最新结果（当前书）
+  let view = "read";           // read | chat | workshop
+
+  // 别人电脑上写的建议文件是不可信输入，进 innerHTML 前一律转义
+  const esc = s => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+  async function api(url, body) {
+    const r = await fetch(url, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.hint || j.error || "出错了");
+    return j;
+  }
+
+  // ------------------------------------------------------------------ 书架
+  async function loadShelf() {
+    const r = await fetch("/api/books").then(r => r.json()).catch(() => ({ books: [] }));
+    const parts = ['<div class="side-h">书架</div>'];
+    if (!r.books.length) parts.push('<div class="side-item" style="cursor:default;color:var(--ink-mute)">还没有书</div>');
+    for (const b of r.books) {
+      parts.push(`<button class="side-item" data-book="${encodeURIComponent(b.name)}">${esc(b.name)}<small>${b.chapters} 章 · <span class="done">已翻 ${b.translated}</span></small></button>`);
+    }
+    parts.push('<button class="side-item upload" id="uploadBook">📕 传一本书</button>');
+    parts.push('<div class="side-h">协作</div>');
+    parts.push('<button class="side-item" id="joinShared">📥 加入朋友共享的书</button>');
+    sidebar.innerHTML = parts.join("");
+    if (currentBook) renderBookMenu();
+  }
+
+  async function openBook(name) {
+    currentBook = await fetch("/api/book?name=" + encodeURIComponent(name)).then(r => r.json());
+    collabState = null;
+    refreshCollab(name);
+    renderBookMenu();
+    // 默认打开梗概；没有就开第一章译文；再没有就第一章原文
+    if (currentBook.outline) openFile(`Library/${name}/01-全书梗概.md`, "全书梗概");
+    else if (currentBook.translated[0]) openFile(`Library/${name}/译文/${currentBook.translated[0]}`, currentBook.translated[0]);
+    else if (currentBook.original[0]) openFile(`Library/${name}/00-原书/${currentBook.original[0]}`, currentBook.original[0]);
+  }
+
+  async function refreshCollab(name) {
+    try {
+      const st = await fetch("/api/collab/state?book=" + encodeURIComponent(name)).then(r => r.json());
+      if (currentBook && currentBook.name === name) { collabState = st; renderBookMenu(); }
+    } catch { }
+  }
+
+  function renderBookMenu() {
+    const b = currentBook;
+    const parts = [
+      `<button class="side-item" id="backShelf">← 书架</button>`,
+      `<div class="side-h">${esc(b.name)}</div>`,
+    ];
+    if (b.outline) parts.push(item(`Library/${b.name}/01-全书梗概.md`, "📖 全书梗概"));
+    if (b.summary) parts.push(item(`Library/${b.name}/02-逐章摘要.md`, "🗂 逐章摘要"));
+    if (b.translated.length) {
+      parts.push('<div class="side-h">译文</div>');
+      for (const f of b.translated) parts.push(item(`Library/${b.name}/译文/${f}`, f.replace(/\.md$/, "")));
+    }
+    if (b.original.length) {
+      parts.push('<div class="side-h">原文</div>');
+      for (const f of b.original) parts.push(item(`Library/${b.name}/00-原书/${f}`, f.replace(/\.md$/, "")));
+    }
+    for (const [dir, label] of [["笔记", "笔记"], ["讨论", "讨论"]]) {
+      const files = b[dir === "笔记" ? "notes" : "discussions"];
+      if (files.length) {
+        parts.push(`<div class="side-h">${label}</div>`);
+        for (const f of files) parts.push(item(`Library/${b.name}/${dir}/${f}`, f.replace(/\.md$/, "")));
+      }
+    }
+
+    // ---- 校对协作区 ----
+    const cs = collabState;
+    if (cs) {
+      const open = (cs.suggestions || []).filter(s => s.status === "open");
+      const dotCls = cs.state ? cs.state.dot : "gray";
+      if (cs.shared) {
+        parts.push(`<div class="side-h" style="display:flex;align-items:center;gap:.4rem"><span class="sync-dot ${dotCls}"></span>校对 (${open.length})</div>`);
+        for (const s of (cs.suggestions || []).slice(0, 30)) {
+          const done = s.status !== "open" ? " sug-done" : "";
+          const tag = { accepted: "✅", rejected: "❌", stale: "⏳" }[s.status] || "💬";
+          const preview = esc((s.anchor || "").slice(0, 14));
+          const chapLabel = esc(String(s.chapter || "").split("/").pop().replace(/\.md$/, ""));
+          parts.push(`<button class="side-item${done}" data-sug="${encodeURIComponent(s.id)}">${tag} ${preview}…<span class="sug-meta">${esc(s.author)} · ${chapLabel}</span></button>`);
+        }
+        if (cs.role === "owner") parts.push(`<button class="side-item" id="showInvite">🔗 邀请朋友</button>`);
+        parts.push(`<button class="side-item" id="syncNow">🔄 立即同步</button>`);
+      } else if (cs.engine) {
+        parts.push('<div class="side-h">校对</div>');
+        parts.push(`<button class="side-item" id="shareBook">🤝 共享这本书给朋友</button>`);
+      }
+    }
+
+    sidebar.innerHTML = parts.join("");
+    function item(p, label) {
+      const on = p === currentFile ? " on" : "";
+      return `<button class="side-item${on}" data-file="${encodeURIComponent(p)}">${esc(label)}</button>`;
+    }
+  }
+
+  async function openFile(rel, label) {
+    const r = await fetch("/api/file?path=" + encodeURIComponent(rel)).then(r => r.json());
+    if (r.error) return;
+    currentFile = rel;
+    crumb.textContent = (currentBook ? currentBook.name + " · " : "") + (label || rel.split("/").pop());
+    const nav = chapterNav(rel);
+    reader.innerHTML = `<div class="page">${r.html}${nav}</div>`;
+    reader.scrollTop = 0;
+    if (currentBook) renderBookMenu();
+    sidebar.classList.remove("open");
+    bindPager();
+  }
+
+  // 上一章/下一章：在当前文件所属列表(译文或原文)里找邻居
+  function chapterNav(rel) {
+    if (!currentBook) return "";
+    const inTrans = rel.includes("/译文/"), inOrig = rel.includes("/00-原书/");
+    if (!inTrans && !inOrig) return "";
+    const list = inTrans ? currentBook.translated : currentBook.original;
+    const fname = rel.split("/").pop();
+    const i = list.indexOf(fname);
+    if (i < 0) return "";
+    const dir = inTrans ? "译文" : "00-原书";
+    const mk = (f, t) => f ? `<button data-nav="${encodeURIComponent(`Library/${currentBook.name}/${dir}/${f}`)}">${t}</button>` : `<button disabled>${t}</button>`;
+    return `<div class="pager">${mk(list[i - 1], "← 上一章")}${mk(list[i + 1], "下一章 →")}</div>`;
+  }
+  function bindPager() {
+    reader.querySelectorAll("[data-nav]").forEach(b =>
+      b.addEventListener("click", () => openFile(decodeURIComponent(b.dataset.nav))));
+  }
+
+  sidebar.addEventListener("click", e => {
+    const el = e.target.closest("[data-book],[data-file],[data-sug],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook");
+    if (!el) return;
+    if (el.id === "uploadBook") { pickFile(); return; }
+    if (el.id === "backShelf") { currentBook = null; currentFile = null; collabState = null; loadShelf(); return; }
+    if (el.id === "joinShared") { joinWizard(); return; }
+    if (el.id === "shareBook") { shareWizard(); return; }
+    if (el.id === "showInvite") { showInvite(); return; }
+    if (el.id === "syncNow") { syncNow(); return; }
+    if (el.dataset.sug) { openSuggestionCard(decodeURIComponent(el.dataset.sug)); return; }
+    if (el.dataset.book) openBook(decodeURIComponent(el.dataset.book));
+    else openFile(decodeURIComponent(el.dataset.file));
+  });
+
+  // ------------------------------------------------------------------ 弹窗
+  const modalHost = $("modalHost");
+  const suggestBtn = $("suggestBtn");
+
+  function modal(html) {
+    modalHost.innerHTML = `<div class="modal-wrap"><div class="modal-back"></div><div class="modal">${html}</div></div>`;
+    modalHost.querySelector(".modal-back").addEventListener("click", closeModal);
+    return modalHost.querySelector(".modal");
+  }
+  function closeModal() { modalHost.innerHTML = ""; }
+
+  // 署名：所有协作/发布动作的前置。没有就先要一个。
+  let knownAuthor = null;
+  async function needAuthor() {
+    const have = (collabState && collabState.author) || knownAuthor;
+    if (have) return have;
+    return new Promise(resolve => {
+      const m = modal(`
+        <h3>先留个名字</h3>
+        <p>让朋友知道是谁提的意见、谁发的插件。就填平时叫你的名字，不是账号。</p>
+        <input id="mAuthor" maxlength="24" placeholder="比如：小王" />
+        <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">好了</button></div>`);
+      m.querySelector("#mCancel").addEventListener("click", () => { closeModal(); resolve(null); });
+      m.querySelector("#mOk").addEventListener("click", async () => {
+        const v = m.querySelector("#mAuthor").value.trim();
+        if (!v) return;
+        try {
+          await api("/api/collab/author", { author: v });
+          knownAuthor = v;
+          if (collabState) collabState.author = v;
+          closeModal(); resolve(v);
+        } catch (e) { alert(e.message); }
+      });
+      m.querySelector("#mAuthor").focus();
+    });
+  }
+
+  // ------------------------------------------------------------------ 校对协作
+  // ---- 选中译文 → 提建议 ----
+  reader.addEventListener("mouseup", () => setTimeout(maybeShowSuggestBtn, 10));
+  reader.addEventListener("touchend", () => setTimeout(maybeShowSuggestBtn, 10));
+  document.addEventListener("selectionchange", () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) suggestBtn.style.display = "none";
+  });
+
+  function maybeShowSuggestBtn() {
+    suggestBtn.style.display = "none";
+    if (view !== "read") return;
+    if (!collabState || !collabState.shared) return;
+    if (!currentFile || !currentFile.includes("/译文/")) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const text = sel.toString().trim();
+    if (!text || text.length < 2 || text.length > 300) return;
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    suggestBtn.style.left = Math.max(8, rect.left + rect.width / 2 - 50) + "px";
+    suggestBtn.style.top = Math.min(window.innerHeight - 48, rect.bottom + 8) + "px";
+    suggestBtn.style.display = "block";
+    suggestBtn._anchor = text;
+  }
+
+  suggestBtn.addEventListener("click", async () => {
+    const anchor = suggestBtn._anchor;
+    suggestBtn.style.display = "none";
+    if (!anchor || !(await needAuthor())) return;
+
+    // 第几处出现：数选区之前的渲染文本里同串出现了几次
+    let anchorIndex = 0;
+    try {
+      const sel = window.getSelection();
+      const rng = sel.getRangeAt(0);
+      const pre = document.createRange();
+      pre.selectNodeContents(reader);
+      pre.setEnd(rng.startContainer, rng.startOffset);
+      const before = pre.toString();
+      let c = 0, i = -1;
+      while ((i = before.indexOf(anchor, i + 1)) >= 0) c++;
+      anchorIndex = c;
+    } catch { }
+
+    const m = modal(`
+      <h3>提个建议</h3>
+      <div class="quote">${esc(anchor)}</div>
+      <label>改成这样（可以空着，只说问题也行）</label>
+      <textarea id="mProposed" rows="3"></textarea>
+      <label>为什么</label>
+      <textarea id="mReason" rows="2"></textarea>
+      <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">提交</button></div>`);
+    m.querySelector("#mCancel").addEventListener("click", closeModal);
+    m.querySelector("#mOk").addEventListener("click", async () => {
+      const proposed = m.querySelector("#mProposed").value.trim();
+      const reason = m.querySelector("#mReason").value.trim();
+      if (!proposed && !reason) { alert("「改成这样」和「为什么」至少填一个。"); return; }
+      const chapter = currentFile.replace(`Library/${currentBook.name}/`, "");
+      try {
+        await api("/api/collab/suggest", { book: currentBook.name, chapter, anchor, anchorIndex, proposed, reason });
+        closeModal();
+        refreshCollab(currentBook.name);
+      } catch (e) { alert(e.message); }
+    });
+  });
+
+  // ---- 建议卡片 ----
+  function openSuggestionCard(id) {
+    const s = (collabState && collabState.suggestions || []).find(x => x.id === id);
+    if (!s) return;
+    const isOwner = collabState.role === "owner";
+    const statusLabel = { open: "待处理", accepted: "已采纳", rejected: "未采纳", stale: "译文已变，建议失效" }[s.status] || s.status;
+    const when = String(s.created || "").slice(0, 16).replace("T", " ");
+    const buttons = s.status === "open"
+      ? (isOwner
+        ? `<button class="danger" id="mReject">不采纳</button>` +
+          (s.proposed ? `<button class="primary" id="mAccept">采纳（改进译文）</button>` : "") +
+          `<button class="plain" id="mSecond">👍 附议</button>`
+        : `<button class="plain" id="mSecond">👍 附议</button>`)
+      : "";
+    const m = modal(`
+      <h3>${esc(s.author)} 的建议 <span class="hint">（${esc(statusLabel)}）</span></h3>
+      <label>原文</label><div class="quote">${esc(s.anchor)}</div>
+      ${s.proposed ? `<label>建议改为</label><div class="quote">${esc(s.proposed)}</div>` : ""}
+      ${s.reason ? `<label>理由</label><p>${esc(s.reason)}</p>` : ""}
+      ${s.body ? `<p class="hint">${esc(s.body)}</p>` : ""}
+      <p class="hint">${esc(String(s.chapter || ""))} · ${esc(when)}</p>
+      <div class="row"><button class="plain" id="mClose">关闭</button>${buttons}</div>`);
+    m.querySelector("#mClose").addEventListener("click", closeModal);
+    const act = async (action) => {
+      try {
+        const r = await api("/api/collab/decide", { book: currentBook.name, id, action });
+        closeModal();
+        await refreshCollab(currentBook.name);
+        if (r.status === "accepted" && s.chapter) openFile(`Library/${currentBook.name}/${s.chapter}`);
+        if (r.status === "stale") alert("这段译文后来改过了，原句已经找不到，这条建议标为失效。");
+      } catch (e) { alert(e.message); }
+    };
+    const acceptBtn = m.querySelector("#mAccept");
+    if (acceptBtn) acceptBtn.addEventListener("click", () => act("accept"));
+    const rejectBtn = m.querySelector("#mReject");
+    if (rejectBtn) rejectBtn.addEventListener("click", () => act("reject"));
+    const secondBtn = m.querySelector("#mSecond");
+    if (secondBtn) secondBtn.addEventListener("click", async () => {
+      if (!(await needAuthor())) return;
+      try { await api("/api/collab/second", { book: currentBook.name, id }); closeModal(); refreshCollab(currentBook.name); }
+      catch (e) { alert(e.message); }
+    });
+  }
+
+  // ---- 共享向导（发起人）----
+  async function shareWizard() {
+    if (!(await needAuthor())) return;
+    const suggested = "shufang-" + Date.now().toString(36).slice(-4);
+    const m = modal(`
+      <h3>共享《${esc(currentBook.name)}》</h3>
+      <div class="steps">
+        <p>去 GitHub 建一个<strong>私有</strong>仓库放这本书（还没有 GitHub 账号就先注册一个，只有你需要，朋友不用）。<br/>
+        <button class="plain" id="mOpenNew" style="margin-top:.3rem">打开 github.com/new</button><br/>
+        <span class="hint">仓库名随意（比如 ${esc(suggested)}），Private 必选，「Add a README」等选项全都<strong>不要勾</strong>，点 Create。</span></p>
+        <p>建好后把仓库网址粘到这里：<input id="mRepo" placeholder="https://github.com/你的用户名/仓库名" /></p>
+        <p>再创建一把只开这一个仓库的钥匙（token）：<br/>
+        <button class="plain" id="mOpenPat" style="margin-top:.3rem">打开 token 创建页</button><br/>
+        <span class="hint">Repository access 选 Only select repositories → 挑刚建的仓；Permissions 里把 <strong>Contents</strong> 设为 Read and write；有效期选最长的。生成后复制那串 github_pat_ 开头的字。</span><br/>
+        <input id="mToken" placeholder="github_pat_..." style="margin-top:.3rem" /></p>
+      </div>
+      <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">开始共享</button></div>`);
+    m.querySelector("#mOpenNew").addEventListener("click", () => window.open("https://github.com/new?visibility=private&name=" + suggested, "_blank"));
+    m.querySelector("#mOpenPat").addEventListener("click", () => window.open("https://github.com/settings/personal-access-tokens/new", "_blank"));
+    m.querySelector("#mCancel").addEventListener("click", closeModal);
+    m.querySelector("#mOk").addEventListener("click", async () => {
+      const repoUrl = m.querySelector("#mRepo").value.trim();
+      const token = m.querySelector("#mToken").value.trim();
+      if (!repoUrl || !token) { alert("仓库网址和钥匙都要填。"); return; }
+      const okBtn = m.querySelector("#mOk");
+      okBtn.disabled = true; okBtn.textContent = "上传中…（第一次要一会儿）";
+      try {
+        const r = await api("/api/collab/share", { book: currentBook.name, repoUrl, token });
+        closeModal();
+        showInviteString(r.invite, r.ignoredBigFiles);
+        refreshCollab(currentBook.name);
+      } catch (e) {
+        okBtn.disabled = false; okBtn.textContent = "开始共享";
+        alert(e.message);
+      }
+    });
+  }
+
+  async function showInvite() {
+    try {
+      const r = await fetch("/api/collab/invite?book=" + encodeURIComponent(currentBook.name)).then(r => r.json());
+      if (r.invite) showInviteString(r.invite);
+    } catch { }
+  }
+
+  function showInviteString(invite, ignored, what) {
+    const m = modal(`
+      <h3>邀请串</h3>
+      <p>把下面这一整串发给朋友（微信就行）。他在自己的群星阅览室里点「${esc(what || "加入朋友共享的书")}」，粘进去就行。</p>
+      <div class="invite-box" id="mInvite">${esc(invite)}</div>
+      ${ignored && ignored.length ? `<p class="hint">注意：原始文件太大没有上传（${esc(ignored.join("、"))}），不影响朋友看译文。</p>` : ""}
+      <p class="hint">⚠️ 这串字里带着仓库钥匙，别发到大群里。发错了可以去 GitHub 把 token 撤销掉再重新生成。</p>
+      <div class="row"><button class="plain" id="mCopy">复制</button><button class="primary" id="mClose">好了</button></div>`);
+    m.querySelector("#mClose").addEventListener("click", closeModal);
+    m.querySelector("#mCopy").addEventListener("click", () => {
+      navigator.clipboard && navigator.clipboard.writeText(invite).then(() => {
+        m.querySelector("#mCopy").textContent = "已复制 ✓";
+      }).catch(() => { });
+    });
+  }
+
+  // ---- 加入向导（朋友）----
+  async function joinWizard() {
+    if (!(await needAuthor())) return;
+    const m = modal(`
+      <h3>加入朋友共享的书</h3>
+      <p>把朋友发来的邀请串（SF1: 开头的一整串）粘到这里：</p>
+      <textarea id="mInvite" rows="4" placeholder="SF1:..."></textarea>
+      <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">加入</button></div>`);
+    m.querySelector("#mCancel").addEventListener("click", closeModal);
+    m.querySelector("#mOk").addEventListener("click", async () => {
+      const invite = m.querySelector("#mInvite").value.trim();
+      if (!invite) return;
+      const okBtn = m.querySelector("#mOk");
+      okBtn.disabled = true; okBtn.textContent = "下载中…";
+      try {
+        const r = await api("/api/collab/join", { invite });
+        closeModal();
+        await loadShelf();
+        openBook(r.book);
+      } catch (e) {
+        okBtn.disabled = false; okBtn.textContent = "加入";
+        alert(e.message);
+      }
+    });
+  }
+
+  async function syncNow() {
+    try {
+      await api("/api/collab/sync", { book: currentBook.name });
+      refreshCollab(currentBook.name);
+    } catch (e) { alert(e.message); }
+  }
+
+  // 打开着共享书时轮询：90 秒刷一次建议列表（后台 2 分钟自动同步一轮）
+  setInterval(() => {
+    if (currentBook && collabState && collabState.shared) refreshCollab(currentBook.name);
+  }, 90000);
+
+  // ------------------------------------------------------------------ 聊天
+  // 一个对话模型，两处显示：侧栏（纯文本）和对话视图（助手消息渲染 markdown）。
+  // 共用同一条 /api/chat 通道和同一个 streaming 标志——服务端本来也只允许一个在跑。
+  let midSeq = 0;
+  const convo = [];
+
+  function paintInto(host, e, rich) {
+    let el = host.querySelector(`[data-mid="${e.mid}"]`);
+    if (!el) { el = document.createElement("div"); el.dataset.mid = e.mid; host.appendChild(el); }
+    el.className = "msg " + e.role + (rich && e.html ? " md" : "");
+    // html 是服务端 marked 渲染 + 清洗过的；没有就退回纯文本
+    if (rich && e.html) el.innerHTML = e.html;
+    else el.textContent = e.text;
+  }
+  function paintEntry(e) { paintInto(msgs, e, false); paintInto(chatBody, e, true); }
+  function scrollBoth() {
+    msgs.scrollTop = msgs.scrollHeight;
+    chatScroll.scrollTop = chatScroll.scrollHeight;
+  }
+  function addMsg(role, text, html) {
+    const e = { mid: ++midSeq, role, text: text || "", html: html || "" };
+    convo.push(e);
+    paintEntry(e);
+    dockToEnd();          // 后台作业卡片永远贴在最下面
+    scrollBoth();
+    return e;
+  }
+  function dropMsg(e) {
+    const i = convo.indexOf(e);
+    if (i >= 0) convo.splice(i, 1);
+    for (const host of [msgs, chatBody]) {
+      const el = host.querySelector(`[data-mid="${e.mid}"]`);
+      if (el) el.remove();
+    }
+  }
+  // 一段回复收尾时才渲染 markdown：流式过程中每个 delta 都往服务端跑一趟不划算
+  async function renderRich(e) {
+    if (!e || !e.text.trim()) return;
+    try {
+      const r = await api("/api/render", { md: e.text });
+      if (r.html) { e.html = r.html; paintEntry(e); scrollBoth(); }
+    } catch { }
+  }
+
+  const GREETING = "你好，我是群星阅览室助手。把书的文件路径发给我（或直接把文件放进书库文件夹再告诉我），我来整理概要；想看哪章就说「翻第几章」。";
+
+  async function loadHistory() {
+    let r = null;
+    try { r = await fetch("/api/chat/history").then(x => x.json()); } catch { }
+    const items = (r && r.items) || [];
+    for (const it of items) addMsg(it.role === "user" ? "user" : "bot", it.text, it.html);
+    if (!items.length) addMsg("bot", GREETING);
+    if (r && r.brain === "claude") {
+      addMsg("status", "历史在助手自己的会话里，这里只显示本次启动后的消息。");
+    }
+  }
+
+  let streaming = false;
+  function setBusy(on) {
+    streaming = on;
+    sendBtn.disabled = on; sendBtn2.disabled = on;
+    $("clipBtn").disabled = on;
+  }
+
+  function send(from) {
+    const box = from === "main" ? input2 : input;
+    const text = box.value.trim();
+    if (!text) return;
+    input.value = ""; input2.value = "";     // 两个框都清，免得另一个留着草稿被重发
+    return sendText(text);
+  }
+
+  async function sendText(text) {
+    if (!text || streaming) return;
+    addMsg("user", text);
+    setBusy(true);
+
+    let bot = null, statusEl = null;
+    const ensureBot = () => bot || (bot = addMsg("bot", ""));
+
+    try {
+      const resp = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+      if (resp.status === 429) { addMsg("status", "助手还在忙上一件事，稍等再发。"); return; }
+      if (!resp.ok || !resp.body) { addMsg("status", "连不上助手，检查「群星阅览室」窗口还开着没。"); return; }
+
+      const rd = resp.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await rd.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let idx;
+        while ((idx = buf.indexOf("\n\n")) >= 0) {
+          const raw = buf.slice(0, idx); buf = buf.slice(idx + 2);
+          const evm = raw.match(/^event: (\S+)\ndata: (.*)$/s);
+          if (!evm) continue;
+          const [_, ev, dataStr] = evm;
+          let data = {}; try { data = JSON.parse(dataStr); } catch { }
+          if (ev === "delta") {
+            if (statusEl) { dropMsg(statusEl); statusEl = null; }
+            const e = ensureBot();
+            e.text += data.text;
+            paintEntry(e);
+            scrollBoth();
+          } else if (ev === "status") {
+            if (!statusEl) statusEl = addMsg("status", "");
+            statusEl.text = "⏳ " + data.text + "…";
+            paintEntry(statusEl);
+          } else if (ev === "turn") {
+            renderRich(bot);             // 工具调用之后新起一个气泡，旧的先定稿
+            bot = null;
+          } else if (ev === "error") {
+            addMsg("status", "⚠️ " + data.text);
+          }
+        }
+      }
+    } catch {
+      addMsg("status", "网络断了，稍后重试。");
+    } finally {
+      if (statusEl) dropMsg(statusEl);
+      setBusy(false);
+      renderRich(bot);
+      loadShelf();                        // 助手可能新建/翻完了章节，刷新书架
+      if (currentBook) openBook(currentBook.name).catch(() => { });
+    }
+  }
+
+  // ------------------------------------------------------------------ 后台作业
+  // 入库要十几分钟，跑在后台，聊天区只留一张安静的卡片（读书侧栏和对话视图各
+  // 一份，同一份状态）。用户在这期间照常聊天——服务端的作业进程跟聊天进程是
+  // 两回事。中间过程不刷气泡：只说「在弄、还要多久、弄好了」。
+  const jobDocks = new Map();          // host 元素 -> 它那份卡片容器
+  let jobList = [];
+  let jobTimer = null;
+
+  // 「这是本什么书」那段是当成正常助手消息发的，服务端也写进了聊天记录——
+  // 刷新页面后历史里会再出现一次，所以记下已经显示过的作业号，别重复。
+  const jobInfoShown = (() => {
+    try { return new Set(JSON.parse(localStorage.getItem("sfJobInfo") || "[]")); }
+    catch { return new Set(); }
+  })();
+
+  function jobDock(host) {
+    let d = jobDocks.get(host);
+    if (!d) { d = document.createElement("div"); d.className = "job-dock"; jobDocks.set(host, d); }
+    if (d.parentNode !== host) host.appendChild(d);
+    return d;
+  }
+  function dockToEnd() {
+    for (const host of [msgs, chatBody]) {
+      const d = jobDocks.get(host);
+      if (d && d.parentNode === host) host.appendChild(d);
+    }
+  }
+
+  function jobCardHtml(icon, title, sub, acts) {
+    const ic = icon === "spin" ? `<div class="jicon spin"></div>`
+      : `<div class="jicon${icon === "✓" ? " ok" : ""}">${icon}</div>`;
+    return `<div class="job-card">${ic}<div class="jmain"><div class="jt">${title}</div>` +
+      (sub ? `<div class="js">${sub}</div>` : "") +
+      (acts ? `<div class="ja">${acts}</div>` : "") + `</div></div>`;
+  }
+
+  function jobCard(j) {
+    const name = esc(j.title || "这本书");
+    const id = esc(j.id);
+    const dismiss = `<button data-job="dismiss" data-id="${id}">知道了</button>`;
+    if (j.state === "queued") {
+      return jobCardHtml("spin", `《${name}》排着队`,
+        j.ahead ? `前面还有 ${j.ahead} 本，弄完就轮到它` : "马上开始");
+    }
+    if (j.state === "running") {
+      // 章一切好书就能读了，摘要在后台慢慢补——没必要为了后半程让人干等
+      if (j.readable && j.book) {
+        const bits = [`一共 ${j.chapters} 章 · 摘要还在写`];
+        if (j.stage) bits.push(esc(j.stage));
+        return jobCardHtml("spin", `《${name}》已经可以开始读了`, bits.join(" · "),
+          `<button class="primary" data-job="open" data-id="${id}">去看看</button>`);
+      }
+      const mins = j.startedAt ? Math.floor((Date.now() - j.startedAt) / 60000) : 0;
+      const bits = [`预计 ${j.etaMin} 分钟`];
+      if (mins >= 1) bits.push(`已 ${mins} 分钟`);
+      if (j.stage) bits.push(esc(j.stage));
+      return jobCardHtml("spin", `正在整理《${name}》`, bits.join(" · "));
+    }
+    if (j.state === "done") {
+      return jobCardHtml("✓", `《${name}》整理好了`,
+        `一共 ${j.chapters} 章，梗概和摘要都写好了`,
+        `<button class="primary" data-job="open" data-id="${id}">去看看</button>${dismiss}`);
+    }
+    return jobCardHtml("⚠️", `《${name}》没整理成`, esc(j.error || "中途出岔子了。"),
+      `<button class="primary" data-job="retry" data-id="${id}">再试一次</button>${dismiss}`);
+  }
+
+  function renderJobs() {
+    const html = jobList.map(jobCard).join("");
+    for (const host of [msgs, chatBody]) {
+      const d = jobDock(host);
+      d.innerHTML = html;
+      d.style.display = html ? "flex" : "none";
+      host.appendChild(d);                 // 永远排在消息流最后
+    }
+  }
+
+  function showJobInfo(j) {
+    if (!j.summary || jobInfoShown.has(j.id)) return;
+    jobInfoShown.add(j.id);
+    try { localStorage.setItem("sfJobInfo", JSON.stringify([...jobInfoShown].slice(-50))); } catch { }
+    renderRich(addMsg("bot", j.summary));
+  }
+
+  const jobActive = j => j.state === "running" || j.state === "queued";
+
+  function scheduleJobPoll(ms) {
+    clearTimeout(jobTimer);
+    jobTimer = setTimeout(pollJobs, ms);
+  }
+
+  async function pollJobs() {
+    let r = null;
+    try { r = await fetch("/api/jobs").then(x => x.json()); } catch { }
+    if (!r) { scheduleJobPoll(20000); return; }
+    const wasActive = jobList.some(jobActive);
+    const wasReadable = new Set(jobList.filter(j => j.readable).map(j => j.id));
+    jobList = r.jobs || [];
+    for (const j of jobList) showJobInfo(j);
+    renderJobs();
+    // 刚切完章的书这会儿才出现在书架上，不刷一下「去看看」会点进空列表
+    if (jobList.some(j => j.readable && !wasReadable.has(j.id))) loadShelf();
+    const active = jobList.some(jobActive);
+    if (wasActive && !active) {            // 刚有作业做完，书架上多了一本
+      loadShelf();
+      if (currentBook) openBook(currentBook.name).catch(() => { });
+    }
+    scheduleJobPoll(active ? 4000 : 20000);
+  }
+
+  for (const host of [msgs, chatBody]) {
+    host.addEventListener("click", async e => {
+      const el = e.target.closest("[data-job]");
+      if (!el) return;
+      const id = el.dataset.id;
+      const j = jobList.find(x => x.id === id);
+      if (!j) return;
+      if (el.dataset.job === "open") {
+        if (!j.book) return;
+        setView("read");
+        await loadShelf();
+        openBook(j.book);
+        return;
+      }
+      el.disabled = true;
+      try {
+        if (el.dataset.job === "dismiss") await api("/api/job/dismiss", { id });
+        else await api("/api/job", { kind: "ingest", file: j.file });
+      } catch (err) { toast(err.message); }
+      pollJobs();
+    });
+  }
+
+  async function startIngest(file) {
+    try { await api("/api/job", { kind: "ingest", file }); }
+    catch (e) { toast(`《${file}》传好了，但没能开始整理：${e.message}　你可以跟助手说一句「帮我整理入库」。`); }
+    pollJobs();
+  }
+
+  // ------------------------------------------------------------------ 传书
+  // 手机用户打不开电脑上的「文档\书房」文件夹，网页上传是他们唯一的路。
+  // 传完自动起一个后台整理作业，聊天不受影响。
+  const fileInput = $("fileInput");
+  const OK_EXT = ["epub", "txt", "docx", "pdf", "md"];
+  const MAX_MB = 200;
+
+  function pickFile() { fileInput.value = ""; fileInput.click(); }
+
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (f) uploadBook(f);
+  });
+
+  function uploadBook(file) {
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    if (!OK_EXT.includes(ext)) {
+      return toast("只能传 " + OK_EXT.join("、") + " 这几种文件。别的格式先在电脑上转一下。");
+    }
+    if (file.size > MAX_MB * 1024 * 1024) {
+      return toast(`这个文件 ${(file.size / 1024 / 1024).toFixed(0)}MB，超过 ${MAX_MB}MB 传不了。`);
+    }
+
+    const m = modal(`
+      <h3>正在上传《${esc(file.name)}》</h3>
+      <div class="prog"><i id="mBar"></i></div>
+      <p class="hint" id="mPct">0%　·　别关这个页面</p>`);
+    const bar = m.querySelector("#mBar"), pct = m.querySelector("#mPct");
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload");
+    xhr.upload.addEventListener("progress", e => {
+      if (!e.lengthComputable) return;
+      const p = Math.round(e.loaded / e.total * 100);
+      bar.style.width = p + "%";
+      pct.textContent = p + "%　·　" + (p >= 100 ? "正在保存…" : "别关这个页面");
+    });
+    xhr.addEventListener("load", () => {
+      let j = {};
+      try { j = JSON.parse(xhr.responseText); } catch { }
+      closeModal();
+      if (xhr.status === 200 && j.ok) {
+        loadShelf();
+        setView("chat");
+        startIngest(j.name);     // 后台整理，不占聊天
+      } else {
+        toast(j.hint || "上传失败了，再试一次。");
+      }
+    });
+    xhr.addEventListener("error", () => { closeModal(); toast("网络断了，没传上去。"); });
+    xhr.addEventListener("abort", () => closeModal());
+
+    const fd = new FormData();
+    fd.append("file", file, file.name);
+    xhr.send(fd);
+  }
+
+  $("clipBtn").addEventListener("click", pickFile);
+
+  sendBtn.addEventListener("click", () => send("side"));
+  sendBtn2.addEventListener("click", () => send("main"));
+  const enterToSend = (from) => e => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(from); }
+  };
+  input.addEventListener("keydown", enterToSend("side"));
+  input2.addEventListener("keydown", enterToSend("main"));
+
+  // ------------------------------------------------------------------ 创意工坊
+  let shopState = null;
+
+  const shopSignature = st => !st || !st.configured ? ""
+    : (st.plugins || []).map(p => p.dir + "@" + p.meta.version).sort().join(",");
+
+  function updateShopDot(markSeen) {
+    const sig = shopSignature(shopState);
+    if (markSeen && sig) { try { localStorage.setItem("sfShopSeen", sig); } catch { } }
+    let seen = "";
+    try { seen = localStorage.getItem("sfShopSeen") || ""; } catch { }
+    $("tabShop").classList.toggle("has-new", !!sig && sig !== seen);
+  }
+
+  async function loadShop(markSeen) {
+    try { shopState = await fetch("/api/workshop/state").then(r => r.json()); } catch { shopState = null; }
+    if (shopState && shopState.author) knownAuthor = shopState.author;
+    renderShop();
+    updateShopDot(markSeen);
+  }
+
+  function renderShop() {
+    const st = shopState;
+    if (!st) { wkBody.innerHTML = `<div class="wk-empty">读不到工坊状态，刷新一下页面。</div>`; return; }
+
+    if (!st.configured) {
+      wkBody.innerHTML = `
+        <h2>创意工坊</h2>
+        <p class="lead">把你调教好的本事（技能）打包成插件，跟朋友互相安装。<br/>
+        工坊是一个你们几个人共用的私密仓库——谁发布，大家就都能装上。</p>
+        ${st.engine ? "" : `<p class="lead">⚠️ 协作组件还没装上，重启一次「群星阅览室」再来。</p>`}
+        <div class="wk-entries">
+          <button class="wk-entry" id="wkCreate"><b>🏗 创建工坊</b><span>你来当发起人：建一个私密仓库，把邀请串发给朋友</span></button>
+          <button class="wk-entry" id="wkJoin"><b>📥 加入工坊</b><span>朋友已经建好了：把 SFW1: 开头的邀请串粘进来</span></button>
+        </div>`;
+      return;
+    }
+
+    const dot = st.syncState ? st.syncState.dot : "gray";
+    const plugins = st.plugins || [];
+    const cards = plugins.map(p => {
+      const m = p.meta;
+      const canUpdate = p.installed && m.version > (p.installedVersion || 0);
+      const acts = [];
+      if (canUpdate) acts.push(`<button class="primary" data-act="install" data-dir="${encodeURIComponent(p.dir)}">更新到 v${m.version}</button>`);
+      else if (p.installed) acts.push(`<button class="on" data-act="uninstall" data-dir="${encodeURIComponent(p.dir)}">已装 ✓</button>`);
+      else acts.push(`<button class="primary" data-act="install" data-dir="${encodeURIComponent(p.dir)}">安装</button>`);
+      if (st.role === "owner") acts.push(`<button class="danger" data-act="remove" data-dir="${encodeURIComponent(p.dir)}">下架</button>`);
+      return `<div class="wk-card">
+        <div class="wk-name">${esc(m.name)}<span class="wk-ver">v${m.version}</span></div>
+        <div class="wk-by">${esc(m.author)}${m.updated ? " · " + esc(m.updated) : ""}${p.installed ? ` · 已装 v${p.installedVersion}` : ""}</div>
+        <div class="wk-desc">${esc(m.desc || "（没写简介）")}</div>
+        <div class="wk-act">${acts.join("")}</div>
+      </div>`;
+    }).join("");
+
+    wkBody.innerHTML = `
+      <div class="wk-bar">
+        <span class="title"><span class="sync-dot ${dot}"></span>创意工坊 · ${plugins.length} 个插件</span>
+        <span class="spacer"></span>
+        <button class="primary" id="wkPublish">发布我的插件</button>
+        ${st.role === "owner" ? `<button id="wkInvite">邀请朋友</button>` : ""}
+        <button id="wkSync">立即同步</button>
+      </div>
+      ${plugins.length ? `<div class="wk-grid">${cards}</div>`
+        : `<div class="wk-empty">工坊里还没有插件。<br/>点右上角「发布我的插件」放第一个进来。</div>`}`;
+  }
+
+  wkBody.addEventListener("click", async e => {
+    const el = e.target.closest("[data-act],#wkCreate,#wkJoin,#wkPublish,#wkInvite,#wkSync");
+    if (!el) return;
+    if (el.id === "wkCreate") return createWorkshopWizard();
+    if (el.id === "wkJoin") return joinWorkshopWizard();
+    if (el.id === "wkPublish") return publishWizard();
+    if (el.id === "wkInvite") return showWorkshopInvite();
+    if (el.id === "wkSync") {
+      el.disabled = true; el.textContent = "同步中…";
+      try { await api("/api/workshop/sync", {}); } catch (err) { alert(err.message); }
+      await loadShop(true);
+      return;
+    }
+    const dir = decodeURIComponent(el.dataset.dir || "");
+    const act = el.dataset.act;
+    if (act === "remove" && !confirm("从工坊里下架这个插件？已经装到别人电脑上的那份不会被删。")) return;
+    if (act === "uninstall" && !confirm("卸载这个插件？")) return;
+    el.disabled = true;
+    try {
+      await api("/api/workshop/" + act, { dir });
+      await loadShop(true);
+      if (act === "install") toast("装好了。下次跟助手说话就能用上。");
+    } catch (err) {
+      alert(err.message);
+      await loadShop(false);
+    }
+  });
+
+  function toast(text) {
+    const m = modal(`<p>${esc(text)}</p><div class="row"><button class="primary" id="mClose">知道了</button></div>`);
+    m.querySelector("#mClose").addEventListener("click", closeModal);
+  }
+
+  async function createWorkshopWizard() {
+    if (!(await needAuthor())) return;
+    const suggested = "shufang-workshop-" + Date.now().toString(36).slice(-4);
+    const m = modal(`
+      <h3>创建创意工坊</h3>
+      <div class="steps">
+        <p>去 GitHub 建一个<strong>私有</strong>仓库当工坊（朋友不用注册账号，只有你需要）。<br/>
+        <button class="plain" id="mOpenNew" style="margin-top:.3rem">打开 github.com/new</button><br/>
+        <span class="hint">仓库名随意（比如 ${esc(suggested)}），Private 必选，「Add a README」等选项全都<strong>不要勾</strong>，点 Create。</span></p>
+        <p>把仓库网址粘到这里：<input id="mRepo" placeholder="https://github.com/你的用户名/仓库名" /></p>
+        <p>再创建一把只开这一个仓库的钥匙（token）：<br/>
+        <button class="plain" id="mOpenPat" style="margin-top:.3rem">打开 token 创建页</button><br/>
+        <span class="hint">Repository access 选 Only select repositories → 挑刚建的仓；Permissions 里把 <strong>Contents</strong> 设为 Read and write；有效期选最长的。</span><br/>
+        <input id="mToken" placeholder="github_pat_..." style="margin-top:.3rem" /></p>
+      </div>
+      <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">建好了，开工</button></div>`);
+    m.querySelector("#mOpenNew").addEventListener("click", () => window.open("https://github.com/new?visibility=private&name=" + suggested, "_blank"));
+    m.querySelector("#mOpenPat").addEventListener("click", () => window.open("https://github.com/settings/personal-access-tokens/new", "_blank"));
+    m.querySelector("#mCancel").addEventListener("click", closeModal);
+    m.querySelector("#mOk").addEventListener("click", async () => {
+      const repoUrl = m.querySelector("#mRepo").value.trim();
+      const token = m.querySelector("#mToken").value.trim();
+      if (!repoUrl || !token) { alert("仓库网址和钥匙都要填。"); return; }
+      const okBtn = m.querySelector("#mOk");
+      okBtn.disabled = true; okBtn.textContent = "建立中…";
+      try {
+        const r = await api("/api/workshop/create", { repoUrl, token });
+        closeModal();
+        await loadShop(true);
+        showInviteString(r.invite, null, "加入工坊");
+      } catch (err) {
+        okBtn.disabled = false; okBtn.textContent = "建好了，开工";
+        alert(err.message);
+      }
+    });
+  }
+
+  async function joinWorkshopWizard() {
+    if (!(await needAuthor())) return;
+    const m = modal(`
+      <h3>加入工坊</h3>
+      <p>把对方发来的工坊邀请串（<strong>SFW1:</strong> 开头的一整串）粘到这里：</p>
+      <textarea id="mInvite" rows="4" placeholder="SFW1:..."></textarea>
+      <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">加入</button></div>`);
+    m.querySelector("#mCancel").addEventListener("click", closeModal);
+    m.querySelector("#mOk").addEventListener("click", async () => {
+      const invite = m.querySelector("#mInvite").value.trim();
+      if (!invite) return;
+      const okBtn = m.querySelector("#mOk");
+      okBtn.disabled = true; okBtn.textContent = "下载中…";
+      try {
+        await api("/api/workshop/join", { invite });
+        closeModal();
+        await loadShop(true);
+      } catch (err) {
+        okBtn.disabled = false; okBtn.textContent = "加入";
+        alert(err.message);
+      }
+    });
+  }
+
+  async function showWorkshopInvite() {
+    try {
+      const r = await fetch("/api/workshop/invite").then(r => r.json());
+      if (r.invite) showInviteString(r.invite, null, "加入工坊");
+    } catch { }
+  }
+
+  async function publishWizard() {
+    if (!(await needAuthor())) return;
+    const skills = (shopState && shopState.localSkills) || [];
+    if (!skills.length) {
+      toast("本机还没有可发布的技能。技能放在书库的 .claude/skills 文件夹里，一个文件夹一个技能（里面要有 SKILL.md）。");
+      return;
+    }
+    const m = modal(`
+      <h3>发布我的插件</h3>
+      <p>挑一个本机的技能发到工坊，朋友就能装上。同名再发一次就是升版本。</p>
+      <label>选一个技能</label>
+      <select id="mSkill">${skills.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select>
+      <label>给它起个好懂的名字</label>
+      <input id="mName" maxlength="60" placeholder="比如：诗歌翻译腔调" />
+      <label>一句话说明它能干嘛</label>
+      <textarea id="mDesc" rows="3" maxlength="300" placeholder="比如：翻诗的时候保留押韵和断行，不出大白话。"></textarea>
+      <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">发布</button></div>`);
+    const nameBox = m.querySelector("#mName");
+    const skillBox = m.querySelector("#mSkill");
+    const fillName = () => { if (!nameBox.value.trim()) nameBox.value = skillBox.value; };
+    fillName();
+    skillBox.addEventListener("change", () => { nameBox.value = skillBox.value; });
+    m.querySelector("#mCancel").addEventListener("click", closeModal);
+    m.querySelector("#mOk").addEventListener("click", async () => {
+      const okBtn = m.querySelector("#mOk");
+      okBtn.disabled = true; okBtn.textContent = "上传中…";
+      try {
+        const r = await api("/api/workshop/publish", {
+          skillName: skillBox.value,
+          name: nameBox.value.trim(),
+          desc: m.querySelector("#mDesc").value.trim(),
+        });
+        closeModal();
+        await loadShop(true);
+        toast(`《${r.meta.name}》已经发到工坊（v${r.meta.version}）。朋友那边同步后就能看到。`);
+      } catch (err) {
+        okBtn.disabled = false; okBtn.textContent = "发布";
+        alert(err.message);
+      }
+    });
+  }
+
+  // 工坊有新东西时给顶栏点个小圆点（后台每 2 分钟自己同步一轮）
+  setInterval(() => { if (view !== "workshop") loadShop(false); }, 120000);
+
+  // ------------------------------------------------------------------ 视图切换
+  function setView(v) {
+    view = v;
+    document.body.className = "view-" + v;
+    $("tabRead").classList.toggle("on", v === "read");
+    $("tabChat").classList.toggle("on", v === "chat");
+    $("tabShop").classList.toggle("on", v === "workshop");
+    if (v !== "read") sidebar.classList.remove("open");
+    if (v === "chat") { scrollBoth(); if (window.innerWidth > 860) input2.focus(); }
+    if (v === "workshop") loadShop(true);
+  }
+  $("tabRead").addEventListener("click", () => setView("read"));
+  $("tabChat").addEventListener("click", () => setView("chat"));
+  $("tabShop").addEventListener("click", () => setView("workshop"));
+  $("menuBtn").addEventListener("click", () => sidebar.classList.toggle("open"));
+
+  loadHistory();
+  loadShelf();
+  loadShop(false);
+  pollJobs();
+})();
+</script>
+</body>
+</html>

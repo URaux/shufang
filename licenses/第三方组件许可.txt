@@ -1,0 +1,27 @@
+群星阅览室 · 第三方组件许可说明
+=================================
+
+本软件的分发包内附带了以下第三方组件。它们各自的著作权归其作者所有，
+按各自的许可协议分发：
+
+1. Node.js
+   许可：MIT 及其内含组件的相应许可
+   许可全文随附于 Node 目录下的 LICENSE 文件。
+   项目主页：https://nodejs.org
+
+2. Pandoc（仅「全量包」内置 pandoc.exe）
+   许可：GNU General Public License, version 2 或更高版本（GPL-2.0+）
+   许可全文：见本目录下的 GPL-2.0.txt
+   源代码获取：https://github.com/jgm/pandoc
+   说明：本分发包按 GPL 的「聚合（aggregation）」条款附带未经修改的
+   pandoc 可执行文件。你有权按 GPL 条款获取、使用、再分发 pandoc 的源代码，
+   源代码可从上述项目主页获得。
+
+3. dsh（DeepSeek Harness，@deepseek-ai/dsh）
+   许可：MIT
+   项目主页：https://github.com/deepseek-ai/deepseek-harness
+
+4. 其余 Node 依赖（isomorphic-git、express、marked、busboy 等）
+   均为 MIT / ISC / BSD 一类的宽松许可。
+
+—— 群星阅览室本体版权所有、保留所有权利，与上述第三方组件是聚合分发关系。
