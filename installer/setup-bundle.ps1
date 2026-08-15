@@ -165,11 +165,13 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
 # ---------------------------------------------------------------- API key
 try { Stop-Transcript | Out-Null } catch {}
 Step "配置 DeepSeek"
-if ($OldKey) {
+# 次序：命令行显式传的 > 上次存的 > 问用户。
+# 反过来的话，用户想换 key 而特地带 -ApiKey 重装，会被老 key 默默盖掉。
+if ($ApiKey -match "^sk-") {
+  $key = $ApiKey
+} elseif ($OldKey) {
   $key = $OldKey
   Ok "沿用你上次填的 key（想换成别的：删掉 $ConfigPath 再装一遍）"
-} elseif ($ApiKey -match "^sk-") {
-  $key = $ApiKey
 } else {
   Write-Host "   需要一个 DeepSeek API key（在 platform.deepseek.com 注册后创建，sk- 开头）。"
   Write-Host "   粘贴时屏幕上不会显示，这是正常的——粘完直接回车。" -ForegroundColor DarkGray
