@@ -401,9 +401,12 @@ app.post("/api/collab/share", async (req, res) => {
   if (!repoUrl || !token) return res.status(400).json({ error: "missing_fields" });
   const url = String(repoUrl).trim().replace(/\.git$/, "") + ".git";
 
-  // 版权书不进公开仓：能查就查，查出来是公开仓直接拒绝
+  // 版权书不进公开仓——这条是硬规则，确认不了就不放行（fail-closed）
   const check = await collab.checkRepoPrivate(url, String(token).trim());
-  if (check.ok && !check.private) {
+  if (!check.ok) {
+    return res.status(400).json({ error: "verify_failed", hint: "没能确认仓库是私密的（网络不通或钥匙权限不够）。稍后再试；建仓时记得选 Private。" });
+  }
+  if (!check.private) {
     return res.status(400).json({ error: "repo_public", hint: "这个仓库是公开的。书的内容不能进公开仓库——去 GitHub 仓库 Settings 把它改成 Private，或者重建一个 Private 仓。" });
   }
 

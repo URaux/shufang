@@ -72,11 +72,3 @@ $f="$env:TEMP\shufang-install.ps1";iwr https://raw.githubusercontent.com/URaux/s
 - **Obsidian 第一次打开问「是否信任」** — 点信任。它只是个看笔记的软件，书库就是普通文件夹。
 - **想换电脑** — 把 `文档\书房` 文件夹整个拷走就行，书和译文都在里面。
 
-## 这东西怎么工作的（技术人员看）
-
-- 翻译大脑：Claude Code CLI 跑在 DeepSeek 官方 Anthropic 兼容端点上（`api.deepseek.com/anthropic`），按 [官方文档](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/) 配置
-- 工作流：vault 内的 `book-translator` skill（入库/摘要/翻译/译名表/讨论）
-- 前端：`~\.shufang\webapp` 里的 Node 服务（端口 7787），聊天走 SSE 包 `claude -p --continue`，阅读器直接渲染 vault markdown
-- 格式转换：pandoc（epub/docx），可选 pymupdf4llm（PDF）
-- 协作：isomorphic-git（纯 JS，无需装 git）+ GitHub 私有仓（每本书一仓），单分支「建议文件」模式，冲突兜底「远端赢 + 本地备份」；设计文档 `docs/2026-08-15-collab-research.md`
-- 配置：`~\.shufang\config.json`（key、模型、端口、局域网访问口令都在这）
