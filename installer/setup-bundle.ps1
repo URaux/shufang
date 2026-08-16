@@ -53,15 +53,61 @@ Write-Host "  群星阅览室 · 全量包安装"
 Write-Host "  所有东西都在包里，不用下载、不要管理员"
 Write-Host "=============================================="
 
+$NEED_APP_MB = 900      # 全量包铺开约 700MB，留点余量
+$NEED_VAULT_MB = 200   # 书库起步很小，但一本扫描书就能到几百 MB
+
+# 装之前先把空间说清楚。位置选择本来就有，但只写「C 盘不够就换个地方」是不够的——
+# 用户不知道要多少、也不知道自己剩多少，一路回车就把系统盘撑爆了，
+# 而且炸的时候是在复制到一半，目录已经建了一堆。
+function DriveFreeMB($path) {
+  try {
+    $root = [System.IO.Path]::GetPathRoot(([System.IO.Path]::GetFullPath($path)))
+    $d = Get-PSDrive -Name $root.TrimEnd(":\") -ErrorAction Stop
+    return [int]($d.Free / 1MB)
+  } catch { return -1 }   # 网络盘、映射盘之类问不出来，那就别拦着
+}
+
+function ShowDrives($needMB) {
+  Write-Host "   各个盘还剩多少（这次要 $([int]($needMB/1024)) GB 左右）：" -ForegroundColor DarkGray
+  foreach ($d in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
+    if ($null -eq $d.Free -or $null -eq $d.Used) { continue }
+    $free = [int]($d.Free / 1MB)
+    $mark = if ($free -lt $needMB) { "  装不下" } else { "" }
+    $color = if ($free -lt $needMB) { "DarkGray" } else { "Green" }
+    Write-Host ("     {0}:  剩 {1} GB{2}" -f $d.Name, [math]::Round($d.Free / 1GB, 1), $mark) -ForegroundColor $color
+  }
+}
+
+# 系统盘装不下就换个推荐：挑剩得最多、又确实够的那个盘
+function PickDefaultDir($preferred, $needMB, $leafName) {
+  if ((DriveFreeMB $preferred) -ge $needMB) { return $preferred }
+  $best = Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue |
+    Where-Object { $_.Free -and ($_.Free / 1MB) -ge $needMB } |
+    Sort-Object Free -Descending | Select-Object -First 1
+  if ($best) { return (Join-Path ($best.Name + ":\") $leafName) }
+  return $preferred      # 哪个盘都不够，照原样问，下面的复核会拦住
+}
+
+# 选完真核一遍。不够就当场说明白，别等复制到一半才炸。
+function EnsureSpace($path, $needMB, $what) {
+  $free = DriveFreeMB $path
+  if ($free -lt 0) { return }                    # 问不出来就不拦
+  if ($free -ge $needMB) { return }
+  $root = [System.IO.Path]::GetPathRoot(([System.IO.Path]::GetFullPath($path)))
+  throw ("$root 只剩 $([math]::Round($free/1024,1)) GB，装不下$what（要 $([math]::Round($needMB/1024,1)) GB）。" +
+         "`n    换个空间大的盘重跑一次就行，比如 D:\群星阅览室。")
+}
+
 # ---------------------------------------------------------------- 位置选择
 $DefaultApp = Join-Path $env:USERPROFILE ".shufang"
 if ($InstallDir) {
   $AppDir = $InstallDir
 } else {
+  $DefaultApp = PickDefaultDir $DefaultApp $NEED_APP_MB "群星阅览室"
   Write-Host ""
   Write-Host "程序装到哪？（程序本体 + 运行环境，约 700MB）"
+  ShowDrives $NEED_APP_MB
   Write-Host "直接回车用默认: $DefaultApp"
-  Write-Host "C 盘不够就输入别的地方，比如 D:\群星阅览室"
   $AppDir = ("" + (Read-Host "安装位置")).Trim().Trim('"')
   if (-not $AppDir) { $AppDir = $DefaultApp }
 }
@@ -69,6 +115,8 @@ if ($AppDir -match '[\u4e00-\u9fff]') {
   # 中文路径本身没问题，但个别 npm 包对非 ASCII cwd 犯病，提示一句不拦着
   Write-Host "   （路径带中文一般没事，万一之后出怪问题可以换成纯英文路径重装）" -ForegroundColor DarkGray
 }
+EnsureSpace $AppDir $NEED_APP_MB "程序"
+EnsureSpace $Vault $NEED_VAULT_MB "书库"
 New-Item -ItemType Directory -Force $AppDir | Out-Null
 
 # ---------------------------------------------------------------- 读老配置
@@ -98,6 +146,7 @@ if ($VaultDir) {
 } else {
   Write-Host ""
   Write-Host "书库放到哪？（你的书、译文、笔记都在这，会越来越大）"
+  ShowDrives $NEED_VAULT_MB
   Write-Host "直接回车用默认: $DefaultVault"
   $Vault = ("" + (Read-Host "书库位置")).Trim().Trim('"')
   if (-not $Vault) { if ($OldVault) { $Vault = $OldVault } else { $Vault = $DefaultVault } }
