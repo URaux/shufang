@@ -503,7 +503,9 @@
   const editBar = () => {
     const href = obsidianHref(currentFile);
     return `<div class="editbar"><button data-edit="1">✏️ 改一改</button>`
-      + (href ? `<a class="obs" href="${href}">在 Obsidian 里打开</a>` : "")
+      // Obsidian 只认它自己「打开过」的库。第一次点没反应不是坏了，
+      // 是那边还不知道有这么个库——把这句写在悬停提示里，省一次求助。
+      + (href ? `<a class="obs" href="${href}" title="第一次用要先在 Obsidian 里「打开文件夹作为库」选中你的书库">在 Obsidian 里打开</a>` : "")
       + `</div>`;
   };
 
