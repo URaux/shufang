@@ -72,7 +72,15 @@ cp -R "$PAYLOAD/bin" "$BIN_DIR" || die "复制 Pandoc 失败"
 chmod +x "$NODE_DIR/bin/"* "$BIN_DIR/"* 2>/dev/null
 # macOS 会给下载来的可执行文件打隔离标记，去掉它才不会每个都弹「无法验证开发者」
 xattr -dr com.apple.quarantine "$NODE_DIR" "$BIN_DIR" 2>/dev/null || true
-ok "运行环境就绪"
+# dsh 的会话存储要 Node 22.15 才有的 zstd 接口。版本低了 dsh 一启动就崩，
+# 表现是聊天完全没反应，而入库还好好的（那条路直连 API 不经过 dsh），很难猜。
+NODE_VER=$("$NODE_DIR/bin/node" --version 2>/dev/null | tr -d 'v')
+# 用 case 而不是 sort -V：不同 macOS 的 sort 行为不完全一致，这里不值得赌
+case "$NODE_VER" in
+  22.0.*|22.1.*|22.2.*|22.3.*|22.4.*|22.5.*|22.6.*|22.7.*|22.8.*|22.9.*|22.1[0-4].*)
+    die "这个安装包里的 Node 是 $NODE_VER，太旧了（要 22.15 以上，聊天功能依赖它）。请重新下载安装包。" ;;
+esac
+ok "运行环境就绪（Node $NODE_VER）"
 
 step "安放程序本体"
 rm -rf "$APP_REPO"

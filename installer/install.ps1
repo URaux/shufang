@@ -130,16 +130,30 @@ if ($stopped -gt 0) { Start-Sleep -Seconds 2; Ok "已关掉 $stopped 个正在�
 # ---------------------------------------------------------------- Node
 Step "安装 Node（网页程序的运行环境）"
 if (-not (Test-Path (Join-Path $NodeDir "node.exe"))) {
-  # 阿里云 npmmirror 在国内很快且没被墙；失败回退官方
+  # dsh 的会话存储 import 了 zlib 的 zstd 接口，那是 Node 22.15 才有的。
+  # 版本低了 dsh 一启动就抛「does not provide an export named 'createZstdDecompress'」，
+  # 表现是聊天完全没反应（入库还好好的，因为那条路直连 API 不经过 dsh）。
+  $NODE_MIN = [version]"22.15.0"
+
+  # 阿里云 npmmirror 在国内很快且没被墙；失败回退官方。
+  # 注意 latest-v22.x/ 这个目录名骗人——它列的是**所有** v22 版本，不是最新那个。
+  # 原来取第一个匹配，拿到的是排在最前面的 v22.0.0（正好低于门槛，聊天全废）。
+  $file = ""
   $verJson = curl.exe -fsSL --connect-timeout 25 "https://registry.npmmirror.com/-/binary/node/latest-v22.x/" 2>$null
-  $file = ([regex]::Matches($verJson, 'node-v[0-9.]+-win-x64\.zip') | Select-Object -First 1).Value
-  if (-not $file) {
-    $idx = curl.exe -fsSL "https://nodejs.org/dist/index.json" 2>$null | ConvertFrom-Json
-    $v = ($idx | Where-Object { $_.lts } | Select-Object -First 1).version
-    $file = "node-$v-win-x64.zip"
-    Fetch "https://nodejs.org/dist/$v/$file" "$env:TEMP\sf-node.zip"
-  } else {
+  if ($verJson) {
+    $best = [regex]::Matches($verJson, 'node-v([0-9]+\.[0-9]+\.[0-9]+)-win-x64\.zip') |
+      ForEach-Object { [version]$_.Groups[1].Value } |
+      Sort-Object -Descending | Select-Object -First 1
+    if ($best -and $best -ge $NODE_MIN) { $file = "node-v$best-win-x64.zip" }
+  }
+  if ($file) {
     Fetch "https://registry.npmmirror.com/-/binary/node/latest-v22.x/$file" "$env:TEMP\sf-node.zip"
+  } else {
+    $idx = curl.exe -fsSL "https://nodejs.org/dist/index.json" 2>$null | ConvertFrom-Json
+    $v = ($idx | Where-Object { $_.lts -and ([version]($_.version.TrimStart("v"))) -ge $NODE_MIN } |
+          Select-Object -First 1).version
+    if (-not $v) { throw "找不到可用的 Node（需要 22.15 以上）。换个网络环境再试。" }
+    Fetch "https://nodejs.org/dist/$v/node-$v-win-x64.zip" "$env:TEMP\sf-node.zip"
   }
   Expand "$env:TEMP\sf-node.zip" "$env:TEMP\sf-node"
   $inner = Get-ChildItem "$env:TEMP\sf-node" -Directory | Select-Object -First 1

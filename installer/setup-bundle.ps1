@@ -134,7 +134,15 @@ foreach ($piece in @("node", "bin")) {
   RemoveWithRetry $dest
   Copy-Item (Join-Path $Payload $piece) $dest -Recurse
 }
-Ok "运行环境就绪（$NodeDir）"
+# dsh 的会话存储要 Node 22.15 才有的 zstd 接口。版本低了 dsh 一启动就抛
+# 「does not provide an export named 'createZstdDecompress'」——表现是聊天完全
+# 没反应，而入库还好好的（那条路直连 API 不经过 dsh），很难猜。
+# 包是我们自己打的，装的时候确认一下，别让坏包静悄悄发出去。
+$nodeVer = (& (Join-Path $NodeDir "node.exe") --version) -replace "^v", ""
+if ([version]$nodeVer -lt [version]"22.15.0") {
+  throw "这个安装包里的 Node 是 $nodeVer，太旧了（要 22.15 以上，聊天功能依赖它）。请重新下载安装包。"
+}
+Ok "运行环境就绪（$NodeDir，Node $nodeVer）"
 
 Step "安放程序本体"
 RemoveWithRetry $AppRepo
