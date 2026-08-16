@@ -891,7 +891,13 @@
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, book: lane.scope || "" }),
+        // chapter 只在读书那条带上：对话模式是书架级的，没有"当前章节"这回事
+        body: JSON.stringify({
+          message: text,
+          book: lane.scope || "",
+          chapter: (lane === readLane && lane.scope && currentFile)
+            ? currentFile.split("/").pop().replace(/\.md$/, "") : "",
+        }),
       });
       if (resp.status === 429) { addMsg(lane, "status", "助手还在忙上一件事，稍等再发。"); return; }
       if (!resp.ok || !resp.body) { addMsg(lane, "status", "连不上助手，检查「群星阅览室」窗口还开着没。"); return; }
