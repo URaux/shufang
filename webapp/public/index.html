@@ -57,6 +57,18 @@
   /* 阅读区 */
   #reader { flex: 1; overflow-y: auto; min-width: 0; }
   #reader .page { max-width: 46rem; margin: 0 auto; padding: 2.2rem 1.4rem 5rem; }
+  .editbar { display: flex; align-items: center; gap: .5rem; margin: -.8rem 0 1.4rem; flex-wrap: wrap; }
+  .editbar button { font: inherit; font-size: .85rem; padding: .3rem .8rem; border-radius: 999px;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
+  .editbar button:hover { background: var(--card); color: var(--ink); border-color: var(--accent-soft); }
+  .editbar button[disabled] { opacity: .5; cursor: default; }
+  .edittip { font-size: .8rem; color: var(--ink-soft); }
+  /* 编辑框用等宽字体：改译文常要对齐标记和缩进，比例字体下看不准 */
+  #editor { width: 100%; min-height: 60vh; box-sizing: border-box; padding: 1rem;
+    font: 1rem/1.75 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei", monospace;
+    color: var(--ink); background: var(--paper); border: 1px solid var(--line);
+    border-radius: .5rem; resize: vertical; }
+  #editor:focus { outline: 2px solid var(--accent, #8a6a3b); outline-offset: -1px; }
   #reader h1, #reader h2, #reader h3 { line-height: 1.4; margin: 1.6em 0 .6em; font-weight: 600; }
   #reader h1 { font-size: 1.55rem; } #reader h2 { font-size: 1.25rem; } #reader h3 { font-size: 1.05rem; }
   #reader p { line-height: 2; margin: .9em 0; font-size: 1.02rem; }
@@ -337,12 +349,19 @@
     if (currentBook) renderBookMenu();
   }
 
-  async function openBook(name) {
+  // keepChat：这不是「用户点开了一本书」，只是助手干完活后刷新一下目录。
+  // 这种时候既不能重载对话（会把刚聊的清掉），也不能跳回默认章节（读者正读着呢）。
+  async function openBook(name, opts) {
+    const keep = !!(opts && opts.keepChat);
+    const wasFile = currentFile;
     currentBook = await fetch("/api/book?name=" + encodeURIComponent(name)).then(r => r.json());
-    collabState = null;
-    loadHistory(name);            // 换成这本书自己的对话
+    if (!keep) { collabState = null; loadHistory(name); }
     refreshCollab(name);
     renderBookMenu();
+    if (keep) {
+      if (wasFile) openFile(wasFile);      // 停在原来那一章
+      return;
+    }
     // 默认打开梗概；没有就开第一章译文；再没有就第一章原文
     if (currentBook.outline) openFile(`Library/${name}/01-全书梗概.md`, "全书梗概");
     else if (currentBook.translated[0]) openFile(`Library/${name}/译文/${currentBook.translated[0]}`, currentBook.translated[0]);
@@ -409,18 +428,81 @@
     }
   }
 
+  let fileMd = "", fileMtime = 0, editing = false;
+
   async function openFile(rel, label) {
     const r = await fetch("/api/file?path=" + encodeURIComponent(rel)).then(r => r.json());
     if (r.error) return;
     currentFile = rel;
+    fileMd = r.md || "";
+    fileMtime = r.mtime || 0;
+    editing = false;
     crumb.textContent = (currentBook ? currentBook.name + " · " : "") + (label || rel.split("/").pop());
     const nav = chapterNav(rel);
-    reader.innerHTML = `<div class="page">${r.html}${nav}</div>`;
+    reader.innerHTML = `<div class="page">${editBar()}${r.html}${nav}</div>`;
     reader.scrollTop = 0;
     if (currentBook) renderBookMenu();
     sidebar.classList.remove("open");
     bindPager();
   }
+
+  // ---------------------------------------------------------------- 自己改
+  // 机翻出来的东西一定有要改的地方，而想改的人往往正是不会用命令行、
+  // 也不会专门去装 Obsidian 的那批。改不了，这软件就只剩「看个大概」。
+  // 所以给一个文本框就够了——不做富文本编辑器，不做实时预览。
+  const editBar = () => `<div class="editbar"><button data-edit="1">✏️ 改一改</button></div>`;
+
+  function enterEdit() {
+    if (!currentFile) return;
+    editing = true;
+    const page = reader.querySelector(".page");
+    if (!page) return;
+    page.innerHTML =
+      `<div class="editbar"><button data-save="1">保存</button>` +
+      `<button data-cancel="1">不改了</button>` +
+      `<span class="edittip">改完记得保存。想让助手帮你改，就在右边直接说。</span></div>` +
+      `<textarea id="editor" spellcheck="false"></textarea>`;
+    const ta = $("editor");
+    ta.value = fileMd;
+    ta.focus();
+    ta.addEventListener("keydown", e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveEdit(); }
+    });
+  }
+
+  async function saveEdit() {
+    const ta = $("editor");
+    if (!ta) return;
+    const btn = reader.querySelector("[data-save]");
+    if (btn) { btn.disabled = true; btn.textContent = "保存中…"; }
+    let r = null, why = "";
+    try {
+      r = await api("/api/file", { path: currentFile, md: ta.value, mtime: fileMtime });
+    } catch (e) {
+      // api() 遇到非 2xx 会抛，服务端的 hint 就在 message 里——那句话正是
+      // 用户唯一看得懂的部分（比如「文件刚被助手改过」），不能吞掉
+      why = (e && e.message) || "";
+    }
+    if (btn) { btn.disabled = false; btn.textContent = "保存"; }
+    if (!r || !r.ok) {
+      alert(why || "没能存进去，稍后再试。你的文字还在框里，可以先复制一份。");
+      return;
+    }
+    fileMd = ta.value;
+    fileMtime = r.mtime || 0;
+    editing = false;
+    const page = reader.querySelector(".page");
+    if (page) page.innerHTML = editBar() + r.html + chapterNav(currentFile);
+    bindPager();
+  }
+
+  reader.addEventListener("click", e => {
+    const el = e.target.closest("[data-edit],[data-save],[data-cancel]");
+    if (!el) return;
+    if (el.dataset.edit) return enterEdit();
+    if (el.dataset.save) return saveEdit();
+    if (el.dataset.cancel) { editing = false; openFile(currentFile); }
+  });
 
   // 上一章/下一章：在当前文件所属列表(译文或原文)里找邻居
   function chapterNav(rel) {
@@ -701,81 +783,84 @@
   }, 90000);
 
   // ------------------------------------------------------------------ 聊天
-  // 一个对话模型，两处显示：侧栏（纯文本）和对话视图（助手消息渲染 markdown）。
-  // 共用同一条 /api/chat 通道和同一个 streaming 标志——服务端本来也只允许一个在跑。
+  // 两条**互不相干**的对话：
+  //   读书模式右边那条 —— 只谈当前打开的这本书，记录存在书自己的目录里
+  //   对话模式那条     —— 书架级的通用对话，跟具体哪本书无关
+  // 原来是一条对话同时画进两个面板，所以「点开魔法书右边还是爱丽丝的话」，
+  // 而且读书和对话看到的永远是同一串——两个模式等于白分。
   let midSeq = 0;
-  const convo = [];
 
-  function paintInto(host, e, rich) {
-    let el = host.querySelector(`[data-mid="${e.mid}"]`);
-    if (!el) { el = document.createElement("div"); el.dataset.mid = e.mid; host.appendChild(el); }
-    el.className = "msg " + e.role + (rich && e.html ? " md" : "");
+  function makeLane(host, scrollEl, rich) {
+    return { items: [], host, scroll: scrollEl, rich, scope: null, loaded: false, seq: 0 };
+  }
+  const readLane = makeLane(msgs, msgs, false);        // 读书模式：纯文本，跟着当前书走
+  const chatLane = makeLane(chatBody, chatScroll, true); // 对话模式：渲染 markdown，恒为书架
+  const laneOf = () => (view === "chat" ? chatLane : readLane);
+
+  function paintEntry(lane, e) {
+    let el = lane.host.querySelector(`[data-mid="${e.mid}"]`);
+    if (!el) { el = document.createElement("div"); el.dataset.mid = e.mid; lane.host.appendChild(el); }
+    el.className = "msg " + e.role + (lane.rich && e.html ? " md" : "");
     // html 是服务端 marked 渲染 + 清洗过的；没有就退回纯文本
-    if (rich && e.html) el.innerHTML = e.html;
+    if (lane.rich && e.html) el.innerHTML = e.html;
     else el.textContent = e.text;
   }
-  function paintEntry(e) { paintInto(msgs, e, false); paintInto(chatBody, e, true); }
-  function scrollBoth() {
-    msgs.scrollTop = msgs.scrollHeight;
-    chatScroll.scrollTop = chatScroll.scrollHeight;
-  }
-  function addMsg(role, text, html) {
+  function scrollLane(lane) { lane.scroll.scrollTop = lane.scroll.scrollHeight; }
+
+  function addMsg(lane, role, text, html) {
     const e = { mid: ++midSeq, role, text: text || "", html: html || "" };
-    convo.push(e);
-    paintEntry(e);
+    lane.items.push(e);
+    paintEntry(lane, e);
     dockToEnd();          // 后台作业卡片永远贴在最下面
-    scrollBoth();
+    scrollLane(lane);
     return e;
   }
-  function dropMsg(e) {
-    const i = convo.indexOf(e);
-    if (i >= 0) convo.splice(i, 1);
-    for (const host of [msgs, chatBody]) {
-      const el = host.querySelector(`[data-mid="${e.mid}"]`);
-      if (el) el.remove();
-    }
+  function dropMsg(lane, e) {
+    const i = lane.items.indexOf(e);
+    if (i >= 0) lane.items.splice(i, 1);
+    const el = lane.host.querySelector(`[data-mid="${e.mid}"]`);
+    if (el) el.remove();
   }
   // 一段回复收尾时才渲染 markdown：流式过程中每个 delta 都往服务端跑一趟不划算
-  async function renderRich(e) {
+  async function renderRich(lane, e) {
     if (!e || !e.text.trim()) return;
     try {
       const r = await api("/api/render", { md: e.text });
-      if (r.html) { e.html = r.html; paintEntry(e); scrollBoth(); }
+      if (r.html) { e.html = r.html; paintEntry(lane, e); scrollLane(lane); }
     } catch { }
   }
 
-  const GREETING = "你好，我是群星阅览室助手。把书的文件路径发给我（或直接把文件放进书库文件夹再告诉我），我来整理概要；想看哪章就说「翻第几章」。";
+  const GREETING = "你好，我是群星阅览室助手。把书拖进来我帮你整理；整理好了去书架点开，那本书的问题在书里面问。";
 
-  // 每本书一段自己的对话，书架上另有一段。切书时整段换掉，
-  // 不然开着 A 书聊的内容会一直挂在 B 书右边。
-  let chatScope = null;              // 当前对话属于哪本书；null = 书架
-
-  function clearConvo() {
-    convo.length = 0;
-    for (const host of [msgs, chatBody]) {
-      for (const el of Array.from(host.querySelectorAll("[data-mid]"))) el.remove();
-    }
+  function clearLane(lane) {
+    lane.items.length = 0;
+    for (const el of Array.from(lane.host.querySelectorAll("[data-mid]"))) el.remove();
     dockToEnd();
   }
 
-  async function loadHistory(book) {
+  async function loadLane(lane, book) {
     const scope = book || null;
-    chatScope = scope;
-    clearConvo();
+    lane.scope = scope;
+    const token = ++lane.seq;         // 慢回来的旧请求不许再往新的对话里写
+    clearLane(lane);
     let r = null;
     const q = scope ? "?book=" + encodeURIComponent(scope) : "";
     try { r = await fetch("/api/chat/history" + q).then(x => x.json()); } catch { }
-    // 等回来的时候用户可能已经又切走了，别把旧书的历史铺到新书上
-    if (chatScope !== scope) return;
+    if (token !== lane.seq) return;
     const items = (r && r.items) || [];
-    for (const it of items) addMsg(it.role === "user" ? "user" : "bot", it.text, it.html);
+    for (const it of items) addMsg(lane, it.role === "user" ? "user" : "bot", it.text, it.html);
     if (!items.length) {
-      addMsg("bot", scope ? `这里是《${scope}》的对话。想看哪章就说「翻第几章」，想翻译就说「翻译第几章」。` : GREETING);
+      addMsg(lane, "bot", scope
+        ? `这里是《${scope}》的对话，只聊这本书。想看哪章就说「翻第几章」，想翻译就说「翻译第几章」。`
+        : GREETING);
     }
     if (r && r.brain === "claude") {
-      addMsg("status", "历史在助手自己的会话里，这里只显示本次启动后的消息。");
+      addMsg(lane, "status", "历史在助手自己的会话里，这里只显示本次启动后的消息。");
     }
   }
+
+  // 读书模式那条跟着书走；对话模式那条永远是书架级的，只在第一次进去时加载
+  const loadHistory = book => loadLane(readLane, book);
 
   let streaming = false;
   function setBusy(on) {
@@ -785,29 +870,31 @@
   }
 
   function send(from) {
+    // 两个输入框分属两个模式，各发各的，不再互相清空
     const box = from === "main" ? input2 : input;
     const text = box.value.trim();
     if (!text) return;
-    input.value = ""; input2.value = "";     // 两个框都清，免得另一个留着草稿被重发
-    return sendText(text);
+    box.value = "";
+    return sendText(text, from === "main" ? chatLane : readLane);
   }
 
-  async function sendText(text) {
+  async function sendText(text, lane) {
+    lane = lane || laneOf();
     if (!text || streaming) return;
-    addMsg("user", text);
+    addMsg(lane, "user", text);
     setBusy(true);
 
     let bot = null, statusEl = null;
-    const ensureBot = () => bot || (bot = addMsg("bot", ""));
+    const ensureBot = () => bot || (bot = addMsg(lane, "bot", ""));
 
     try {
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, book: chatScope || "" }),
+        body: JSON.stringify({ message: text, book: lane.scope || "" }),
       });
-      if (resp.status === 429) { addMsg("status", "助手还在忙上一件事，稍等再发。"); return; }
-      if (!resp.ok || !resp.body) { addMsg("status", "连不上助手，检查「群星阅览室」窗口还开着没。"); return; }
+      if (resp.status === 429) { addMsg(lane, "status", "助手还在忙上一件事，稍等再发。"); return; }
+      if (!resp.ok || !resp.body) { addMsg(lane, "status", "连不上助手，检查「群星阅览室」窗口还开着没。"); return; }
 
       const rd = resp.body.getReader();
       const dec = new TextDecoder();
@@ -824,31 +911,36 @@
           const [_, ev, dataStr] = evm;
           let data = {}; try { data = JSON.parse(dataStr); } catch { }
           if (ev === "delta") {
-            if (statusEl) { dropMsg(statusEl); statusEl = null; }
+            if (statusEl) { dropMsg(lane, statusEl); statusEl = null; }
             const e = ensureBot();
             e.text += data.text;
-            paintEntry(e);
-            scrollBoth();
+            paintEntry(lane, e);
+            scrollLane(lane);
           } else if (ev === "status") {
-            if (!statusEl) statusEl = addMsg("status", "");
+            if (!statusEl) statusEl = addMsg(lane, "status", "");
             statusEl.text = "⏳ " + data.text + "…";
-            paintEntry(statusEl);
+            paintEntry(lane, statusEl);
           } else if (ev === "turn") {
-            renderRich(bot);             // 工具调用之后新起一个气泡，旧的先定稿
+            renderRich(lane, bot);       // 工具调用之后新起一个气泡，旧的先定稿
             bot = null;
           } else if (ev === "error") {
-            addMsg("status", "⚠️ " + data.text);
+            addMsg(lane, "status", "⚠️ " + data.text);
           }
         }
       }
     } catch {
-      addMsg("status", "网络断了，稍后重试。");
+      addMsg(lane, "status", "网络断了，稍后重试。");
     } finally {
-      if (statusEl) dropMsg(statusEl);
+      if (statusEl) dropMsg(lane, statusEl);
       setBusy(false);
-      renderRich(bot);
+      renderRich(lane, bot);
+      // 没打开书的时候读书那条也是书架级的，跟对话那条同源——
+      // 让另一条下次显示时重新拉一遍，不然两边各说各的
+      if (lane === readLane && !lane.scope) chatLane.loaded = false;
+      if (lane === chatLane && !readLane.scope) loadLane(readLane, null);
       loadShelf();                        // 助手可能新建/翻完了章节，刷新书架
-      if (currentBook) openBook(currentBook.name).catch(() => { });
+      // 只有谈这本书的那条对话才可能改到书里的文件，刷新它
+      if (lane === readLane && currentBook) openBook(currentBook.name, { keepChat: true }).catch(() => { });
     }
   }
 
@@ -933,7 +1025,8 @@
     if (!j.summary || jobInfoShown.has(j.id)) return;
     jobInfoShown.add(j.id);
     try { localStorage.setItem("sfJobInfo", JSON.stringify([...jobInfoShown].slice(-50))); } catch { }
-    renderRich(addMsg("bot", j.summary));
+    // 传书是在书架上做的，这条「这是本什么书」就归书架级那条对话
+    renderRich(chatLane, addMsg(chatLane, "bot", j.summary));
   }
 
   const jobActive = j => j.state === "running" || j.state === "queued";
@@ -957,7 +1050,7 @@
     const active = jobList.some(jobActive);
     if (wasActive && !active) {            // 刚有作业做完，书架上多了一本
       loadShelf();
-      if (currentBook) openBook(currentBook.name).catch(() => { });
+      if (currentBook) openBook(currentBook.name, { keepChat: true }).catch(() => { });
     }
     scheduleJobPoll(active ? 4000 : 20000);
   }
@@ -1280,7 +1373,12 @@
     $("tabChat").classList.toggle("on", v === "chat");
     $("tabShop").classList.toggle("on", v === "workshop");
     if (v !== "read") sidebar.classList.remove("open");
-    if (v === "chat") { scrollBoth(); if (window.innerWidth > 860) input2.focus(); }
+    if (v === "chat") {
+      // 书架级那条对话第一次进来才拉，之后原样留着
+      if (!chatLane.loaded) { chatLane.loaded = true; loadLane(chatLane, null); }
+      else scrollLane(chatLane);
+      if (window.innerWidth > 860) input2.focus();
+    }
     if (v === "workshop") loadShop(true);
   }
   $("tabRead").addEventListener("click", () => setView("read"));
@@ -1288,7 +1386,8 @@
   $("tabShop").addEventListener("click", () => setView("workshop"));
   $("menuBtn").addEventListener("click", () => sidebar.classList.toggle("open"));
 
-  loadHistory();
+  // 启动落在读书模式，还没打开书，所以读书那条先给个空态提示
+  loadLane(readLane, null);
   loadShelf();
   loadShop(false);
   pollJobs();
