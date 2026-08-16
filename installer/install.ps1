@@ -216,27 +216,44 @@ if (Test-Path $Vault) {
   Ok "书库建在 $Vault"
 }
 
-# ---------------------------------------------------------------- 可选：Obsidian
-$ObsidianInstalled = Test-Path (Join-Path $env:LOCALAPPDATA "Obsidian\Obsidian.exe")
+# ---------------------------------------------------------------- Obsidian
+# 译文是机器翻的，一定有要改的地方，而 Obsidian 读写的就是书库里那批 .md，
+# 改完这边立刻看得到。所以它是默认装的一环，不是可选配件。
+#
+# 「装没装」不能靠猜路径：原来查 %LOCALAPPDATA%\Obsidian\Obsidian.exe，
+# 而实测这台机器上它在 E:\Obsidian\——装到别的盘很常见，结果就是明明装了
+# 却被判成没装，白下 316MB。真正该问的是 obsidian:// 这个协议有没有人接，
+# 因为我们依赖的正是它。
+Step "检查 Obsidian（用来自己改译文、做笔记）"
+$ObsidianInstalled = $false
+foreach ($root in @("HKCU:", "HKLM:")) {
+  $cmd = (Get-ItemProperty "$root\SOFTWARE\Classes\obsidian\shell\open\command" -ErrorAction SilentlyContinue)."(default)"
+  if ($cmd -match "obsidian") { $ObsidianInstalled = $true; break }
+}
 
-Write-Host ""
-Write-Host ">> 可选组件" -ForegroundColor Cyan
-Write-Host "   群星阅览室自带网页界面，看书+对话已经够用。"
-Write-Host "   Obsidian 是给想把书库当笔记库深度整理的人用的（约 100MB，可跳过）。"
-$wantObs = "" + (Read-Host "   要顺便装 Obsidian 吗 (y/N)")
-if ($wantObs -match "^[Yy]") {
-  Step "安装 Obsidian"
-  $orel = curl.exe -fsSL "https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest" 2>$null | ConvertFrom-Json
-  $oasset = $orel.assets | Where-Object { $_.name -match "^Obsidian.*\.exe$" -and $_.name -notmatch "arm64" } | Select-Object -First 1
-  if ($oasset) {
-    Fetch $oasset.browser_download_url "$env:TEMP\sf-obsidian.exe"
-    # NSIS 静默、按用户安装到 AppData，不要管理员
-    Start-Process "$env:TEMP\sf-obsidian.exe" -ArgumentList "/S" -Wait
-    Remove-Item -Force "$env:TEMP\sf-obsidian.exe" -ErrorAction SilentlyContinue
-    $ObsidianInstalled = $true
-    Ok "Obsidian 装好了"
+if ($ObsidianInstalled) {
+  Ok "已经装过了"
+} else {
+  Write-Host "   要下载 316MB。网不好可以按 N 跳过，以后重跑安装器随时能补。" -ForegroundColor DarkGray
+  $skipObs = "" + (Read-Host "   现在装 Obsidian 吗 (Y/n)")
+  if ($skipObs -match "^[Nn]") {
+    Write-Host "   跳过了。网页界面照常能看能改。" -ForegroundColor DarkGray
   } else {
-    Write-Host "   没取到 Obsidian 下载地址，跳过（不影响使用网页界面）。" -ForegroundColor Yellow
+    try {
+      $orel = curl.exe -fsSL "https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest" 2>$null | ConvertFrom-Json
+      $oasset = $orel.assets | Where-Object { $_.name -match "^Obsidian-[\d.]+\.exe$" } | Select-Object -First 1
+      if (-not $oasset) { throw "没取到下载地址" }
+      Fetch $oasset.browser_download_url "$env:TEMP\sf-obsidian.exe"
+      # NSIS 静默、按用户安装，不要管理员
+      Start-Process "$env:TEMP\sf-obsidian.exe" -ArgumentList "/S" -Wait
+      Remove-Item -Force "$env:TEMP\sf-obsidian.exe" -ErrorAction SilentlyContinue
+      $ObsidianInstalled = $true
+      Ok "Obsidian 装好了"
+    } catch {
+      # 装不上不该拦住整个安装 —— 群星阅览室本身完全能用
+      Write-Host "   Obsidian 这一步没成（$($_.Exception.Message)）。" -ForegroundColor Yellow
+      Write-Host "   不影响使用，联网后重跑一次安装器就能补上。" -ForegroundColor Yellow
+    }
   }
 }
 

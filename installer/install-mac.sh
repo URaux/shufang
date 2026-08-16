@@ -77,28 +77,34 @@ if [ ! -x "$BIN_DIR/pandoc" ]; then
 fi
 ok "Pandoc 就绪"
 
-# ---------------------------------------------------------------- Obsidian（可选）
-# 装不上不能让整个安装失败——群星阅览室自带网页界面，没有 Obsidian 一样能用。
+# ---------------------------------------------------------------- Obsidian
+# 译文是机器翻的，一定有要改的地方，而 Obsidian 读写的就是书库里那批 .md，
+# 改完这边立刻看得到。所以它是默认装的一环，不是可选配件。
+# 但装不上绝不能让整个安装失败——群星阅览室自带网页界面，照样能看能改。
 HAS_OBSIDIAN=0
 if [ -d "/Applications/Obsidian.app" ] || [ -d "$HOME/Applications/Obsidian.app" ]; then
   HAS_OBSIDIAN=1
   ok "已装过 Obsidian"
 else
   echo ""
-  printf '\033[36m>> 可选组件\033[0m\n'
-  echo "   群星阅览室自带网页界面，看书+对话已经够用。"
-  echo "   Obsidian 是给想把书库当笔记库深度整理的人用的（约 100MB，可跳过）。"
-  printf '   要顺便装 Obsidian 吗 (y/N): '
+  step "安装 Obsidian（用来自己改译文、做笔记）"
+  printf '\033[90m   要下载 218MB。网不好可以按 n 跳过，以后重跑安装器随时能补。\033[0m\n'
+  printf '   现在装吗 (Y/n): '
   read -r WANT_OBS </dev/tty
-  if [[ "$WANT_OBS" =~ ^[Yy] ]]; then
-    step "安装 Obsidian"
+  if [[ "$WANT_OBS" =~ ^[Nn] ]]; then
+    printf '\033[90m   跳过了。网页界面照常能看能改。\033[0m\n'
+  else
     install_obsidian() {
       local dmg_url mnt
-      dmg_url=$(curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest | grep -o 'https://[^"]*universal.dmg' | head -1)
+      # 资产名是 Obsidian-<版本>.dmg。原来这里写死找 universal.dmg，
+      # 而人家早就不叫这个了——grep 永远空手而归，这一步等于从来没成功过。
+      dmg_url=$(curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest \
+        | grep -o 'https://[^"]*/Obsidian-[0-9.]*\.dmg' | head -1)
       [ -n "$dmg_url" ] || return 1
       curl -fL --progress-bar "$dmg_url" -o /tmp/shufang-obsidian.dmg || return 1
       mnt=$(hdiutil attach -nobrowse -readonly /tmp/shufang-obsidian.dmg | grep -o '/Volumes/.*' | head -1)
       [ -n "$mnt" ] || return 1
+      mkdir -p "$HOME/Applications"
       cp -R "$mnt/Obsidian.app" "$HOME/Applications/" || { hdiutil detach "$mnt" >/dev/null 2>&1; return 1; }
       hdiutil detach "$mnt" >/dev/null 2>&1
       rm -f /tmp/shufang-obsidian.dmg

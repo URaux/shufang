@@ -848,7 +848,9 @@
   let midSeq = 0;
 
   function makeLane(host, scrollEl, rich) {
-    return { items: [], host, scroll: scrollEl, rich, scope: null, loaded: false, seq: 0 };
+    // hiddenJobs：这条对话已经翻篇的作业卡。换一段对话就把当时跑完的那些收起来。
+    return { items: [], host, scroll: scrollEl, rich, scope: null, session: "",
+             loaded: false, seq: 0, hiddenJobs: new Set() };
   }
   const readLane = makeLane(msgs, msgs, false);        // 读书模式：纯文本，跟着当前书走
   const chatLane = makeLane(chatBody, chatScroll, true); // 对话模式：渲染 markdown，恒为书架
@@ -892,7 +894,9 @@
   function clearLane(lane) {
     lane.items.length = 0;
     for (const el of Array.from(lane.host.querySelectorAll("[data-mid]"))) el.remove();
-    dockToEnd();
+    // 已经跑完的作业卡属于刚才那条对话，一起收走；还在跑的留着
+    for (const j of jobList) if (!jobActive(j)) lane.hiddenJobs.add(j.id);
+    renderJobs();
   }
 
   async function loadLane(lane, book) {
@@ -1150,13 +1154,19 @@
       `<button class="primary" data-job="retry" data-id="${id}">再试一次</button>${dismiss}`);
   }
 
+  // 作业卡以前是「一份画进两个面板」，对话拆成两条之后没跟着拆，
+  // 于是「新对话」清掉了消息、卡片还挂在那儿（用户截图反馈）。
+  //
+  // 分清两种卡：**还在跑**的是全局状态，哪条对话都该看得见；
+  // **已经跑完**的是一次事件通知，只属于当时那条对话，换一条就不该再出现。
   function renderJobs() {
-    const html = jobList.map(jobCard).join("");
-    for (const host of [msgs, chatBody]) {
-      const d = jobDock(host);
+    for (const lane of [readLane, chatLane]) {
+      const mine = jobList.filter(j => jobActive(j) || !lane.hiddenJobs.has(j.id));
+      const html = mine.map(jobCard).join("");
+      const d = jobDock(lane.host);
       d.innerHTML = html;
       d.style.display = html ? "flex" : "none";
-      host.appendChild(d);                 // 永远排在消息流最后
+      lane.host.appendChild(d);            // 永远排在消息流最后
     }
   }
 

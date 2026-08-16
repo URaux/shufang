@@ -115,6 +115,45 @@ else
   printf '\033[33m   这台电脑没装 python3，PDF 格式的书暂时读不了（epub/txt/docx 不受影响）。\033[0m\n'
 fi
 
+# ---------------------------------------------------------------- Obsidian
+# 译文是机器翻的，一定有要改的地方，而 Obsidian 读写的就是书库里那批 .md，
+# 改完这边立刻看得到。所以它是默认装的一环，不是可选配件。
+# 它是闭源软件，不能塞进我们的压缩包分发，只能从官方下载。
+# 但装不上绝不能让整个安装失败——群星阅览室自带网页界面，照样能看能改。
+step "检查 Obsidian（用来自己改译文、做笔记）"
+if [ -d "/Applications/Obsidian.app" ] || [ -d "$HOME/Applications/Obsidian.app" ]; then
+  ok "已经装过了"
+else
+  printf '\033[90m   要下载 218MB。网不好可以按 n 跳过，以后重跑安装器随时能补。\033[0m\n'
+  printf '   现在装吗 (Y/n): '
+  read -r WANT_OBS </dev/tty
+  if [[ "$WANT_OBS" =~ ^[Nn] ]]; then
+    printf '\033[90m   跳过了。网页界面照常能看能改。\033[0m\n'
+  else
+    obs_ok=0
+    # 资产名是 Obsidian-<版本>.dmg
+    DMG=$(curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest \
+      | grep -o 'https://[^"]*/Obsidian-[0-9.]*\.dmg' | head -1)
+    if [ -n "$DMG" ] && curl -fL --progress-bar "$DMG" -o /tmp/shufang-obsidian.dmg; then
+      MNT=$(hdiutil attach -nobrowse -readonly /tmp/shufang-obsidian.dmg | grep -o '/Volumes/.*' | head -1)
+      if [ -n "$MNT" ]; then
+        mkdir -p "$HOME/Applications"
+        cp -R "$MNT/Obsidian.app" "$HOME/Applications/" && obs_ok=1
+        hdiutil detach "$MNT" >/dev/null 2>&1
+      fi
+    fi
+    rm -f /tmp/shufang-obsidian.dmg
+    if [ "$obs_ok" = "1" ]; then
+      xattr -dr com.apple.quarantine "$HOME/Applications/Obsidian.app" 2>/dev/null || true
+      # 先起一次，让系统记住 obsidian:// 链接归它管
+      open -a "$HOME/Applications/Obsidian.app" --hide 2>/dev/null || true
+      ok "Obsidian 装好了"
+    else
+      printf '\033[33m   Obsidian 这一步没成，不影响使用。联网后重跑一次安装器就能补上。\033[0m\n'
+    fi
+  fi
+fi
+
 # ---------------------------------------------------------------- API key
 step "配置 DeepSeek"
 echo "   需要一个 DeepSeek API key（platform.deepseek.com 注册后创建，sk- 开头）。"
