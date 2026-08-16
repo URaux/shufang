@@ -4,6 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>群星阅览室</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTYgMjU2IiB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiI+CiAgPCEtLSDnvqTmmJ/pmIXop4jlrqTvvJrkuIDmnKzmkYrlvIDnmoTkuabvvIzkuabpobXkuIrmlrnmta7nnYDmmJ/ovrAgLS0+CiAgPHJlY3Qgd2lkdGg9IjI1NiIgaGVpZ2h0PSIyNTYiIHJ4PSI1MiIgZmlsbD0iIzFmMWIxNiIvPgogIDwhLS0g5pifIC0tPgogIDxnIGZpbGw9IiNlOGM4NzciPgogICAgPHBhdGggZD0iTTEyOCA0NCBMMTM0IDY2IEwxNTYgNzIgTDEzNCA3OCBMMTI4IDEwMCBMMTIyIDc4IEwxMDAgNzIgTDEyMiA2NiBaIi8+CiAgICA8Y2lyY2xlIGN4PSI3NiIgY3k9IjYyIiByPSI0LjUiLz4KICAgIDxjaXJjbGUgY3g9IjE4NiIgY3k9IjU4IiByPSI2Ii8+CiAgICA8Y2lyY2xlIGN4PSIyMDAiIGN5PSI5MiIgcj0iMy41Ii8+CiAgICA8Y2lyY2xlIGN4PSI2MCIgY3k9Ijk4IiByPSIzIi8+CiAgPC9nPgogIDwhLS0g5LmmIC0tPgogIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2YzZTlkNiIgc3Ryb2tlLXdpZHRoPSI5IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgPHBhdGggZD0iTTEyOCAxMzggQzExMCAxMjQgODIgMTIwIDUyIDEyNCBMNTIgMjAwIEM4MiAxOTYgMTEwIDIwMCAxMjggMjE0Ii8+CiAgICA8cGF0aCBkPSJNMTI4IDEzOCBDMTQ2IDEyNCAxNzQgMTIwIDIwNCAxMjQgTDIwNCAyMDAgQzE3NCAxOTYgMTQ2IDIwMCAxMjggMjE0Ii8+CiAgICA8cGF0aCBkPSJNMTI4IDEzOCBMMTI4IDIxNCIvPgogIDwvZz4KICA8ZyBzdHJva2U9IiNjODlhNGEiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KICAgIDxwYXRoIGQ9Ik03MCAxNDYgTDEwNiAxNTAiLz4KICAgIDxwYXRoIGQ9Ik03MCAxNjYgTDEwNiAxNzAiLz4KICAgIDxwYXRoIGQ9Ik0xNTAgMTUwIEwxODYgMTQ2Ii8+CiAgICA8cGF0aCBkPSJNMTUwIDE3MCBMMTg2IDE2NiIvPgogIDwvZz4KPC9zdmc+Cg==" />
+<link rel="apple-touch-icon" href="data:image/png;base64,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" />
+<meta name="theme-color" content="#1f1b16" />
 <style>
   /* 全站一套米纸色配色；组件只认变量。 */
   :root {
@@ -63,6 +66,9 @@
   .editbar button:hover { background: var(--card); color: var(--ink); border-color: var(--accent-soft); }
   .editbar button[disabled] { opacity: .5; cursor: default; }
   .edittip { font-size: .8rem; color: var(--ink-soft); }
+  .editbar a.obs { font-size: .85rem; padding: .3rem .8rem; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--ink-soft); text-decoration: none; }
+  .editbar a.obs:hover { background: var(--card); color: var(--ink); border-color: var(--accent-soft); }
   /* 编辑框用等宽字体：改译文常要对齐标记和缩进，比例字体下看不准 */
   #editor { width: 100%; min-height: 60vh; box-sizing: border-box; padding: 1rem;
     font: 1rem/1.75 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei", monospace;
@@ -103,8 +109,27 @@
   #sendBtn:disabled, #sendBtn2:disabled { opacity: .5; cursor: default; }
 
   /* 对话视图：居中单列（与读书的三栏区分靠布局，不靠配色） */
-  #chatview { flex: 1; min-width: 0; flex-direction: column; background: var(--paper); }
+  #chatview { flex: 1; min-width: 0; flex-direction: row; background: var(--paper); }
+  #chatMain { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   #chatScroll { flex: 1; overflow-y: auto; }
+  /* 会话列表：跟网页版聊天一个位置和一个习惯，左边一列，最新的在上面 */
+  #sessions { width: 15rem; flex-shrink: 0; border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; overflow-y: auto; padding: .8rem .6rem; gap: .5rem; }
+  #newSession { font: inherit; font-size: .9rem; padding: .5rem; border-radius: .5rem;
+    border: 1px dashed var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
+  #newSession:hover { border-style: solid; color: var(--ink); border-color: var(--accent-soft); }
+  #sessionList { display: flex; flex-direction: column; gap: .15rem; }
+  .sess { display: flex; align-items: center; gap: .3rem; border-radius: .45rem; padding: .1rem .1rem .1rem .5rem; }
+  .sess:hover { background: var(--card); }
+  .sess.on { background: var(--card); box-shadow: inset 2px 0 0 var(--accent); }
+  .sess .name { flex: 1; min-width: 0; font: inherit; font-size: .88rem; text-align: left;
+    background: none; border: 0; color: var(--ink); cursor: pointer; padding: .45rem 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sess .act { opacity: 0; font-size: .8rem; background: none; border: 0; cursor: pointer;
+    color: var(--ink-mute); padding: .3rem .2rem; }
+  .sess:hover .act, .sess.on .act { opacity: 1; }
+  .sess .act:hover { color: var(--ink); }
+  .sess-empty { font-size: .82rem; color: var(--ink-mute); padding: .4rem .5rem; line-height: 1.7; }
   .col { max-width: 880px; margin: 0 auto; padding: 0 1.2rem; }
   #chatBody { display: flex; flex-direction: column; gap: 1rem; padding-top: 1.8rem; padding-bottom: 2.5rem; }
   #chatBody .msg { max-width: 88%; padding: .75rem 1.05rem; border-radius: 14px; font-size: 1rem; line-height: 1.9; }
@@ -189,6 +214,11 @@
     .tabs button { padding: .3rem .6rem; }
     #chatBody .msg { max-width: 94%; }
     .col { padding: 0 .9rem; }
+    /* 窄屏放不下并排两栏：会话列表变成盖上来的一层，点顶栏的☰开关 */
+    #sessions { position: fixed; inset: 49px 0 0 0; width: 100%; z-index: 20;
+      display: none; background: var(--paper); }
+    body.view-chat #sessions.open { display: flex; }
+    body.view-chat #menuBtn { display: block; }
   }
 
   /* 校对协作 */
@@ -288,14 +318,20 @@
     </section>
 
     <section id="chatview">
-      <div id="chatScroll"><div id="chatBody" class="col"></div></div>
-      <div id="chatComposer">
-        <div class="col">
-          <button id="clipBtn" title="传一本书">📎</button>
-          <textarea id="input2" rows="3" placeholder="说点什么…（回车发送，Shift+回车换行）"></textarea>
-          <button id="sendBtn2">发送</button>
+      <aside id="sessions">
+        <button id="newSession">＋ 新对话</button>
+        <div id="sessionList"></div>
+      </aside>
+      <div id="chatMain">
+        <div id="chatScroll"><div id="chatBody" class="col"></div></div>
+        <div id="chatComposer">
+          <div class="col">
+            <button id="clipBtn" title="传一本书">📎</button>
+            <textarea id="input2" rows="3" placeholder="说点什么…（回车发送，Shift+回车换行）"></textarea>
+            <button id="sendBtn2">发送</button>
+          </div>
+          <div class="col chat-hint" id="chatHint"></div>
         </div>
-        <div class="col chat-hint" id="chatHint"></div>
       </div>
     </section>
 
@@ -450,7 +486,26 @@
   // 机翻出来的东西一定有要改的地方，而想改的人往往正是不会用命令行、
   // 也不会专门去装 Obsidian 的那批。改不了，这软件就只剩「看个大概」。
   // 所以给一个文本框就够了——不做富文本编辑器，不做实时预览。
-  const editBar = () => `<div class="editbar"><button data-edit="1">✏️ 改一改</button></div>`;
+  // 装了 Obsidian 就多给一条路：书库本来就是个 Obsidian vault，
+  // 点过去就有双链、大纲、图谱和全文搜索，比我们自己造编辑器强得多。
+  // 没装就不显示——点了没反应的按钮比没有按钮更糟。
+  let obsidian = { ok: false, vault: "" };
+  fetch("/api/status").then(r => r.json())
+    .then(s => { obsidian = { ok: !!s.obsidian, vault: s.vaultName || "" }; })
+    .catch(() => { });
+
+  function obsidianHref(rel) {
+    if (!obsidian.ok || !obsidian.vault || !rel) return "";
+    return "obsidian://open?vault=" + encodeURIComponent(obsidian.vault)
+      + "&file=" + encodeURIComponent(rel.replace(/\.md$/, ""));
+  }
+
+  const editBar = () => {
+    const href = obsidianHref(currentFile);
+    return `<div class="editbar"><button data-edit="1">✏️ 改一改</button>`
+      + (href ? `<a class="obs" href="${href}">在 Obsidian 里打开</a>` : "")
+      + `</div>`;
+  };
 
   function enterEdit() {
     if (!currentFile) return;
@@ -844,7 +899,8 @@
     const token = ++lane.seq;         // 慢回来的旧请求不许再往新的对话里写
     clearLane(lane);
     let r = null;
-    const q = scope ? "?book=" + encodeURIComponent(scope) : "";
+    const q = scope ? "?book=" + encodeURIComponent(scope)
+      : (lane.session ? "?session=" + encodeURIComponent(lane.session) : "");
     try { r = await fetch("/api/chat/history" + q).then(x => x.json()); } catch { }
     if (token !== lane.seq) return;
     const items = (r && r.items) || [];
@@ -859,8 +915,80 @@
     }
   }
 
-  // 读书模式那条跟着书走；对话模式那条永远是书架级的，只在第一次进去时加载
+  // 读书模式那条跟着书走
   const loadHistory = book => loadLane(readLane, book);
+
+  // ---------------------------------------------------------------- 会话管理
+  // 对话模式能像网页版聊天那样开好几段、各聊各的。读书模式不需要——
+  // 那条永远绑在当前这本书上，一本书一段。
+  let sessions = [], curSession = "";
+
+  function renderSessions() {
+    const host = $("sessionList");
+    if (!sessions.length) {
+      host.innerHTML = `<div class="sess-empty">还没有对话。点上面「新对话」开一段。</div>`;
+      return;
+    }
+    host.innerHTML = sessions.map(s => {
+      const on = s.id === curSession ? " on" : "";
+      // id 也要转义：它是从磁盘读回来的，跟标题同一个信任等级。
+      // 带个引号就能从属性里逃出去往页面注标签。
+      const id = esc(s.id);
+      return `<div class="sess${on}" data-sid="${id}">`
+        + `<button class="name" data-open="${id}" title="${esc(s.title)}">${esc(s.title)}</button>`
+        + `<button class="act" data-ren="${id}" title="改名">✎</button>`
+        + `<button class="act" data-del="${id}" title="删掉">🗑</button></div>`;
+    }).join("");
+  }
+
+  async function loadSessions(pick) {
+    try { sessions = (await fetch("/api/chat/sessions").then(r => r.json())).sessions || []; }
+    catch { sessions = []; }
+    if (pick) curSession = pick;
+    // 上次选的那段被删了，或者头一回进来，就落到最近用过的那段
+    if (!sessions.some(s => s.id === curSession)) curSession = sessions.length ? sessions[0].id : "";
+    renderSessions();
+    return curSession;
+  }
+
+  async function newSession() {
+    let r = null;
+    try { r = await api("/api/chat/session/new", {}); } catch (e) { alert(e.message); return; }
+    await loadSessions(r.id);
+    chatLane.session = r.id;
+    await loadLane(chatLane, null);
+  }
+
+  $("newSession").addEventListener("click", newSession);
+
+  $("sessions").addEventListener("click", async e => {
+    const el = e.target.closest("[data-open],[data-ren],[data-del]");
+    if (!el) return;
+    if (el.dataset.open) {
+      if (el.dataset.open === curSession) return;
+      curSession = el.dataset.open;
+      chatLane.session = curSession;
+      renderSessions();
+      $("sessions").classList.remove("open");
+      return loadLane(chatLane, null);
+    }
+    if (el.dataset.ren) {
+      const cur = (sessions.find(s => s.id === el.dataset.ren) || {}).title || "";
+      const title = prompt("给这段对话起个名字", cur);
+      if (title === null) return;
+      try { await api("/api/chat/session/rename", { id: el.dataset.ren, title }); }
+      catch (err) { alert(err.message || "改名没成功"); }
+      return loadSessions();
+    }
+    if (el.dataset.del) {
+      const s = sessions.find(x => x.id === el.dataset.del) || {};
+      if (!confirm(`删掉「${s.title || "这段对话"}」？\n\n（会先挪进书库的「已删除」文件夹，不是立刻抹掉）`)) return;
+      try { await api("/api/chat/session/delete", { id: el.dataset.del }); } catch (e) { alert(e.message); return; }
+      await loadSessions();
+      chatLane.session = curSession;
+      return loadLane(chatLane, null);
+    }
+  });
 
   let streaming = false;
   function setBusy(on) {
@@ -895,6 +1023,7 @@
         body: JSON.stringify({
           message: text,
           book: lane.scope || "",
+          session: lane.scope ? "" : (lane.session || ""),
           chapter: (lane === readLane && lane.scope && currentFile)
             ? currentFile.split("/").pop().replace(/\.md$/, "") : "",
         }),
@@ -943,7 +1072,9 @@
       // 没打开书的时候读书那条也是书架级的，跟对话那条同源——
       // 让另一条下次显示时重新拉一遍，不然两边各说各的
       if (lane === readLane && !lane.scope) chatLane.loaded = false;
-      if (lane === chatLane && !readLane.scope) loadLane(readLane, null);
+      if (lane === chatLane && !readLane.scope && !chatLane.session) loadLane(readLane, null);
+      // 会话标题是服务端拿第一句话生成的，发完刷一下列表才看得见
+      if (lane === chatLane && lane.session) loadSessions(lane.session);
       loadShelf();                        // 助手可能新建/翻完了章节，刷新书架
       // 只有谈这本书的那条对话才可能改到书里的文件，刷新它
       if (lane === readLane && currentBook) openBook(currentBook.name, { keepChat: true }).catch(() => { });
@@ -1380,9 +1511,11 @@
     $("tabShop").classList.toggle("on", v === "workshop");
     if (v !== "read") sidebar.classList.remove("open");
     if (v === "chat") {
-      // 书架级那条对话第一次进来才拉，之后原样留着
-      if (!chatLane.loaded) { chatLane.loaded = true; loadLane(chatLane, null); }
-      else scrollLane(chatLane);
+      // 第一次进来才拉会话列表和内容，之后原样留着
+      if (!chatLane.loaded) {
+        chatLane.loaded = true;
+        loadSessions().then(id => { chatLane.session = id; return loadLane(chatLane, null); });
+      } else scrollLane(chatLane);
       if (window.innerWidth > 860) input2.focus();
     }
     if (v === "workshop") loadShop(true);
@@ -1390,7 +1523,11 @@
   $("tabRead").addEventListener("click", () => setView("read"));
   $("tabChat").addEventListener("click", () => setView("chat"));
   $("tabShop").addEventListener("click", () => setView("workshop"));
-  $("menuBtn").addEventListener("click", () => sidebar.classList.toggle("open"));
+  // ☰ 在读书模式开书目录，在对话模式开会话列表——同一个位置，同一个含义
+  $("menuBtn").addEventListener("click", () => {
+    if (view === "chat") $("sessions").classList.toggle("open");
+    else sidebar.classList.toggle("open");
+  });
 
   // 启动落在读书模式，还没打开书，所以读书那条先给个空态提示
   loadLane(readLane, null);
