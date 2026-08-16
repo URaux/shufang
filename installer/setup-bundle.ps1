@@ -159,13 +159,43 @@ if (Test-Path $Vault) {
 
 # ---------------------------------------------------------------- PDF 支持
 Step "检查 PDF 支持"
-if (Get-Command python -ErrorAction SilentlyContinue) {
+# 三个名字都试：运行期 ingest.js 就是 python/python3/py 轮着找的，
+# 安装期口径得跟它一致，否则会出现「装的时候说没有、用的时候却有」。
+# 而且不能只看 Get-Command 找不找得到 —— Windows 应用商店在 WindowsApps 下面
+# 放了个同名的桩，跑起来只会弹商店。必须真问一次版本才算数。
+$PyExe = ""
+foreach ($cand in @("python", "python3", "py")) {
+  $c = Get-Command $cand -ErrorAction SilentlyContinue
+  if (-not $c) { continue }
+  # 注意这里不能写 [string]$ver：PowerShell 里 [string]$null 仍然是 $null，
+  # 而商店那个桩恰恰什么都不输出 —— [regex]::Match 会抛 ArgumentNullException，
+  # 在 $ErrorActionPreference="Stop" 下直接把整个安装打断。只有 "" + x 一定得到字符串。
+  $ver = ""
+  try { $ver = "" + (& $c.Source --version 2>&1 | Select-Object -First 1) } catch { continue }
+  $m = [regex]::Match($ver, "(\d+)\.(\d+)")
+  if (-not $m.Success) { continue }                      # 商店那个桩答不出版本
+  $major = [int]$m.Groups[1].Value; $minor = [int]$m.Groups[2].Value
+  if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 9)) { continue }   # pymupdf4llm 要 3.9+
+  $PyExe = $c.Source
+  break
+}
+
+if ($PyExe) {
   # 版本必须钉死。pymupdf4llm 从 1.27 起 import 时就硬 import onnxruntime（自带 OCR），
   # 而 onnxruntime 在不少 Windows 机器上 DLL load failed —— 实测本机 1.22/1.28 都起不来，
   # 结果是 import 直接崩、PDF 支持静默消失，报错用户完全看不懂。0.0.27 不碰它。
-  python -m pip install --quiet --user "pymupdf4llm==0.0.27" 2>$null
-  Ok "PDF 支持就绪"
+  # 底座也一起钉：只钉 pymupdf4llm 的话 pymupdf 会浮动到新版，等于没钉。
+  # --user：装进用户自己的包目录，不碰系统站点目录，也不需要管理员。
+  & $PyExe -m pip install --quiet --user "pymupdf4llm==0.0.27" "pymupdf==1.26.3" 2>$null
+  # 装完真 import 一次再说「就绪」—— 上面那个 onnxruntime 的坑正是「装上了但 import 就崩」
+  & $PyExe -c "import pymupdf4llm" 2>$null | Out-Null
+  if ($LASTEXITCODE -eq 0) {
+    Ok "PDF 支持就绪（用你电脑上的 Python）"
+  } else {
+    Write-Host "   PDF 组件装上了但跑不起来，PDF 格式的书暂时读不了（epub/txt/docx 不受影响）。" -ForegroundColor Yellow
+  }
 } else {
+
   Write-Host "   这台电脑没装 Python，PDF 格式的书暂时读不了（epub/txt/docx 不受影响）。" -ForegroundColor Yellow
   Write-Host "   想读 PDF：去 python.org 装一个 Python，再重跑一次本安装器就行。" -ForegroundColor Yellow
 }

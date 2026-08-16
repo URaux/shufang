@@ -128,12 +128,21 @@ Get-Process node -ErrorAction SilentlyContinue | ForEach-Object {
 if ($stopped -gt 0) { Start-Sleep -Seconds 2; Ok "已关掉 $stopped 个正在运行的窗口" } else { Ok "没有在运行的" }
 
 # ---------------------------------------------------------------- Node
+# dsh 的会话存储 import 了 zlib 的 zstd 接口，那是 Node 22.15 才有的。
+# 版本低了 dsh 一启动就抛「does not provide an export named 'createZstdDecompress'」，
+# 表现是聊天完全没反应（入库还好好的，因为那条路直连 API 不经过 dsh）。
+$NODE_MIN = [version]"22.15.0"
+
+# 不复用系统 Node，哪怕它版本够。
+# 用 nvm / volta 的人随时会 `nvm use 18` 切走，而我们对版本的要求是硬的（22.15+），
+# 切走之后的表现是「聊天一点反应没有、传书整理却完全正常」—— 用户根本联想不到
+# 是自己切了 Node 版本，我们也没法远程诊断。自带一份几十兆换一个不会被外部
+# 状态搞坏的运行时，划算。
+#
+# 反过来，我们也绝不往系统那份里装东西：dsh 一律装进我们自己的目录，
+# 靠进程级的 npm_config_prefix，不碰用户的 ~/.npmrc。
 Step "安装 Node（网页程序的运行环境）"
 if (-not (Test-Path (Join-Path $NodeDir "node.exe"))) {
-  # dsh 的会话存储 import 了 zlib 的 zstd 接口，那是 Node 22.15 才有的。
-  # 版本低了 dsh 一启动就抛「does not provide an export named 'createZstdDecompress'」，
-  # 表现是聊天完全没反应（入库还好好的，因为那条路直连 API 不经过 dsh）。
-  $NODE_MIN = [version]"22.15.0"
 
   # 阿里云 npmmirror 在国内很快且没被墙；失败回退官方。
   # 注意 latest-v22.x/ 这个目录名骗人——它列的是**所有** v22 版本，不是最新那个。
@@ -163,7 +172,13 @@ if (-not (Test-Path (Join-Path $NodeDir "node.exe"))) {
 }
 $env:Path = "$NodeDir;$BinDir;$env:Path"
 # npm 全局装到便携 node 目录（无需管理员）
-& (Join-Path $NodeDir "npm.cmd") config set prefix "$NodeDir" 2>$null | Out-Null
+# 用环境变量而不是 `npm config set prefix`。
+# 后者写的是**用户全局**的 ~/.npmrc，等于把用户自己 npm i -g 的去向改掉了——
+# 自己做开发的人从此往我们的目录里装包，而且卸载我们也不会还原。
+# 实测残留：某台机器的 ~/.npmrc 里躺着一行指向临时打包目录的 prefix。
+# 环境变量优先级本来就高于用户配置（npm config list 里标 "overridden by env"），
+# 效果一样，但只影响当前这个安装进程，出了这扇门什么都没变。
+$env:npm_config_prefix = $NodeDir
 Ok "Node $(& (Join-Path $NodeDir 'node.exe') --version) 就绪"
 
 # ---------------------------------------------------------------- Pandoc
@@ -259,13 +274,43 @@ if ($ObsidianInstalled) {
 
 # ---------------------------------------------------------------- PDF 支持
 Step "检查 PDF 支持"
-if (Get-Command python -ErrorAction SilentlyContinue) {
+# 三个名字都试：运行期 ingest.js 就是 python/python3/py 轮着找的，
+# 安装期口径得跟它一致，否则会出现「装的时候说没有、用的时候却有」。
+# 而且不能只看 Get-Command 找不找得到 —— Windows 应用商店在 WindowsApps 下面
+# 放了个同名的桩，跑起来只会弹商店。必须真问一次版本才算数。
+$PyExe = ""
+foreach ($cand in @("python", "python3", "py")) {
+  $c = Get-Command $cand -ErrorAction SilentlyContinue
+  if (-not $c) { continue }
+  # 注意这里不能写 [string]$ver：PowerShell 里 [string]$null 仍然是 $null，
+  # 而商店那个桩恰恰什么都不输出 —— [regex]::Match 会抛 ArgumentNullException，
+  # 在 $ErrorActionPreference="Stop" 下直接把整个安装打断。只有 "" + x 一定得到字符串。
+  $ver = ""
+  try { $ver = "" + (& $c.Source --version 2>&1 | Select-Object -First 1) } catch { continue }
+  $m = [regex]::Match($ver, "(\d+)\.(\d+)")
+  if (-not $m.Success) { continue }                      # 商店那个桩答不出版本
+  $major = [int]$m.Groups[1].Value; $minor = [int]$m.Groups[2].Value
+  if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 9)) { continue }   # pymupdf4llm 要 3.9+
+  $PyExe = $c.Source
+  break
+}
+
+if ($PyExe) {
   # 版本必须钉死。pymupdf4llm 从 1.27 起 import 时就硬 import onnxruntime（自带 OCR），
   # 而 onnxruntime 在不少 Windows 机器上 DLL load failed —— 实测本机 1.22/1.28 都起不来，
   # 结果是 import 直接崩、PDF 支持静默消失，报错用户完全看不懂。0.0.27 不碰它。
-  python -m pip install --quiet --user "pymupdf4llm==0.0.27" 2>$null
-  Ok "PDF 支持就绪"
+  # 底座也一起钉：只钉 pymupdf4llm 的话 pymupdf 会浮动到新版，等于没钉。
+  # --user：装进用户自己的包目录，不碰系统站点目录，也不需要管理员。
+  & $PyExe -m pip install --quiet --user "pymupdf4llm==0.0.27" "pymupdf==1.26.3" 2>$null
+  # 装完真 import 一次再说「就绪」—— 上面那个 onnxruntime 的坑正是「装上了但 import 就崩」
+  & $PyExe -c "import pymupdf4llm" 2>$null | Out-Null
+  if ($LASTEXITCODE -eq 0) {
+    Ok "PDF 支持就绪（用你电脑上的 Python）"
+  } else {
+    Write-Host "   PDF 组件装上了但跑不起来，PDF 格式的书暂时读不了（epub/txt/docx 不受影响）。" -ForegroundColor Yellow
+  }
 } else {
+
   Write-Host "   这台电脑没装 Python，PDF 格式的书暂时读不了（epub/txt/docx 不受影响）。" -ForegroundColor Yellow
   Write-Host "   想读 PDF：去 python.org 装一个 Python，再重跑一次本安装器就行。" -ForegroundColor Yellow
 }
