@@ -340,6 +340,7 @@
   async function openBook(name) {
     currentBook = await fetch("/api/book?name=" + encodeURIComponent(name)).then(r => r.json());
     collabState = null;
+    loadHistory(name);            // 换成这本书自己的对话
     refreshCollab(name);
     renderBookMenu();
     // 默认打开梗概；没有就开第一章译文；再没有就第一章原文
@@ -443,7 +444,7 @@
     const el = e.target.closest("[data-book],[data-file],[data-sug],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook");
     if (!el) return;
     if (el.id === "uploadBook") { pickFile(); return; }
-    if (el.id === "backShelf") { currentBook = null; currentFile = null; collabState = null; loadShelf(); return; }
+    if (el.id === "backShelf") { currentBook = null; currentFile = null; collabState = null; loadHistory(null); loadShelf(); return; }
     if (el.id === "joinShared") { joinWizard(); return; }
     if (el.id === "shareBook") { shareWizard(); return; }
     if (el.id === "showInvite") { showInvite(); return; }
@@ -745,12 +746,32 @@
 
   const GREETING = "你好，我是群星阅览室助手。把书的文件路径发给我（或直接把文件放进书库文件夹再告诉我），我来整理概要；想看哪章就说「翻第几章」。";
 
-  async function loadHistory() {
+  // 每本书一段自己的对话，书架上另有一段。切书时整段换掉，
+  // 不然开着 A 书聊的内容会一直挂在 B 书右边。
+  let chatScope = null;              // 当前对话属于哪本书；null = 书架
+
+  function clearConvo() {
+    convo.length = 0;
+    for (const host of [msgs, chatBody]) {
+      for (const el of Array.from(host.querySelectorAll("[data-mid]"))) el.remove();
+    }
+    dockToEnd();
+  }
+
+  async function loadHistory(book) {
+    const scope = book || null;
+    chatScope = scope;
+    clearConvo();
     let r = null;
-    try { r = await fetch("/api/chat/history").then(x => x.json()); } catch { }
+    const q = scope ? "?book=" + encodeURIComponent(scope) : "";
+    try { r = await fetch("/api/chat/history" + q).then(x => x.json()); } catch { }
+    // 等回来的时候用户可能已经又切走了，别把旧书的历史铺到新书上
+    if (chatScope !== scope) return;
     const items = (r && r.items) || [];
     for (const it of items) addMsg(it.role === "user" ? "user" : "bot", it.text, it.html);
-    if (!items.length) addMsg("bot", GREETING);
+    if (!items.length) {
+      addMsg("bot", scope ? `这里是《${scope}》的对话。想看哪章就说「翻第几章」，想翻译就说「翻译第几章」。` : GREETING);
+    }
     if (r && r.brain === "claude") {
       addMsg("status", "历史在助手自己的会话里，这里只显示本次启动后的消息。");
     }
@@ -783,7 +804,7 @@
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, book: chatScope || "" }),
       });
       if (resp.status === 429) { addMsg("status", "助手还在忙上一件事，稍等再发。"); return; }
       if (!resp.ok || !resp.body) { addMsg("status", "连不上助手，检查「群星阅览室」窗口还开着没。"); return; }
