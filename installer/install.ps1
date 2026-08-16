@@ -1,6 +1,21 @@
 ﻿# 群星阅览室 一键安装器（零依赖版）
 # 不用 winget、不用 git、不要管理员权限。所有东西装进用户目录 ~\.shufang。
 # 既可编译成 exe 双击运行，也可 powershell -File 运行。
+#
+# 两类用户都要照顾，但用不同的办法：
+#
+# 傻瓜路线（默认）：什么都自带，一路回车，跟你电脑上别的东西互不干扰。
+#   安装器不读你的 PATH、不改 ~/.npmrc、不动注册表（只读一下 obsidian:// 认它装没装）。
+#
+# 程序员路线（装完再开）：不想让它多占几百兆、想用自己那套 pandoc/dsh，
+#   在 ~/.shufang/config.json 里加一行 "preferSystemTools": true 就行——
+#   启动时会把你的 PATH 排在我们自带的前面，谁在前面就用谁。
+#   唯独 Node 不参与：dsh 硬要 22.15+，而用 nvm 的人一句 `nvm use 18` 就能把它换掉，
+#   换掉之后的表现是「聊天没反应、别的全正常」，最难查。自带一份省这份心。
+#
+# 之所以不在安装器里做「检测到就问你要不要复用」：那要把 Node 目录、npm 全局前缀、
+# 启动器 PATH 十来处全部改成可变的，主安装路径上的风险跟收益不成比例。
+# 配置文件里一行开关，效果一样，而且随时能改回来。
 
 $ErrorActionPreference = "Stop"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
