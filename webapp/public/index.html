@@ -135,21 +135,21 @@
   #chatBody .msg { max-width: 88%; padding: .75rem 1.05rem; border-radius: 14px; font-size: 1rem; line-height: 1.9; }
   #chatBody .msg.bot { border: 1px solid var(--line); }
   #chatBody .msg.status { border: 0; padding: 0 .4rem; font-size: .85rem; }
-  #chatBody .msg.md { white-space: normal; }
-  #chatBody .msg.md > *:first-child { margin-top: 0; }
-  #chatBody .msg.md > *:last-child { margin-bottom: 0; }
-  #chatBody .msg.md p { margin: .7em 0; }
-  #chatBody .msg.md h1, #chatBody .msg.md h2, #chatBody .msg.md h3 { font-size: 1.08rem; margin: 1.1em 0 .5em; font-weight: 600; }
-  #chatBody .msg.md ul, #chatBody .msg.md ol { margin: .6em 0 .6em 1.3em; }
-  #chatBody .msg.md li { margin: .25em 0; }
-  #chatBody .msg.md code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: #f0ead9; border: 1px solid var(--line); padding: .08em .35em; border-radius: 4px; }
-  #chatBody .msg.md pre { background: #f6f1e4; border: 1px solid var(--line); border-radius: 8px; padding: .7rem .85rem; overflow-x: auto; margin: .8em 0; }
-  #chatBody .msg.md pre code { background: none; border: 0; padding: 0; font-size: .85em; line-height: 1.7; }
-  #chatBody .msg.md blockquote { border-left: 3px solid var(--accent-soft); padding-left: .9em; color: var(--ink-soft); margin: .8em 0; }
-  #chatBody .msg.md a { color: var(--accent); }
-  #chatBody .msg.md table { border-collapse: collapse; margin: .8em 0; width: 100%; }
-  #chatBody .msg.md th, #chatBody .msg.md td { border: 1px solid var(--line); padding: .35em .6em; font-size: .92em; }
-  #chatBody .msg.md hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
+  .msg.md { white-space: normal; }
+  .msg.md > *:first-child { margin-top: 0; }
+  .msg.md > *:last-child { margin-bottom: 0; }
+  .msg.md p { margin: .7em 0; }
+  .msg.md h1, .msg.md h2, .msg.md h3 { font-size: 1.08rem; margin: 1.1em 0 .5em; font-weight: 600; }
+  .msg.md ul, .msg.md ol { margin: .6em 0 .6em 1.3em; }
+  .msg.md li { margin: .25em 0; }
+  .msg.md code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: #f0ead9; border: 1px solid var(--line); padding: .08em .35em; border-radius: 4px; }
+  .msg.md pre { background: #f6f1e4; border: 1px solid var(--line); border-radius: 8px; padding: .7rem .85rem; overflow-x: auto; margin: .8em 0; }
+  .msg.md pre code { background: none; border: 0; padding: 0; font-size: .85em; line-height: 1.7; }
+  .msg.md blockquote { border-left: 3px solid var(--accent-soft); padding-left: .9em; color: var(--ink-soft); margin: .8em 0; }
+  .msg.md a { color: var(--accent); }
+  .msg.md table { border-collapse: collapse; margin: .8em 0; width: 100%; }
+  .msg.md th, .msg.md td { border: 1px solid var(--line); padding: .35em .6em; font-size: .92em; }
+  .msg.md hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
   #chatComposer { border-top: 1px solid var(--line); background: var(--card); padding: .9rem 0 1.1rem; flex-shrink: 0; }
   #chatComposer .col { display: flex; gap: .6rem; align-items: flex-end; }
   #chatComposer textarea {
@@ -877,8 +877,11 @@
     return { items: [], host, scroll: scrollEl, rich, scope: null, session: "",
              loaded: false, seq: 0, hiddenJobs: new Set() };
   }
-  const readLane = makeLane(msgs, msgs, false);        // 读书模式：纯文本，跟着当前书走
-  const chatLane = makeLane(chatBody, chatScroll, true); // 对话模式：渲染 markdown，恒为书架
+  // 两条都渲染 markdown。读书栏原来是纯文本，但手机上 #chat 是隐藏的
+  // （见 CSS 的窄屏分支），手机用户唯一能用的就是读书栏——
+  // 于是他们看到的全是 **粗体** 这样的裸符号。
+  const readLane = makeLane(msgs, msgs, true);          // 读书模式：跟着当前书走
+  const chatLane = makeLane(chatBody, chatScroll, true); // 对话模式：恒为书架
   const laneOf = () => (view === "chat" ? chatLane : readLane);
 
   function paintEntry(lane, e) {
