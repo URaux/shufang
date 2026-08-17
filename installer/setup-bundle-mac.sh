@@ -31,28 +31,13 @@ STOPPED=$(pkill -f "$APP_DIR_DEFAULT/app/webapp/server.js" 2>/dev/null; echo $?)
 sleep 1
 ok "检查完毕"
 
-# ---------------------------------------------------------------- 位置选择
-echo ""
-echo "程序装到哪？（约 700MB）"
-echo "直接回车用默认: $APP_DIR_DEFAULT"
-read -r APP_DIR </dev/tty
-[ -z "$APP_DIR" ] && APP_DIR="$APP_DIR_DEFAULT"
-
-echo ""
-echo "书库放到哪？（你的书、译文、笔记）"
-echo "直接回车用默认: $VAULT_DEFAULT"
-read -r VAULT </dev/tty
-[ -z "$VAULT" ] && VAULT="${OLD_VAULT:-$VAULT_DEFAULT}"
-
-NODE_DIR="$APP_DIR/node"
-BIN_DIR="$APP_DIR/bin"
-APP_REPO="$APP_DIR/app"
+# ---------------------------------------------------------------- 读老配置
+# 必须在问位置**之前**读。原来这段在下面，而上面的默认值就已经用了 $OLD_VAULT，
+# 那时候它还是空的 —— 结果 Mac 用户升级时一路回车，书库被悄悄挪回 Documents。
+# 升级场景：key / token / 端口 / 书库位置全部沿用，别让人重填。
+# token 换了的话，手机上存的那个带 ?t= 的链接会全部失效。
 CONFIG_DIR="$HOME/.shufang"
 CONFIG="$CONFIG_DIR/config.json"
-
-# ---------------------------------------------------------------- 读老配置
-# 升级场景：key / token / 端口 / 书库位置沿用，别让人重填。
-# token 换了的话，手机上存的那个带 ?t= 的链接会全部失效。
 OLD_KEY=""; OLD_TOKEN=""; OLD_VAULT=""
 if [ -f "$CONFIG" ]; then
   OLD_KEY=$(  sed -n 's/.*"DEEPSEEK_API_KEY"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)
@@ -61,6 +46,40 @@ if [ -f "$CONFIG" ]; then
   case "$OLD_KEY" in sk-*|enc:v1:*) ;; *) OLD_KEY="" ;; esac
   [ -d "$OLD_VAULT" ] || OLD_VAULT=""
 fi
+# 老书库在哪就还用哪
+[ -n "$OLD_VAULT" ] && VAULT_DEFAULT="$OLD_VAULT"
+
+# ---------------------------------------------------------------- 位置选择
+# 空间也要说清楚：只写「不够就换个地方」，用户既不知道要多少也不知道自己剩多少。
+free_mb() { df -m "$(dirname "$1")" 2>/dev/null | awk 'NR==2{print $4}'; }
+NEED_APP_MB=900
+NEED_VAULT_MB=200
+
+echo ""
+echo "程序装到哪？（约 700MB）"
+printf '\033[90m   这个盘还剩 %s MB\033[0m\n' "$(free_mb "$APP_DIR_DEFAULT")"
+echo "直接回车用默认: $APP_DIR_DEFAULT"
+read -r APP_DIR </dev/tty
+[ -z "$APP_DIR" ] && APP_DIR="$APP_DIR_DEFAULT"
+
+echo ""
+echo "书库放到哪？（你的书、译文、笔记）"
+echo "直接回车用默认: $VAULT_DEFAULT"
+read -r VAULT </dev/tty
+[ -z "$VAULT" ] && VAULT="$VAULT_DEFAULT"
+
+# 选完真核一遍，别等复制到一半才炸
+for pair in "$APP_DIR:$NEED_APP_MB:程序" "$VAULT:$NEED_VAULT_MB:书库"; do
+  d="${pair%%:*}"; rest="${pair#*:}"; need="${rest%%:*}"; what="${rest#*:}"
+  avail=$(free_mb "$d")
+  if [ -n "$avail" ] && [ "$avail" -lt "$need" ] 2>/dev/null; then
+    die "$(dirname "$d") 只剩 ${avail} MB，装不下${what}（要 ${need} MB）。换个空间大的位置重跑一次。"
+  fi
+done
+
+NODE_DIR="$APP_DIR/node"
+BIN_DIR="$APP_DIR/bin"
+APP_REPO="$APP_DIR/app"
 
 mkdir -p "$APP_DIR" "$CONFIG_DIR"
 
