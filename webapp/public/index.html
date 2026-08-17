@@ -194,13 +194,16 @@
   .wk-empty { color: var(--ink-mute); text-align: center; padding: 3.5rem 1rem; line-height: 2; }
 
   /* 视图切换：谁显示谁不显示 */
-  #chatview, #workshop, #rite { display: none; }
+  #chatview, #workshop, #rite, #settings { display: none; }
   body.view-chat #sidebar, body.view-chat #reader, body.view-chat #chat,
   body.view-workshop #sidebar, body.view-workshop #reader, body.view-workshop #chat,
-  body.view-rite #sidebar, body.view-rite #reader, body.view-rite #chat { display: none; }
+  body.view-rite #sidebar, body.view-rite #reader, body.view-rite #chat,
+  body.view-settings #sidebar, body.view-settings #reader, body.view-settings #chat { display: none; }
   body.view-chat #chatview { display: flex; }
   body.view-workshop #workshop { display: block; }
-  body.view-rite #rite { display: block; overflow-y: auto; }
+  /* flex:1 不能少：main 是 flex 容器，少了就只占内容宽，页面缩在左边一条 */
+  body.view-rite #rite { display: block; overflow-y: auto; flex: 1; min-width: 0; }
+  body.view-settings #settings { display: block; overflow-y: auto; flex: 1; min-width: 0; }
 
   /* 仪轨：一屏一件事，别做成仪表盘 */
   .rite-page { max-width: 42rem; margin: 0 auto; padding: 2.4rem 1.4rem 4rem; }
@@ -222,6 +225,23 @@
   .rite-ask { font: inherit; margin-top: 1rem; padding: .45rem 1.2rem; border-radius: 999px;
     border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
   .rite-ask:hover { background: var(--card); color: var(--ink); border-color: var(--accent-soft); }
+
+  /* 设置：整页复用仪轨的 .rite-page/.rite-card/.rite-q/.rite-go，这里只补差的 */
+  .set-state { font-size: .92rem; margin: 0 0 .7rem; color: var(--ink-soft); }
+  .set-state b { color: var(--accent); font-weight: 600; }
+  .set-state.err { color: #a3453a; }
+  .set-box { font-family: ui-monospace, Consolas, monospace; font-size: .8rem; word-break: break-all;
+    background: var(--paper); border: 1px dashed var(--line); border-radius: 8px; padding: .6rem .7rem; margin: .5em 0; }
+  .set-row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  .set-row .rite-q { flex: 1; min-width: 11rem; width: auto; }
+  .set-row .rite-go { margin-top: 0; }
+  .set-plain { font: inherit; padding: .42rem 1.1rem; border-radius: 999px;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
+  .set-plain:hover { background: var(--paper); color: var(--ink); border-color: var(--accent-soft); }
+  .set-plain.danger { border-color: #c9a09a; color: #a3453a; }
+  .set-note { font-size: .8rem; color: var(--ink-mute); line-height: 1.7; margin: .6rem 0 0; }
+  .set-switch { display: flex; align-items: center; gap: .55rem; font-size: .93rem; cursor: pointer; color: var(--ink); }
+  .set-switch input { accent-color: var(--accent); transform: scale(1.15); }
 
   /* 手机布局：读书视图单栏（侧栏聊天让位给「对话」视图） */
   /* 注意：这条要放在 media query 前面。同是 #menuBtn、同权重，写在后面的赢——
@@ -328,6 +348,7 @@
       <button id="tabChat">对话</button>
       <button id="tabRite">仪轨</button>
       <button id="tabShop">工坊<span class="dot"></span></button>
+      <button id="tabSet" title="设置">⚙</button>
     </nav>
   </header>
   <main>
@@ -360,6 +381,7 @@
     </section>
 
     <section id="rite"><div class="rite-page" id="riteBody"></div></section>
+    <section id="settings"><div class="rite-page" id="setBody"></div></section>
     <section id="workshop"><div class="wk-page" id="wkBody"></div></section>
   </main>
 
@@ -1616,6 +1638,129 @@
         : "");
   });
 
+  // ------------------------------------------------------------------ 设置
+  // 骨架只搭一次；每次进来只刷新动态的字，不动输入框——不然正打一半的 key 会被清掉
+  let setReady = false;
+  function renderSettings() {
+    $("setBody").innerHTML = `
+      <div class="rite-card">
+        <h3>翻译大脑的 API key</h3>
+        <p class="set-state" id="setKeyState">…</p>
+        <div class="set-row">
+          <input id="setKey" class="rite-q" type="password" placeholder="sk- 开头的一串，粘贴到这里" autocomplete="new-password" />
+          <button id="setKeySave" class="rite-go">保存</button>
+        </div>
+        <p class="set-note">在 platform.deepseek.com 注册后创建。保存立刻生效，不用重启。</p>
+      </div>
+      <div class="rite-card">
+        <h3>手机访问</h3>
+        <p>手机连同一个 Wi-Fi，用这个链接打开（打开一次就会记住，之后不用再带口令）：</p>
+        <div class="set-box" id="setLan">—</div>
+        <div class="set-row">
+          <button id="setCopyLan" class="set-plain">复制链接</button>
+          <button id="setRotate" class="set-plain danger">重新生成口令</button>
+        </div>
+        <p class="set-note">「重新生成口令」用在链接发错了人的时候：旧链接全部作废，手机要用新链接重新打开一次。</p>
+      </div>
+      <div class="rite-card">
+        <h3>端口</h3>
+        <div class="set-row">
+          <input id="setPort" class="rite-q" type="number" min="1024" max="65535" />
+          <button id="setPortSave" class="rite-go">保存</button>
+        </div>
+        <p class="set-note" id="setPortNote">改了要重启才生效：关掉启动窗口，再双击桌面「启动群星回廊」。</p>
+      </div>
+      <div class="rite-card">
+        <h3>远程访问模式</h3>
+        <label class="set-switch"><input type="checkbox" id="setRemote" /> 我把它挂到了公网（内网穿透 / 隧道）</label>
+        <p class="set-note">开着的时候，所有访问一律要口令，本机也不例外。没挂公网就别开。</p>
+      </div>
+      <div class="rite-card">
+        <h3>书库位置</h3>
+        <div class="set-box" id="setVault">—</div>
+        <p class="set-note">想把书库搬去别的盘：重跑一遍安装器，在问位置时填新地方即可，书不会丢。</p>
+      </div>`;
+
+    const keyState = (html, err) => { const el = $("setKeyState"); el.innerHTML = html; el.classList.toggle("err", !!err); };
+
+    $("setKeySave").addEventListener("click", async () => {
+      const k = $("setKey").value.trim();
+      if (!k) { keyState("先把 key 粘到框里再点保存。", true); return; }
+      $("setKeySave").disabled = true;
+      try {
+        const r = await fetch("/api/settings", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: k }),
+        });
+        const d = await r.json();
+        if (!r.ok) { keyState(esc(d.error || "没保存上，再试一次。"), true); return; }
+        $("setKey").value = "";
+        fillSettings(d);
+        keyState(`换好了，现在用的是 <b>${esc(d.keyMasked)}</b>。`);
+      } catch { keyState("没保存上（网络问题？），再试一次。", true); }
+      finally { $("setKeySave").disabled = false; }
+    });
+
+    $("setCopyLan").addEventListener("click", () => {
+      const url = $("setLan").textContent;
+      if (!url.startsWith("http")) return;
+      navigator.clipboard && navigator.clipboard.writeText(url).then(() => {
+        $("setCopyLan").textContent = "已复制 ✓";
+        setTimeout(() => { $("setCopyLan").textContent = "复制链接"; }, 1600);
+      });
+    });
+
+    $("setRotate").addEventListener("click", async () => {
+      if (!confirm("重新生成访问口令？\n\n手机上存的旧链接会全部失效，要用新链接重新打开一次。")) return;
+      try {
+        const d = await fetch("/api/settings/token", { method: "POST" }).then(r => r.json());
+        fillSettings(d);
+        $("setRotate").textContent = "已更换 ✓";
+        setTimeout(() => { $("setRotate").textContent = "重新生成口令"; }, 1600);
+      } catch { }
+    });
+
+    $("setPortSave").addEventListener("click", async () => {
+      $("setPortSave").disabled = true;
+      try {
+        const r = await fetch("/api/settings", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ port: Number($("setPort").value) }),
+        });
+        const d = await r.json();
+        $("setPortNote").textContent = r.ok
+          ? (d.restart ? "已保存。重启后生效：关掉启动窗口，再双击桌面「启动群星回廊」。" : "端口没变。")
+          : (d.error || "没保存上。");
+      } catch { $("setPortNote").textContent = "没保存上（网络问题？），再试一次。"; }
+      finally { $("setPortSave").disabled = false; }
+    });
+
+    $("setRemote").addEventListener("change", () => {
+      fetch("/api/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ remoteAccess: $("setRemote").checked }),
+      }).catch(() => { });
+    });
+  }
+
+  function fillSettings(s) {
+    $("setKeyState").innerHTML = s.keyMasked
+      ? `现在用的是 <b>${esc(s.keyMasked)}</b>，要换就贴一个新的：`
+      : `<b>还没配 key</b>——聊天和翻译都靠它，配一个吧：`;
+    $("setLan").textContent = s.lanUrl || "没找到局域网地址（电脑可能没连网）";
+    if (document.activeElement !== $("setPort")) $("setPort").value = s.port;
+    if (s.actualPort && s.actualPort !== s.port) {
+      $("setPortNote").textContent = `配置的端口 ${s.port} 被别的程序占了，现在实际用的是 ${s.actualPort}。`;
+    }
+    $("setRemote").checked = !!s.remoteAccess;
+    $("setVault").textContent = s.vaultPath || "—";
+  }
+
+  async function loadSettings() {
+    if (!setReady) { renderSettings(); setReady = true; }
+    try { fillSettings(await fetch("/api/settings").then(r => r.json())); } catch { }
+  }
+
   // ------------------------------------------------------------------ 视图切换
   function setView(v) {
     view = v;
@@ -1624,6 +1769,7 @@
     $("tabChat").classList.toggle("on", v === "chat");
     $("tabRite").classList.toggle("on", v === "rite");
     $("tabShop").classList.toggle("on", v === "workshop");
+    $("tabSet").classList.toggle("on", v === "settings");
     if (v !== "read") sidebar.classList.remove("open");
     if (v === "chat") {
       // 第一次进来才拉会话列表和内容，之后原样留着
@@ -1634,12 +1780,14 @@
       if (window.innerWidth > 860) input2.focus();
     }
     if (v === "rite") loadRites();
+    if (v === "settings") loadSettings();
     if (v === "workshop") loadShop(true);
   }
   $("tabRead").addEventListener("click", () => setView("read"));
   $("tabChat").addEventListener("click", () => setView("chat"));
   $("tabRite").addEventListener("click", () => setView("rite"));
   $("tabShop").addEventListener("click", () => setView("workshop"));
+  $("tabSet").addEventListener("click", () => setView("settings"));
   // ☰ 在读书模式开书目录，在对话模式开会话列表——同一个位置，同一个含义
   $("menuBtn").addEventListener("click", () => {
     if (view === "chat") $("sessions").classList.toggle("open");
