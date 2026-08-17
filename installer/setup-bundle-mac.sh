@@ -97,9 +97,9 @@ NODE_VER=$("$NODE_DIR/bin/node" --version 2>/dev/null | tr -d 'v')
 # 用 case 而不是 sort -V：不同 macOS 的 sort 行为不完全一致，这里不值得赌
 case "$NODE_VER" in
   22.0.*|22.1.*|22.2.*|22.3.*|22.4.*|22.5.*|22.6.*|22.7.*|22.8.*|22.9.*|22.1[0-4].*)
-    die "这个安装包里的 Node 是 $NODE_VER，太旧了（要 22.15 以上，聊天功能依赖它）。请重新下载安装包。" ;;
+    die "这个安装包里的 Node 是 ${NODE_VER}，太旧了（要 22.15 以上，聊天功能依赖它）。请重新下载安装包。" ;;
 esac
-ok "运行环境就绪（Node $NODE_VER）"
+ok "运行环境就绪（Node ${NODE_VER}）"
 
 step "安放程序本体"
 rm -rf "$APP_REPO"
@@ -108,7 +108,7 @@ ok "程序就绪"
 
 step "建书库"
 if [ -d "$VAULT" ]; then
-  ok "书库已存在（$VAULT），保留原样"
+  ok "书库已存在（${VAULT}），保留原样"
 else
   cp -R "$APP_REPO/vault-template" "$VAULT" || die "建书库失败"
   ok "书库建在 $VAULT"
@@ -234,5 +234,4 @@ echo "  安装完成！"
 echo "  程序在: $APP_DIR"
 echo "  书库在: $VAULT"
 echo "  双击桌面「启动群星回廊.command」开始用。"
-echo "  第一次运行若被系统拦，右键它选「打开」一次即可。"
 echo "=============================================="

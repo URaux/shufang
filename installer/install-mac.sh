@@ -171,7 +171,7 @@ fetch_app || die "从 GitHub 获取程序失败"
 ok "已获取最新版"
 
 if [ -d "$VAULT" ]; then
-  ok "书库已存在（$VAULT），保留原样"
+  ok "书库已存在（${VAULT}），保留原样"
 else
   cp -R "$APP_REPO/vault-template" "$VAULT"
   ok "书库建在 $VAULT"
