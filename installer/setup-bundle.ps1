@@ -1,8 +1,8 @@
-﻿# 群星阅览室 全量包安装器 —— 零下载、零依赖，全部东西都在包里。
+﻿# 群星回廊 全量包安装器 —— 零下载、零依赖，全部东西都在包里。
 # 给卡在网络问题上的用户：解压后双击「一键安装.bat」跑到这里。
 # 支持自选安装位置（C 盘满了的人装 D 盘）。
 # 也可以带参数静默安装（帮别人远程装机用）：
-#   powershell -File setup-bundle.ps1 -InstallDir D:\群星阅览室 -VaultDir D:\书库 -ApiKey sk-xxx
+#   powershell -File setup-bundle.ps1 -InstallDir D:\群星回廊 -VaultDir D:\书库 -ApiKey sk-xxx
 param(
   [string]$InstallDir = "",
   [string]$VaultDir = "",
@@ -43,13 +43,13 @@ function RemoveWithRetry($path) {
   }
   # 还删不掉就改名让路，下次启动前清理
   try { Rename-Item $path "$path.old-$(Get-Random)" -ErrorAction Stop } catch {
-    throw "有程序正占着 $path。请把所有群星阅览室窗口关掉（或重启电脑）后重新安装。"
+    throw "有程序正占着 $path。请把所有群星回廊窗口关掉（或重启电脑）后重新安装。"
   }
 }
 
 
 Write-Host "=============================================="
-Write-Host "  群星阅览室 · 全量包安装"
+Write-Host "  群星回廊 · 全量包安装"
 Write-Host "  所有东西都在包里，不用下载、不要管理员"
 Write-Host "=============================================="
 
@@ -95,7 +95,7 @@ function EnsureSpace($path, $needMB, $what) {
   if ($free -ge $needMB) { return }
   $root = [System.IO.Path]::GetPathRoot(([System.IO.Path]::GetFullPath($path)))
   throw ("$root 只剩 $([math]::Round($free/1024,1)) GB，装不下$what（要 $([math]::Round($needMB/1024,1)) GB）。" +
-         "`n    换个空间大的盘重跑一次就行，比如 D:\群星阅览室。")
+         "`n    换个空间大的盘重跑一次就行，比如 D:\群星回廊。")
 }
 
 # ---------------------------------------------------------------- 位置选择
@@ -103,7 +103,7 @@ $DefaultApp = Join-Path $env:USERPROFILE ".shufang"
 if ($InstallDir) {
   $AppDir = $InstallDir
 } else {
-  $DefaultApp = PickDefaultDir $DefaultApp $NEED_APP_MB "群星阅览室"
+  $DefaultApp = PickDefaultDir $DefaultApp $NEED_APP_MB "群星回廊"
   Write-Host ""
   Write-Host "程序装到哪？（程序本体 + 运行环境，约 700MB）"
   ShowDrives $NEED_APP_MB
@@ -163,7 +163,7 @@ $AppRepo = Join-Path $AppDir "app"
 # ---------------------------------------------------------------- 先停掉在跑的实例
 # 程序开着的时候装/重装，node.exe 正被占用，复制会「访问被拒绝」。
 # 小白不知道要先关窗口，这里自动停一下。
-Step "检查有没有正在运行的群星阅览室"
+Step "检查有没有正在运行的群星回廊"
 $stopped = 0
 Get-Process node -ErrorAction SilentlyContinue | ForEach-Object {
   try {
@@ -285,7 +285,7 @@ if ($ObsidianInstalled) {
       $ObsidianInstalled = $true
       Ok "Obsidian 装好了"
     } catch {
-      # 装不上不该拦住整个安装 —— 群星阅览室本身完全能用
+      # 装不上不该拦住整个安装 —— 群星回廊本身完全能用
       Write-Host "   Obsidian 这一步没成（$($_.Exception.Message)）。" -ForegroundColor Yellow
       Write-Host "   不影响使用，联网后重跑一次安装器就能补上。" -ForegroundColor Yellow
     }
@@ -416,23 +416,23 @@ if (Test-Path $VbsSrc) {
   #   UTF-16 带 BOM -> 正确，且跟系统语言无关（ANSI 只在中文系统上碰巧对）
   [System.IO.File]::WriteAllText($LauncherVbs, $vbs, (New-Object System.Text.UnicodeEncoding($false, $true)))
 
-  $sc = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $Desktop "群星阅览室.lnk"))
+  $sc = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $Desktop "群星回廊.lnk"))
   $sc.TargetPath = "wscript.exe"
   $sc.Arguments = '"' + $LauncherVbs + '"'
   $sc.WorkingDirectory = $AppDir
-  $sc.Description = "群星阅览室 — 在自己电脑上啃外文书"
+  $sc.Description = "群星回廊 — 在自己电脑上啃外文书"
   if (Test-Path $IconPath) { $sc.IconLocation = $IconPath }
   $sc.Save()
   # 老版本留下的 .bat 启动器清掉，免得桌面上两个图标
-  Remove-Item (Join-Path $Desktop "启动群星阅览室.bat") -Force -ErrorAction SilentlyContinue
-  Ok "桌面上有「群星阅览室」了"
+  Remove-Item (Join-Path $Desktop "启动群星回廊.bat") -Force -ErrorAction SilentlyContinue
+  Ok "桌面上有「群星回廊」了"
 } else {
   # 兜底：没有模板就退回 .bat（老路径，保证一定能启动）
-  $launcher = Join-Path $Desktop "启动群星阅览室.bat"
+  $launcher = Join-Path $Desktop "启动群星回廊.bat"
 $launcherText = @"
 @echo off
 chcp 65001 >nul
-title 群星阅览室
+title 群星回廊
 set "PATH=$NodeDir;$BinDir;%PATH%"
 echo 检查更新中...
 powershell -NoProfile -ExecutionPolicy Bypass -File "$UpdaterPath"
@@ -448,7 +448,7 @@ node server.js
 pause
 "@
   [System.IO.File]::WriteAllText($launcher, $launcherText, (New-Object System.Text.UTF8Encoding($false)))
-  Ok "桌面上有「启动群星阅览室」了"
+  Ok "桌面上有「启动群星回廊」了"
 }
 
 Write-Host ""
@@ -456,7 +456,7 @@ Write-Host "==============================================" -ForegroundColor Gre
 Write-Host "  安装完成！" -ForegroundColor Green
 Write-Host "  程序在: $AppDir" -ForegroundColor Green
 Write-Host "  书库在: $Vault" -ForegroundColor Green
-Write-Host "  双击桌面「启动群星阅览室」开始用。" -ForegroundColor Green
+Write-Host "  双击桌面「启动群星回廊」开始用。" -ForegroundColor Green
 Write-Host "==============================================" -ForegroundColor Green
 try { Stop-Transcript | Out-Null } catch {}
 if (-not ($InstallDir -and $ApiKey)) { Read-Host "按回车关闭本窗口" }

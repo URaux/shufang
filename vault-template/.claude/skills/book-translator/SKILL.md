@@ -3,7 +3,7 @@ name: book-translator
 description: 逐章翻译（译名一致）、讨论与笔记沉淀，以及**流水线跑不通时**才需要的手工入库。注意：用户从网页传书进来时，切章和写摘要由程序自动完成，不需要这个技能。Use when the user asks for chapter translation (单章/范围/全部), discusses book content, or hands you a book file path that is not yet under Library/.
 ---
 
-# 群星阅览室 · 啃书流程
+# 群星回廊 · 啃书流程
 
 ## 目录约定
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# 群星阅览室 · Mac 全量包安装器
+# 群星回廊 · Mac 全量包安装器
 #
 # Node、Pandoc、程序本体都在包里，不用下载。
 # 只有 dsh（翻译大脑）要联网装一次——它有个原生组件必须在本机编译，
@@ -19,14 +19,14 @@ ok()   { printf '\033[32m   OK: %s\033[0m\n' "$1"; }
 die()  { printf '\n\033[31m[X] %s\033[0m\n日志在 %s，可以发给帮你装的人。\n' "$1" "$LOG"; exit 1; }
 
 echo "=============================================="
-echo "  群星阅览室 · 全量包安装 (macOS)"
+echo "  群星回廊 · 全量包安装 (macOS)"
 echo "  Node/Pandoc/程序都在包里，不用下载"
 echo "=============================================="
 
 [ -x "$PAYLOAD/node/bin/node" ] || die "找不到安装材料。你可能是在压缩包里直接双击的——请先把整个压缩包解压出来再运行。"
 
 # ---------------------------------------------------------------- 先停掉在跑的
-step "检查有没有正在运行的群星阅览室"
+step "检查有没有正在运行的群星回廊"
 STOPPED=$(pkill -f "$APP_DIR_DEFAULT/app/webapp/server.js" 2>/dev/null; echo $?)
 sleep 1
 ok "检查完毕"
@@ -138,7 +138,7 @@ fi
 # 译文是机器翻的，一定有要改的地方，而 Obsidian 读写的就是书库里那批 .md，
 # 改完这边立刻看得到。所以它是默认装的一环，不是可选配件。
 # 它是闭源软件，不能塞进我们的压缩包分发，只能从官方下载。
-# 但装不上绝不能让整个安装失败——群星阅览室自带网页界面，照样能看能改。
+# 但装不上绝不能让整个安装失败——群星回廊自带网页界面，照样能看能改。
 step "检查 Obsidian（用来自己改译文、做笔记）"
 if [ -d "/Applications/Obsidian.app" ] || [ -d "$HOME/Applications/Obsidian.app" ]; then
   ok "已经装过了"
@@ -205,7 +205,7 @@ ok "配置写好了"
 
 # ---------------------------------------------------------------- 启动器
 step "创建桌面启动器"
-LAUNCHER="$HOME/Desktop/启动群星阅览室.command"
+LAUNCHER="$HOME/Desktop/启动群星回廊.command"
 cat > "$LAUNCHER" <<LAUNCH_EOF
 #!/bin/bash
 APP_DIR="$APP_DIR"
@@ -226,13 +226,13 @@ wait \$SRV
 LAUNCH_EOF
 chmod +x "$LAUNCHER"
 xattr -d com.apple.quarantine "$LAUNCHER" 2>/dev/null || true
-ok "桌面上有「启动群星阅览室.command」了"
+ok "桌面上有「启动群星回廊.command」了"
 
 echo ""
 echo "=============================================="
 echo "  安装完成！"
 echo "  程序在: $APP_DIR"
 echo "  书库在: $VAULT"
-echo "  双击桌面「启动群星阅览室.command」开始用。"
+echo "  双击桌面「启动群星回廊.command」开始用。"
 echo "  第一次运行若被系统拦，右键它选「打开」一次即可。"
 echo "=============================================="

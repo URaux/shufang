@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title 群星阅览室安装器
+title 群星回廊安装器
 rem 全量包入口。放在解压出来的文件夹里双击。
 
 if not exist "%~dp0setup-bundle.ps1" (

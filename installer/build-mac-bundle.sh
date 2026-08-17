@@ -1,11 +1,11 @@
 #!/bin/bash
-# 在 Mac 上打「群星阅览室」全量包。
+# 在 Mac 上打「群星回廊」全量包。
 #
 # 用法（在任意空目录里）：
 #   curl -fsSL https://raw.githubusercontent.com/URaux/shufang/master/installer/build-mac-bundle.sh -o build.sh
 #   bash build.sh
 #
-# 打出来的是 群星阅览室-Mac.zip，可以直接发给别人。
+# 打出来的是 群星回廊-Mac.zip，可以直接发给别人。
 # 这台机器上不需要预装任何东西——Node 和 Pandoc 都由脚本下载后装进包里。
 #
 # 为什么要在 Mac 上打：包里得放 macOS 版的 Node 和 Pandoc 二进制，
@@ -15,8 +15,8 @@ set -euo pipefail
 NODE_MIN_MAJOR=22
 NODE_MIN_MINOR=15      # dsh 的会话存储要 Node 22.15 才有的 zlib zstd 接口
 WORK="$(pwd)/shufang-build"
-OUT="$(pwd)/群星阅览室-Mac.zip"
-TOP="群星阅览室-Mac"
+OUT="$(pwd)/群星回廊-Mac.zip"
+TOP="群星回廊-Mac"
 
 say()  { printf '\n\033[36m>> %s\033[0m\n' "$1"; }
 ok()   { printf '\033[32m   OK: %s\033[0m\n' "$1"; }
@@ -80,12 +80,12 @@ ok "Pandoc $(payload/bin/pandoc --version | head -1 | awk '{print $2}')"
 # ── 安装器入口 ────────────────────────────────────────────
 say "放置安装器"
 cp payload/app/installer/setup-bundle-mac.sh setup-bundle-mac.sh
-cat > "安装群星阅览室.command" <<'LAUNCH'
+cat > "安装群星回廊.command" <<'LAUNCH'
 #!/bin/bash
 cd "$(dirname "$0")"
 bash setup-bundle-mac.sh
 LAUNCH
-chmod +x "安装群星阅览室.command" setup-bundle-mac.sh
+chmod +x "安装群星回廊.command" setup-bundle-mac.sh
 chmod +x payload/node/bin/* payload/bin/* 2>/dev/null || true
 ok "入口就绪"
 
@@ -96,7 +96,7 @@ cd "$WORK"
 rm -f "$OUT"
 STAGE="$(mktemp -d)/$TOP"
 mkdir -p "$STAGE"
-cp -R payload "安装群星阅览室.command" setup-bundle-mac.sh "$STAGE/"
+cp -R payload "安装群星回廊.command" setup-bundle-mac.sh "$STAGE/"
 ( cd "$(dirname "$STAGE")" && zip -qry "$OUT" "$TOP" -x '*.DS_Store' )
 rm -rf "$(dirname "$STAGE")"
 
@@ -105,6 +105,6 @@ say "完成"
 echo "   $OUT  ($SIZE)"
 echo ""
 echo "   验一下执行位（应该看到 rwxr-xr-x）："
-unzip -l "$OUT" >/dev/null && unzip -Z "$OUT" "$TOP/安装群星阅览室.command" "$TOP/payload/node/bin/node" | grep -E '^-'
+unzip -l "$OUT" >/dev/null && unzip -Z "$OUT" "$TOP/安装群星回廊.command" "$TOP/payload/node/bin/node" | grep -E '^-'
 echo ""
 echo "   发布：gh release upload <tag> \"$OUT\" --repo URaux/shufang --clobber"

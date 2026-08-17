@@ -1,4 +1,4 @@
-﻿# 群星阅览室 一键安装器（零依赖版）
+﻿# 群星回廊 一键安装器（零依赖版）
 # 不用 winget、不用 git、不要管理员权限。所有东西装进用户目录 ~\.shufang。
 # 既可编译成 exe 双击运行，也可 powershell -File 运行。
 #
@@ -69,7 +69,7 @@ function RemoveWithRetry($path) {
   }
   # 还删不掉就改名让路，下次启动前清理
   try { Rename-Item $path "$path.old-$(Get-Random)" -ErrorAction Stop } catch {
-    throw "有程序正占着 $path。请把所有群星阅览室窗口关掉（或重启电脑）后重新安装。"
+    throw "有程序正占着 $path。请把所有群星回廊窗口关掉（或重启电脑）后重新安装。"
   }
 }
 
@@ -100,7 +100,7 @@ function Expand($archive, $dest) {
 }
 
 Write-Host "=============================================="
-Write-Host "  群星阅览室 · 本地啃书翻译器 安装程序"
+Write-Host "  群星回廊 · 本地啃书翻译器 安装程序"
 Write-Host "  零依赖：不用管理员、不改系统、都装你自己目录里"
 Write-Host "=============================================="
 
@@ -146,13 +146,13 @@ function EnsureSpace($path, $needMB, $what) {
   if ($free -ge $needMB) { return }
   $root = [System.IO.Path]::GetPathRoot(([System.IO.Path]::GetFullPath($path)))
   throw ("$root 只剩 $([math]::Round($free/1024,1)) GB，装不下$what（要 $([math]::Round($needMB/1024,1)) GB）。" +
-         "`n    换个空间大的盘重跑一次就行，比如 D:\群星阅览室。")
+         "`n    换个空间大的盘重跑一次就行，比如 D:\群星回廊。")
 }
 
 # ---------------------------------------------------------------- 位置选择
 $DefaultApp = Join-Path $env:USERPROFILE ".shufang"
 Write-Host ""
-$DefaultApp = PickDefaultDir $DefaultApp $NEED_APP_MB "群星阅览室"
+$DefaultApp = PickDefaultDir $DefaultApp $NEED_APP_MB "群星回廊"
 Write-Host "程序装到哪？（程序 + 运行环境，约 400MB；下载解压时峰值更高些）"
 ShowDrives $NEED_APP_MB
 Write-Host "直接回车用默认: $DefaultApp"
@@ -178,7 +178,7 @@ New-Item -ItemType Directory -Force $AppDir, $BinDir, $ConfigDir | Out-Null
 # ---------------------------------------------------------------- 先停掉在跑的实例
 # 程序开着的时候装/重装，node.exe 正被占用，复制会「访问被拒绝」。
 # 小白不知道要先关窗口，这里自动停一下。
-Step "检查有没有正在运行的群星阅览室"
+Step "检查有没有正在运行的群星回廊"
 $stopped = 0
 Get-Process node -ErrorAction SilentlyContinue | ForEach-Object {
   try {
@@ -266,8 +266,8 @@ if (-not (Test-Path (Join-Path $NodeDir "dsh.cmd"))) {
 }
 Ok "dsh 就绪"
 
-# ---------------------------------------------------------------- 群星阅览室程序
-Step "获取群星阅览室程序"
+# ---------------------------------------------------------------- 群星回廊程序
+Step "获取群星回廊程序"
 # 用 zip 而不是 tar.gz：仓库里有中文文件名，Windows 自带的 tar.exe 解 tar.gz 会
 # 「Invalid empty pathname」炸掉；Expand-Archive（.NET）认 zip 的 UTF-8 文件名，稳。
 Fetch "https://codeload.github.com/$Owner/$Repo/zip/refs/heads/master" "$env:TEMP\sf-app.zip"
@@ -329,7 +329,7 @@ if ($ObsidianInstalled) {
       $ObsidianInstalled = $true
       Ok "Obsidian 装好了"
     } catch {
-      # 装不上不该拦住整个安装 —— 群星阅览室本身完全能用
+      # 装不上不该拦住整个安装 —— 群星回廊本身完全能用
       Write-Host "   Obsidian 这一步没成（$($_.Exception.Message)）。" -ForegroundColor Yellow
       Write-Host "   不影响使用，联网后重跑一次安装器就能补上。" -ForegroundColor Yellow
     }
@@ -439,7 +439,7 @@ Ok "配置写好了"
 Step "安装自动更新器"
 $UpdaterPath = Join-Path $AppDir "update.ps1"
 $updaterText = @"
-# 群星阅览室自动更新器 —— 每次启动时比对 GitHub 上 master 的 commit sha，变了就整份换掉 app\。
+# 群星回廊自动更新器 —— 每次启动时比对 GitHub 上 master 的 commit sha，变了就整份换掉 app\。
 # 由安装器生成，不随仓库更新。失败一律静默放行，绝不能挡住用户启动。
 `$ErrorActionPreference = "Stop"
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
@@ -514,19 +514,19 @@ if (Test-Path $VbsSrc) {
   #   UTF-16 带 BOM -> 正确，且跟系统语言无关（ANSI 只在中文系统上碰巧对）
   [System.IO.File]::WriteAllText($LauncherVbs, $vbs, (New-Object System.Text.UnicodeEncoding($false, $true)))
 
-  $sc = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $Desktop "群星阅览室.lnk"))
+  $sc = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $Desktop "群星回廊.lnk"))
   $sc.TargetPath = "wscript.exe"
   $sc.Arguments = '"' + $LauncherVbs + '"'
   $sc.WorkingDirectory = $AppDir
-  $sc.Description = "群星阅览室 — 在自己电脑上啃外文书"
+  $sc.Description = "群星回廊 — 在自己电脑上啃外文书"
   if (Test-Path $IconPath) { $sc.IconLocation = $IconPath }
   $sc.Save()
   # 老版本留下的 .bat 启动器清掉，免得桌面上两个图标
-  Remove-Item (Join-Path $Desktop "启动群星阅览室.bat") -Force -ErrorAction SilentlyContinue
-  Ok "桌面上有「群星阅览室」了"
+  Remove-Item (Join-Path $Desktop "启动群星回廊.bat") -Force -ErrorAction SilentlyContinue
+  Ok "桌面上有「群星回廊」了"
 } else {
   # 兜底：没有模板就退回 .bat（老路径，保证一定能启动）
-  $launcher = Join-Path $Desktop "启动群星阅览室.bat"
+  $launcher = Join-Path $Desktop "启动群星回廊.bat"
 $obsLine = if ($ObsidianInstalled) {
   'start "" "obsidian://open?path=' + [uri]::EscapeDataString($Vault) + '"'
 } else {
@@ -535,7 +535,7 @@ $obsLine = if ($ObsidianInstalled) {
 $launcherText = @"
 @echo off
 chcp 65001 >nul
-title 群星阅览室
+title 群星回廊
 set "PATH=$NodeDir;$BinDir;%PATH%"
 echo 检查更新中...
 powershell -NoProfile -ExecutionPolicy Bypass -File "$UpdaterPath"
@@ -550,13 +550,13 @@ node server.js
 pause
 "@
   [System.IO.File]::WriteAllText($launcher, $launcherText, (New-Object System.Text.UTF8Encoding($false)))
-  Ok "桌面上有「启动群星阅览室」了"
+  Ok "桌面上有「启动群星回廊」了"
 }
 
 Write-Host ""
 Write-Host "==============================================" -ForegroundColor Green
 Write-Host "  安装完成！" -ForegroundColor Green
-Write-Host "  双击桌面「启动群星阅览室」开始用。" -ForegroundColor Green
+Write-Host "  双击桌面「启动群星回廊」开始用。" -ForegroundColor Green
 Write-Host "==============================================" -ForegroundColor Green
 try { Stop-Transcript | Out-Null } catch {}
 Read-Host "按回车关闭本窗口"

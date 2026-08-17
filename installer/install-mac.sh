@@ -1,5 +1,5 @@
 #!/bin/bash
-# 群星阅览室 macOS 安装器 — 零环境友好版
+# 群星回廊 macOS 安装器 — 零环境友好版
 #
 # 特点：不用 Homebrew、不用 Xcode 命令行工具、全程不要管理员密码。
 # 所有东西都装进你自己的用户目录（~/.shufang 和 ~/Applications）。
@@ -39,7 +39,7 @@ ok()   { printf '\033[32m   OK: %s\033[0m\n' "$1"; }
 die()  { printf '\n\033[31m[X] %s\033[0m\n检查一下网络（GitHub 要能访问），然后重跑安装命令。\n日志在 %s，可以发给帮你装的人。\n' "$1" "$LOG"; exit 1; }
 
 echo "=============================================="
-echo "  群星阅览室 · 本地啃书翻译器 安装程序 (macOS)"
+echo "  群星回廊 · 本地啃书翻译器 安装程序 (macOS)"
 echo "  不动系统、不要密码，全装在你自己目录里"
 echo "=============================================="
 
@@ -80,7 +80,7 @@ ok "Pandoc 就绪"
 # ---------------------------------------------------------------- Obsidian
 # 译文是机器翻的，一定有要改的地方，而 Obsidian 读写的就是书库里那批 .md，
 # 改完这边立刻看得到。所以它是默认装的一环，不是可选配件。
-# 但装不上绝不能让整个安装失败——群星阅览室自带网页界面，照样能看能改。
+# 但装不上绝不能让整个安装失败——群星回廊自带网页界面，照样能看能改。
 HAS_OBSIDIAN=0
 if [ -d "/Applications/Obsidian.app" ] || [ -d "$HOME/Applications/Obsidian.app" ]; then
   HAS_OBSIDIAN=1
@@ -154,7 +154,7 @@ while [[ ! "$KEY" =~ ^(sk-|enc:v1:) ]]; do
 done
 
 # ---------------------------------------------------------------- 程序本体
-step "获取群星阅览室程序（之后每次启动自动检查更新）"
+step "获取群星回廊程序（之后每次启动自动检查更新）"
 fetch_app() {
   local sha
   sha=$(curl -fsSL "https://api.github.com/repos/$OWNER/$REPO/commits/master" 2>/dev/null | grep -m1 '"sha"' | cut -d'"' -f4)
@@ -198,7 +198,7 @@ ok "配置写好了"
 
 # ---------------------------------------------------------------- 启动器
 step "创建桌面启动器"
-LAUNCHER="$HOME/Desktop/启动群星阅览室.command"
+LAUNCHER="$HOME/Desktop/启动群星回廊.command"
 cat > "$LAUNCHER" <<'LAUNCH_EOF'
 #!/bin/bash
 APP_DIR="$HOME/.shufang"
@@ -262,12 +262,12 @@ cd "$APP_REPO/webapp" || exit 1
 exec node server.js
 LAUNCH_EOF
 chmod +x "$LAUNCHER"
-ok "桌面上有「启动群星阅览室.command」了"
+ok "桌面上有「启动群星回廊.command」了"
 
 echo ""
 echo "=============================================="
 echo "  安装完成！"
-echo "  双击桌面「启动群星阅览室.command」开始用。"
+echo "  双击桌面「启动群星回廊.command」开始用。"
 echo "  第一次系统若拦截，右键它选「打开」一次即可。"
 if [ "$HAS_OBSIDIAN" = "1" ]; then
   echo "  第一次 Obsidian 打开时选「信任此仓库」。"
