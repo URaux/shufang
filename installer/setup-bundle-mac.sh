@@ -209,8 +209,58 @@ LAUNCHER="$HOME/Desktop/启动群星回廊.command"
 cat > "$LAUNCHER" <<LAUNCH_EOF
 #!/bin/bash
 APP_DIR="$APP_DIR"
+APP_REPO="\$APP_DIR/app"
+# 不转义：把安装时确定的书库路径直接烤进启动器。
+# 写成 \$VAULT 的话，启动器运行时那个变量是空的，下面更新说明书的 cp 会打到 /。
+VAULT_DIR="$VAULT"
 export PATH="\$APP_DIR/node/bin:\$APP_DIR/bin:\$PATH"
-cd "\$APP_DIR/app/webapp" || exit 1
+
+# 检查更新。
+# 这一段以前**只在一行命令安装的启动器里有**，全量包装出来的没有——
+# 结果是拿到 zip 安装的人永远停在打包那天的版本，重启多少次都不会更新，
+# 而且他不会收到任何提示，看起来就像「没有新版本」。
+# 两条安装路径必须给出同样的行为，否则「已经发布了」这句话对一半用户是假的。
+echo "检查更新中..."
+LATEST=\$(curl -fsSL --max-time 8 "https://api.github.com/repos/URaux/shufang/commits/master" 2>/dev/null | grep -m1 '"sha"' | cut -d'"' -f4)
+CURRENT=\$(cat "\$APP_DIR/.app-sha" 2>/dev/null || true)
+if [ -n "\$LATEST" ] && [ "\$LATEST" != "\$CURRENT" ]; then
+  echo "发现新版本，更新中..."
+  # 下载**刚才那个 sha**，不是再要一次 master：
+  # 两次请求之间 master 可能已经往前走了，那样装到的东西和校验过的不是一份。
+  if curl -fsSL --max-time 60 "https://codeload.github.com/URaux/shufang/tar.gz/\$LATEST" -o /tmp/shufang-up.tgz; then
+    rm -rf /tmp/shufang-up && mkdir -p /tmp/shufang-up
+    SRC=""
+    if tar -xzf /tmp/shufang-up.tgz -C /tmp/shufang-up 2>/dev/null; then
+      SRC=\$(find /tmp/shufang-up -maxdepth 1 -type d -name 'shufang-*' | head -1)
+    fi
+    if [ -n "\$SRC" ]; then
+      # 先把旧版挪到旁边再换新的，中途失败还能滚回来。
+      # 挪不动就整段放弃——继续走下去会把新版塞成 app/shufang-xxx，
+      # 那样连服务都起不来，比不更新糟得多。
+      rm -rf "\$APP_DIR/app.old"
+      if ! mv "\$APP_REPO" "\$APP_DIR/app.old" 2>/dev/null; then
+        echo "旧版本挪不开，这次跳过更新。"
+        SRC=""
+      fi
+    fi
+    if [ -n "\$SRC" ]; then
+      if mv "\$SRC" "\$APP_REPO"; then
+        printf '%s' "\$LATEST" > "\$APP_DIR/.app-sha"
+        # 助手的说明书跟着更新（用户自己的书和笔记不动）
+        cp -R "\$APP_REPO/vault-template/.claude" "\$VAULT_DIR/" 2>/dev/null
+        cp "\$APP_REPO/vault-template/CLAUDE.md" "\$VAULT_DIR/" 2>/dev/null
+        rm -rf "\$APP_DIR/app.old"
+        echo "已更新到最新版。"
+      else
+        mv "\$APP_DIR/app.old" "\$APP_REPO" 2>/dev/null
+        echo "更新失败，继续用当前版本。"
+      fi
+    fi
+    rm -rf /tmp/shufang-up.tgz /tmp/shufang-up
+  fi
+fi
+
+cd "\$APP_REPO/webapp" || exit 1
 node server.js &
 SRV=\$!
 # 等端口起来再开浏览器
