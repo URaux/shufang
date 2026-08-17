@@ -1,3 +1,11 @@
-
-# 发布包走 release，不进仓库（否则每个用户自动更新都要拖上百 MB）
+node_modules/
 *.zip
+.shufang-session-started
+.DS_Store
+Thumbs.db
+
+# 构建中间物（installer/build-dist.js 产生）
+dist-build/
+.dist-worktree/
+.smoke-test/
+

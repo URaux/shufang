@@ -57,6 +57,20 @@
   .side-item small { color: var(--ink-mute); display: block; font-size: .75rem; }
   .side-item .done { color: var(--accent); }
 
+  /* 书签：删按钮平时不显形，鼠标移上去才出来——
+     一列书签每条挂个红叉太吵，而且手机上很容易误触。
+     触屏没有 hover，所以窄屏下常驻显示（见下面的窄屏分支）。 */
+  .mark-row { display: flex; align-items: center; gap: .2rem; }
+  .mark-row .side-item { flex: 1; min-width: 0; }
+  .mark-x {
+    flex: none; width: 1.5rem; height: 1.5rem; line-height: 1; border: 0; border-radius: 4px;
+    background: none; color: var(--ink-mute); font-size: 1rem; cursor: pointer;
+    opacity: 0; transition: opacity .12s;
+  }
+  .mark-row:hover .mark-x { opacity: 1; }
+  .mark-x:hover { background: var(--paper); color: #c25549; }
+  .side-item.mark-auto { color: var(--ink); }
+
   /* 阅读区 */
   #reader { flex: 1; overflow-y: auto; min-width: 0; }
   #reader .page { max-width: 46rem; margin: 0 auto; padding: 2.2rem 1.4rem 5rem; }
@@ -194,16 +208,13 @@
   .wk-empty { color: var(--ink-mute); text-align: center; padding: 3.5rem 1rem; line-height: 2; }
 
   /* 视图切换：谁显示谁不显示 */
-  #chatview, #workshop, #rite, #settings { display: none; }
+  #chatview, #workshop, #rite { display: none; }
   body.view-chat #sidebar, body.view-chat #reader, body.view-chat #chat,
   body.view-workshop #sidebar, body.view-workshop #reader, body.view-workshop #chat,
-  body.view-rite #sidebar, body.view-rite #reader, body.view-rite #chat,
-  body.view-settings #sidebar, body.view-settings #reader, body.view-settings #chat { display: none; }
+  body.view-rite #sidebar, body.view-rite #reader, body.view-rite #chat { display: none; }
   body.view-chat #chatview { display: flex; }
   body.view-workshop #workshop { display: block; }
-  /* flex:1 不能少：main 是 flex 容器，少了就只占内容宽，页面缩在左边一条 */
-  body.view-rite #rite { display: block; overflow-y: auto; flex: 1; min-width: 0; }
-  body.view-settings #settings { display: block; overflow-y: auto; flex: 1; min-width: 0; }
+  body.view-rite #rite { display: block; overflow-y: auto; }
 
   /* 仪轨：一屏一件事，别做成仪表盘 */
   .rite-page { max-width: 42rem; margin: 0 auto; padding: 2.4rem 1.4rem 4rem; }
@@ -226,23 +237,6 @@
     border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
   .rite-ask:hover { background: var(--card); color: var(--ink); border-color: var(--accent-soft); }
 
-  /* 设置：整页复用仪轨的 .rite-page/.rite-card/.rite-q/.rite-go，这里只补差的 */
-  .set-state { font-size: .92rem; margin: 0 0 .7rem; color: var(--ink-soft); }
-  .set-state b { color: var(--accent); font-weight: 600; }
-  .set-state.err { color: #a3453a; }
-  .set-box { font-family: ui-monospace, Consolas, monospace; font-size: .8rem; word-break: break-all;
-    background: var(--paper); border: 1px dashed var(--line); border-radius: 8px; padding: .6rem .7rem; margin: .5em 0; }
-  .set-row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
-  .set-row .rite-q { flex: 1; min-width: 11rem; width: auto; }
-  .set-row .rite-go { margin-top: 0; }
-  .set-plain { font: inherit; padding: .42rem 1.1rem; border-radius: 999px;
-    border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
-  .set-plain:hover { background: var(--paper); color: var(--ink); border-color: var(--accent-soft); }
-  .set-plain.danger { border-color: #c9a09a; color: #a3453a; }
-  .set-note { font-size: .8rem; color: var(--ink-mute); line-height: 1.7; margin: .6rem 0 0; }
-  .set-switch { display: flex; align-items: center; gap: .55rem; font-size: .93rem; cursor: pointer; color: var(--ink); }
-  .set-switch input { accent-color: var(--accent); transform: scale(1.15); }
-
   /* 手机布局：读书视图单栏（侧栏聊天让位给「对话」视图） */
   /* 注意：这条要放在 media query 前面。同是 #menuBtn、同权重，写在后面的赢——
      原来它在后面，等于把手机里的 display:block 又盖回 none，☰ 一直点不动。 */
@@ -262,6 +256,8 @@
       display: none; background: var(--paper); }
     body.view-chat #sessions.open { display: flex; }
     body.view-chat #menuBtn { display: block; }
+    /* 触屏没有 hover，删书签的叉常驻显示，否则手机上根本删不掉 */
+    .mark-x { opacity: .6; }
   }
 
   /* 校对协作 */
@@ -348,7 +344,6 @@
       <button id="tabChat">对话</button>
       <button id="tabRite">仪轨</button>
       <button id="tabShop">工坊<span class="dot"></span></button>
-      <button id="tabSet" title="设置">⚙</button>
     </nav>
   </header>
   <main>
@@ -381,7 +376,6 @@
     </section>
 
     <section id="rite"><div class="rite-page" id="riteBody"></div></section>
-    <section id="settings"><div class="rite-page" id="setBody"></div></section>
     <section id="workshop"><div class="wk-page" id="wkBody"></div></section>
   </main>
 
@@ -440,12 +434,15 @@
     currentBook = await fetch("/api/book?name=" + encodeURIComponent(name)).then(r => r.json());
     if (!keep) { collabState = null; loadHistory(name); }
     refreshCollab(name);
+    await loadMarks(name);
     renderBookMenu();
     if (keep) {
       if (wasFile) openFile(wasFile);      // 停在原来那一章
       return;
     }
-    // 默认打开梗概；没有就开第一章译文；再没有就第一章原文
+    // 上次看到哪儿就从哪儿接着看——这才是重新打开一本书时想要的。
+    // 没看过（或者那一章已经不在了）再退回默认：梗概 → 第一章译文 → 第一章原文
+    if (autoPos && autoPos.path && await openFile(autoPos.path, docLabel(autoPos.path), autoPos.frac)) return;
     if (currentBook.outline) openFile(`Library/${name}/01-全书梗概.md`, "全书梗概");
     else if (currentBook.translated[0]) openFile(`Library/${name}/译文/${currentBook.translated[0]}`, currentBook.translated[0]);
     else if (currentBook.original[0]) openFile(`Library/${name}/00-原书/${currentBook.original[0]}`, currentBook.original[0]);
@@ -482,6 +479,24 @@
       }
     }
 
+    // ---- 书签 ----
+    // 「上次看到」单独一条放最上面，它是最常点的那个。
+    if (autoPos && autoPos.path) {
+      const pct = Math.round((autoPos.frac || 0) * 100);
+      parts.push('<div class="side-h">书签</div>');
+      parts.push(`<button class="side-item mark-auto" data-jump="${encodeURIComponent(autoPos.path)}" data-frac="${autoPos.frac || 0}">`
+        + `🕘 上次看到<small>${esc(docLabel(autoPos.path))}${pct ? " · " + pct + "%" : ""}</small></button>`);
+    } else if (marks.length) {
+      parts.push('<div class="side-h">书签</div>');
+    }
+    for (const m of marks) {
+      const pct = Math.round((m.frac || 0) * 100);
+      const sub = esc(m.note || (docLabel(m.path) + (pct ? " · " + pct + "%" : "")));
+      parts.push(`<div class="mark-row"><button class="side-item mark" data-jump="${encodeURIComponent(m.path)}" data-frac="${m.frac || 0}">`
+        + `🔖 ${esc(docLabel(m.path))}<small>${sub}</small></button>`
+        + `<button class="mark-x" data-unmark="${esc(m.id)}" title="删掉这条书签">×</button></div>`);
+    }
+
     // ---- 校对协作区 ----
     const cs = collabState;
     if (cs) {
@@ -513,9 +528,106 @@
 
   let fileMd = "", fileMtime = 0, editing = false;
 
-  async function openFile(rel, label) {
+  // ---------------------------------------------------------------- 书签
+  //
+  // 位置记的是**滚动比例**不是像素：手机和电脑行宽不一样，同一篇文章
+  // 两边的总高度差好几倍，记像素等于记了个没用的数。
+  //
+  // 自动位置（上次看到哪儿）和手动书签（这段我要再回来看）分开存——
+  // 混成一个的话，用户加一条书签就会把「上次看到哪儿」顶掉。
+  let marks = [], autoPos = null, markPanelOpen = false;
+
+  const readFrac = () => {
+    const max = reader.scrollHeight - reader.clientHeight;
+    return max > 8 ? Math.min(1, reader.scrollTop / max) : 0;
+  };
+  const applyFrac = frac => {
+    const f = Number(frac) || 0;
+    if (f <= 0) { reader.scrollTop = 0; return; }
+    // 渲染完到布局稳定有一帧的差，直接设会落空
+    requestAnimationFrame(() => {
+      const max = reader.scrollHeight - reader.clientHeight;
+      reader.scrollTop = max > 0 ? max * f : 0;
+    });
+  };
+  const docLabel = rel => (rel || "").split("/").pop().replace(/\.md$/, "");
+
+  async function loadMarks(book) {
+    if (!book) { marks = []; autoPos = null; return; }
+    try {
+      const r = await fetch("/api/bookmarks?book=" + encodeURIComponent(book)).then(r => r.json());
+      marks = r.marks || [];
+      autoPos = r.auto || null;
+    } catch { marks = []; autoPos = null; }
+  }
+
+  // 滚动就存会把磁盘打满，停下来才存。读者翻页翻得再快，
+  // 真正「停在这儿」的位置也就是他不动的那一下。
+  let autoTimer = 0;
+  function scheduleAutoSave() {
+    if (editing || !currentBook || !currentFile) return;
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(() => {
+      const body = { book: currentBook.name, path: currentFile, frac: readFrac(), label: docLabel(currentFile) };
+      autoPos = { ...body, ts: Date.now() };
+      fetch("/api/bookmarks/auto", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).catch(() => { });
+    }, 1200);
+  }
+  reader.addEventListener("scroll", scheduleAutoSave, { passive: true });
+  // 关标签页时最后补一次：读者常常是看到一半直接关掉的，
+  // 那时上面那个 1.2 秒的延时还没到，最后一段滚动就丢了。
+  // 用 sendBeacon 而不是 fetch——页面正在卸载，普通请求会被浏览器掐掉。
+  window.addEventListener("pagehide", () => {
+    if (editing || !currentBook || !currentFile || !navigator.sendBeacon) return;
+    try {
+      navigator.sendBeacon("/api/bookmarks/auto", new Blob([JSON.stringify({
+        book: currentBook.name, path: currentFile, frac: readFrac(), label: docLabel(currentFile),
+      })], { type: "application/json" }));
+    } catch { }
+  });
+
+  async function addMark() {
+    if (!currentBook || !currentFile) return;
+    const note = prompt("给这条书签写句话（可以留空）", "") ;
+    if (note === null) return;                       // 点了取消
+    try {
+      const r = await fetch("/api/bookmarks/add", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ book: currentBook.name, path: currentFile,
+                               frac: readFrac(), label: docLabel(currentFile), note }),
+      }).then(r => r.json());
+      if (r.error) { toast(r.hint || "没存上"); return; }
+      marks.unshift(r.mark);
+      renderBookMenu();
+      toast("书签存好了");
+    } catch { toast("没存上，网络断了？"); }
+  }
+
+  async function removeMark(id) {
+    marks = marks.filter(m => m.id !== id);
+    renderBookMenu();
+    try {
+      await fetch("/api/bookmarks/remove", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch { }
+  }
+
+  async function jumpTo(rel, frac) {
+    if (rel !== currentFile) await openFile(rel, undefined, frac);
+    else applyFrac(frac);
+  }
+
+  // 返回是否真的打开了。调用方要能分辨「文件没了」——
+  // 书签指向的章节可能已经被重命名或删掉，那时得退回默认章节，
+  // 不然读者点开一本书看到的是一片空白，还以为软件坏了。
+  async function openFile(rel, label, frac) {
     const r = await fetch("/api/file?path=" + encodeURIComponent(rel)).then(r => r.json());
-    if (r.error) return;
+    if (r.error) return false;
     currentFile = rel;
     fileMd = r.md || "";
     fileMtime = r.mtime || 0;
@@ -524,9 +636,11 @@
     const nav = chapterNav(rel);
     reader.innerHTML = `<div class="page">${editBar()}${r.html}${nav}</div>`;
     reader.scrollTop = 0;
+    if (frac) applyFrac(frac);
     if (currentBook) renderBookMenu();
     sidebar.classList.remove("open");
     bindPager();
+    return true;
   }
 
   // ---------------------------------------------------------------- 自己改
@@ -550,6 +664,7 @@
   const editBar = () => {
     const href = obsidianHref(currentFile);
     return `<div class="editbar"><button data-edit="1">✏️ 改一改</button>`
+      + (currentBook ? `<button data-mark="1">🔖 加书签</button>` : "")
       // Obsidian 只认它自己「打开过」的库。第一次点没反应不是坏了，
       // 是那边还不知道有这么个库——把这句写在悬停提示里，省一次求助。
       + (href ? `<a class="obs" href="${href}" title="第一次用要先在 Obsidian 里「打开文件夹作为库」选中你的书库">在 Obsidian 里打开</a>` : "")
@@ -601,10 +716,11 @@
   }
 
   reader.addEventListener("click", e => {
-    const el = e.target.closest("[data-edit],[data-save],[data-cancel]");
+    const el = e.target.closest("[data-edit],[data-save],[data-cancel],[data-mark]");
     if (!el) return;
     if (el.dataset.edit) return enterEdit();
     if (el.dataset.save) return saveEdit();
+    if (el.dataset.mark) return addMark();
     if (el.dataset.cancel) { editing = false; openFile(currentFile); }
   });
 
@@ -627,8 +743,11 @@
   }
 
   sidebar.addEventListener("click", e => {
-    const el = e.target.closest("[data-book],[data-file],[data-sug],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook");
+    const el = e.target.closest("[data-book],[data-file],[data-sug],[data-jump],[data-unmark],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook");
     if (!el) return;
+    // 删按钮压在跳转按钮上面，先判它，否则点叉会顺带跳过去
+    if (el.dataset.unmark) { removeMark(el.dataset.unmark); return; }
+    if (el.dataset.jump) { jumpTo(decodeURIComponent(el.dataset.jump), Number(el.dataset.frac) || 0); return; }
     if (el.id === "uploadBook") { pickFile(); return; }
     if (el.id === "backShelf") { currentBook = null; currentFile = null; collabState = null; loadHistory(null); loadShelf(); return; }
     if (el.id === "joinShared") { joinWizard(); return; }
@@ -1641,129 +1760,6 @@
         : "");
   });
 
-  // ------------------------------------------------------------------ 设置
-  // 骨架只搭一次；每次进来只刷新动态的字，不动输入框——不然正打一半的 key 会被清掉
-  let setReady = false;
-  function renderSettings() {
-    $("setBody").innerHTML = `
-      <div class="rite-card">
-        <h3>翻译大脑的 API key</h3>
-        <p class="set-state" id="setKeyState">…</p>
-        <div class="set-row">
-          <input id="setKey" class="rite-q" type="password" placeholder="sk- 开头的一串，粘贴到这里" autocomplete="new-password" />
-          <button id="setKeySave" class="rite-go">保存</button>
-        </div>
-        <p class="set-note">在 platform.deepseek.com 注册后创建。保存立刻生效，不用重启。</p>
-      </div>
-      <div class="rite-card">
-        <h3>手机访问</h3>
-        <p>手机连同一个 Wi-Fi，用这个链接打开（打开一次就会记住，之后不用再带口令）：</p>
-        <div class="set-box" id="setLan">—</div>
-        <div class="set-row">
-          <button id="setCopyLan" class="set-plain">复制链接</button>
-          <button id="setRotate" class="set-plain danger">重新生成口令</button>
-        </div>
-        <p class="set-note">「重新生成口令」用在链接发错了人的时候：旧链接全部作废，手机要用新链接重新打开一次。</p>
-      </div>
-      <div class="rite-card">
-        <h3>端口</h3>
-        <div class="set-row">
-          <input id="setPort" class="rite-q" type="number" min="1024" max="65535" />
-          <button id="setPortSave" class="rite-go">保存</button>
-        </div>
-        <p class="set-note" id="setPortNote">改了要重启才生效：关掉启动窗口，再双击桌面「启动群星回廊」。</p>
-      </div>
-      <div class="rite-card">
-        <h3>远程访问模式</h3>
-        <label class="set-switch"><input type="checkbox" id="setRemote" /> 我把它挂到了公网（内网穿透 / 隧道）</label>
-        <p class="set-note">开着的时候，所有访问一律要口令，本机也不例外。没挂公网就别开。</p>
-      </div>
-      <div class="rite-card">
-        <h3>书库位置</h3>
-        <div class="set-box" id="setVault">—</div>
-        <p class="set-note">想把书库搬去别的盘：重跑一遍安装器，在问位置时填新地方即可，书不会丢。</p>
-      </div>`;
-
-    const keyState = (html, err) => { const el = $("setKeyState"); el.innerHTML = html; el.classList.toggle("err", !!err); };
-
-    $("setKeySave").addEventListener("click", async () => {
-      const k = $("setKey").value.trim();
-      if (!k) { keyState("先把 key 粘到框里再点保存。", true); return; }
-      $("setKeySave").disabled = true;
-      try {
-        const r = await fetch("/api/settings", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: k }),
-        });
-        const d = await r.json();
-        if (!r.ok) { keyState(esc(d.error || "没保存上，再试一次。"), true); return; }
-        $("setKey").value = "";
-        fillSettings(d);
-        keyState(`换好了，现在用的是 <b>${esc(d.keyMasked)}</b>。`);
-      } catch { keyState("没保存上（网络问题？），再试一次。", true); }
-      finally { $("setKeySave").disabled = false; }
-    });
-
-    $("setCopyLan").addEventListener("click", () => {
-      const url = $("setLan").textContent;
-      if (!url.startsWith("http")) return;
-      navigator.clipboard && navigator.clipboard.writeText(url).then(() => {
-        $("setCopyLan").textContent = "已复制 ✓";
-        setTimeout(() => { $("setCopyLan").textContent = "复制链接"; }, 1600);
-      });
-    });
-
-    $("setRotate").addEventListener("click", async () => {
-      if (!confirm("重新生成访问口令？\n\n手机上存的旧链接会全部失效，要用新链接重新打开一次。")) return;
-      try {
-        const d = await fetch("/api/settings/token", { method: "POST" }).then(r => r.json());
-        fillSettings(d);
-        $("setRotate").textContent = "已更换 ✓";
-        setTimeout(() => { $("setRotate").textContent = "重新生成口令"; }, 1600);
-      } catch { }
-    });
-
-    $("setPortSave").addEventListener("click", async () => {
-      $("setPortSave").disabled = true;
-      try {
-        const r = await fetch("/api/settings", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ port: Number($("setPort").value) }),
-        });
-        const d = await r.json();
-        $("setPortNote").textContent = r.ok
-          ? (d.restart ? "已保存。重启后生效：关掉启动窗口，再双击桌面「启动群星回廊」。" : "端口没变。")
-          : (d.error || "没保存上。");
-      } catch { $("setPortNote").textContent = "没保存上（网络问题？），再试一次。"; }
-      finally { $("setPortSave").disabled = false; }
-    });
-
-    $("setRemote").addEventListener("change", () => {
-      fetch("/api/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ remoteAccess: $("setRemote").checked }),
-      }).catch(() => { });
-    });
-  }
-
-  function fillSettings(s) {
-    $("setKeyState").innerHTML = s.keyMasked
-      ? `现在用的是 <b>${esc(s.keyMasked)}</b>，要换就贴一个新的：`
-      : `<b>还没配 key</b>——聊天和翻译都靠它，配一个吧：`;
-    $("setLan").textContent = s.lanUrl || "没找到局域网地址（电脑可能没连网）";
-    if (document.activeElement !== $("setPort")) $("setPort").value = s.port;
-    if (s.actualPort && s.actualPort !== s.port) {
-      $("setPortNote").textContent = `配置的端口 ${s.port} 被别的程序占了，现在实际用的是 ${s.actualPort}。`;
-    }
-    $("setRemote").checked = !!s.remoteAccess;
-    $("setVault").textContent = s.vaultPath || "—";
-  }
-
-  async function loadSettings() {
-    if (!setReady) { renderSettings(); setReady = true; }
-    try { fillSettings(await fetch("/api/settings").then(r => r.json())); } catch { }
-  }
-
   // ------------------------------------------------------------------ 视图切换
   function setView(v) {
     view = v;
@@ -1772,7 +1768,6 @@
     $("tabChat").classList.toggle("on", v === "chat");
     $("tabRite").classList.toggle("on", v === "rite");
     $("tabShop").classList.toggle("on", v === "workshop");
-    $("tabSet").classList.toggle("on", v === "settings");
     if (v !== "read") sidebar.classList.remove("open");
     if (v === "chat") {
       // 第一次进来才拉会话列表和内容，之后原样留着
@@ -1783,14 +1778,12 @@
       if (window.innerWidth > 860) input2.focus();
     }
     if (v === "rite") loadRites();
-    if (v === "settings") loadSettings();
     if (v === "workshop") loadShop(true);
   }
   $("tabRead").addEventListener("click", () => setView("read"));
   $("tabChat").addEventListener("click", () => setView("chat"));
   $("tabRite").addEventListener("click", () => setView("rite"));
   $("tabShop").addEventListener("click", () => setView("workshop"));
-  $("tabSet").addEventListener("click", () => setView("settings"));
   // ☰ 在读书模式开书目录，在对话模式开会话列表——同一个位置，同一个含义
   $("menuBtn").addEventListener("click", () => {
     if (view === "chat") $("sessions").classList.toggle("open");
