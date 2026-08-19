@@ -177,6 +177,11 @@
 
   /* 工坊视图 */
   #workshop { flex: 1; overflow-y: auto; min-width: 0; }
+  .wk-subs { display: flex; flex-direction: column; gap: .3rem; margin: 0 0 1.2rem; }
+  .wk-sub { font-size: .85rem; color: var(--ink-soft); padding: .3rem .7rem; border-radius: .4rem;
+    background: var(--chat-bg); border-left: 2px solid var(--line); }
+  .wk-sub.ok { border-left-color: #4a7c4e; }
+  .wk-sub.no { border-left-color: #b4442a; }
   .wk-tier { font-size: .76rem; padding: .08rem .55rem; border-radius: 999px;
     border: 1px solid var(--line); color: var(--ink-mute); white-space: nowrap; }
   .wk-tier.official { border-color: var(--accent); color: var(--accent); }
@@ -1676,17 +1681,27 @@
           t.limit ? ` · ${t.used || "?"}/${t.limit} 人` : " · 不限人数"}</span>`
       : "";
 
+    // 自己投出去的稿子。投稿人不碰 GitHub，这块是他唯一能看到结果的地方——
+    // 没有它，投完就只剩干等，不知道是还没审还是被退了。
+    const subs = (st.subs || []).slice(0, 6);
+    const subLine = s => {
+      if (s.status === "approved") return `<span class="wk-sub ok">《${esc(s.name)}》已收录</span>`;
+      if (s.status === "rejected") return `<span class="wk-sub no">《${esc(s.name)}》被退回：${esc(s.reason || "没写理由")}</span>`;
+      return `<span class="wk-sub">《${esc(s.name)}》等站长过目</span>`;
+    };
+
     wkBody.innerHTML = `
       <div class="wk-bar">
         <span class="title"><span class="sync-dot ${dot}"></span>创意工坊 · ${plugins.length} 个插件</span>
         ${tierTag}
         <span class="spacer"></span>
-        <button class="primary" id="wkPublish">发布我的插件</button>
+        <button class="primary" id="wkPublish">${st.readonly ? "投稿到工坊" : "发布我的插件"}</button>
         ${st.role === "owner" ? `<button id="wkInvite">邀请朋友</button>` : ""}
         <button id="wkSync">立即同步</button>
       </div>
+      ${subs.length ? `<div class="wk-subs">${subs.map(subLine).join("")}</div>` : ""}
       ${plugins.length ? `<div class="wk-grid">${cards}</div>`
-        : `<div class="wk-empty">工坊里还没有插件。<br/>点右上角「发布我的插件」放第一个进来。</div>`}`;
+        : `<div class="wk-empty">工坊里还没有插件。<br/>点右上角「${st.readonly ? "投稿到工坊" : "发布我的插件"}」放第一个进来。</div>`}`;
   }
 
   wkBody.addEventListener("click", async e => {
@@ -1797,16 +1812,21 @@
       toast("本机还没有可发布的技能。技能放在书库的 .claude/skills 文件夹里，一个文件夹一个技能（里面要有 SKILL.md）。");
       return;
     }
+    // 走审核的工坊（社群/官方）成员拿的是只读钥匙，推不动仓库，这条路是投稿。
+    // 措辞得跟着换：说「发布」而实际要等人审，用户会以为没成功。
+    const ro = !!(shopState && shopState.readonly);
     const m = modal(`
-      <h3>发布我的插件</h3>
-      <p>挑一个本机的技能发到工坊，朋友就能装上。同名再发一次就是升版本。</p>
+      <h3>${ro ? "投稿到工坊" : "发布我的插件"}</h3>
+      <p>${ro
+        ? "挑一个本机的技能交上去。这个工坊要过目才收，站长通过之后大家同步就能装。"
+        : "挑一个本机的技能发到工坊，朋友就能装上。同名再发一次就是升版本。"}</p>
       <label>选一个技能</label>
       <select id="mSkill">${skills.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select>
       <label>给它起个好懂的名字</label>
       <input id="mName" maxlength="60" placeholder="比如：诗歌翻译腔调" />
       <label>一句话说明它能干嘛</label>
       <textarea id="mDesc" rows="3" maxlength="300" placeholder="比如：翻诗的时候保留押韵和断行，不出大白话。"></textarea>
-      <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">发布</button></div>`);
+      <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">${ro ? "投稿" : "发布"}</button></div>`);
     const nameBox = m.querySelector("#mName");
     const skillBox = m.querySelector("#mSkill");
     const fillName = () => { if (!nameBox.value.trim()) nameBox.value = skillBox.value; };
@@ -1815,7 +1835,7 @@
     m.querySelector("#mCancel").addEventListener("click", closeModal);
     m.querySelector("#mOk").addEventListener("click", async () => {
       const okBtn = m.querySelector("#mOk");
-      okBtn.disabled = true; okBtn.textContent = "上传中…";
+      okBtn.disabled = true; okBtn.textContent = ro ? "投稿中…" : "上传中…";
       try {
         const r = await api("/api/workshop/publish", {
           skillName: skillBox.value,
@@ -1824,7 +1844,9 @@
         });
         closeModal();
         await loadShop(true);
-        toast(`《${r.meta.name}》已经发到工坊（v${r.meta.version}）。朋友那边同步后就能看到。`);
+        toast(r.submitted
+          ? `《${r.meta.name}》投上去了，等站长过目。通过之后大家同步就能看到。`
+          : `《${r.meta.name}》已经发到工坊（v${r.meta.version}）。朋友那边同步后就能看到。`);
       } catch (err) {
         okBtn.disabled = false; okBtn.textContent = "发布";
         alert(err.message);
