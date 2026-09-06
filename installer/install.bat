@@ -18,7 +18,8 @@ if not exist "%~dp0install.ps1" (
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1"
 if errorlevel 1 (
   echo.
-  echo  [!] 安装没有完成。日志在: %TEMP%\shufang-install.log
-  echo      可以把这个文件发给帮你装的人看。
+  echo  [!] 安装没有完成。
+  echo      上面如果说「已经复制到剪贴板」，直接粘贴给站长就行；
+  echo      没说的话，把这个文件发给站长: %USERPROFILE%\.shufang\install.log
 )
 pause

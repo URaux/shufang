@@ -20,25 +20,48 @@
 $ErrorActionPreference = "Stop"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 try { chcp 65001 > $null } catch {}
-$LogPath = Join-Path $env:TEMP "shufang-install.log"
-try { Start-Transcript -Path $LogPath -Force | Out-Null } catch {}
+# 配置文件固定在 ~\.shufang（几 KB，程序按这个位置找配置）；大东西装哪由用户选
+$ConfigDir  = Join-Path $env:USERPROFILE ".shufang"
+$ConfigPath = Join-Path $ConfigDir "config.json"
+# 日志也放 ~\.shufang，不放 %TEMP%：目标用户不知道 %TEMP% 是什么，资源管理器默认还藏着
+# AppData，「把日志发给帮你装的人」这句话对他们等于没说。固定在这儿，桌面的
+# 「复制群星回廊日志」和程序里的「复制诊断日志」都从同一个地方读。
+# 追加而不是覆盖：装失败重跑是常态，上一次是怎么失败的经常正是线索。
+$LogPath = Join-Path $ConfigDir "install.log"
+New-Item -ItemType Directory -Force $ConfigDir | Out-Null
+try { Start-Transcript -Path $LogPath -Append | Out-Null } catch {}
+Write-Host "---- 安装开始 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') ----" -ForegroundColor DarkGray
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
+
+# 出错时把日志末尾放进剪贴板。用户不会找文件、不会截整个窗口，但「粘贴」是会的——
+# 这是失败信息能到站长手里的唯一可靠通道。只取最后 200 行：重跑多次之后日志很长，
+# 全量粘进聊天窗口会卡。必须定义在 trap 前面：trap 里调它，而函数要执行到定义那行才存在。
+function CopyLogToClipboard() {
+  try { Stop-Transcript | Out-Null } catch {}     # 先停，不然末尾几行还在缓冲区里
+  try {
+    $tail = Get-Content $LogPath -Tail 200 -Encoding UTF8 -ErrorAction Stop
+    Set-Clipboard -Value ($tail -join [Environment]::NewLine)
+    Write-Host ""
+    Write-Host "  ============================================================" -ForegroundColor Yellow
+    Write-Host "  出错了。错误信息已经复制到剪贴板，直接粘贴给站长就行。" -ForegroundColor Yellow
+    Write-Host "  ============================================================" -ForegroundColor Yellow
+  } catch {
+    Write-Host ""
+    Write-Host "  出错了。日志在 $LogPath，把这个文件发给站长。" -ForegroundColor Yellow
+  }
+}
 
 # 任何未捕获错误：显示人话、停住窗口，绝不闪退
 trap {
   Write-Host ""
   Write-Host "[X] 安装中途出错了: $($_.Exception.Message)" -ForegroundColor Red
   Write-Host "    多半是某个下载没完成——网络不好的话挂个梯子、或换个时间重试。" -ForegroundColor Yellow
-  Write-Host "    日志在 $LogPath，可以把它发给帮你装的人。" -ForegroundColor Yellow
-  try { Stop-Transcript | Out-Null } catch {}
+  CopyLogToClipboard
   Read-Host "按回车关闭"
   exit 1
 }
 
 $Owner  = "URaux"; $Repo = "shufang"
-# 配置文件固定在 ~\.shufang（几 KB，程序按这个位置找配置）；大东西装哪由用户选
-$ConfigDir  = Join-Path $env:USERPROFILE ".shufang"
-$ConfigPath = Join-Path $ConfigDir "config.json"
 
 # 升级时沿用老配置。重装不该让人重填一遍 key，更不该换掉 token——
 # token 一变，手机上存的那个带 ?t= 的链接就全打不开了。
@@ -69,7 +92,8 @@ function RemoveWithRetry($path) {
   }
   # 还删不掉就改名让路，下次启动前清理
   try { Rename-Item $path "$path.old-$(Get-Random)" -ErrorAction Stop } catch {
-    throw "有程序正占着 $path。请把所有群星回廊窗口关掉（或重启电脑）后重新安装。"
+    # 路径对用户没用（他既不认识也帮不上忙），要紧的是「关窗口再来一次」
+    throw "有文件正被别的程序占着，装不进去。把所有群星回廊的窗口都关掉（或者直接重启一次电脑），然后重新运行这个安装器。"
   }
 }
 
@@ -77,7 +101,17 @@ function RemoveWithRetry($path) {
 function Fetch($url, $out) {
   curl.exe -fL --retry 2 --connect-timeout 25 -o "$out" "$url" 2>$null
   if ($LASTEXITCODE -eq 0 -and (Test-Path $out) -and (Get-Item $out).Length -gt 0) { return }
-  throw "下载失败: $url`n    网络不通或对方限速。挂个梯子、或换个时间重跑本安装器。"
+  # GitHub 的下载在国内时好时坏：2026-09-05 实测直连 600KB/s，但同一天另一个时段就可能 RST。
+  # 官方失败再走 gh-proxy.com 反代（原始地址整个跟在后面，实测 800KB/s）。
+  # 只对 github.com 的地址这么做——别的站没有这种反代，拼上去也是白拼。
+  if ($url -match "^https://(github\.com|objects\.githubusercontent\.com)/") {
+    Remove-Item -Force $out -ErrorAction SilentlyContinue
+    curl.exe -fL --retry 2 --connect-timeout 25 -o "$out" "https://gh-proxy.com/$url" 2>$null
+    if ($LASTEXITCODE -eq 0 -and (Test-Path $out) -and (Get-Item $out).Length -gt 0) { return }
+  }
+  # 人话在前，地址跟在后面单起一行——那一行是给站长看的（日志和剪贴板都会带上它），
+  # 用户不用管
+  throw "有个组件没下下来。多半是网络不通或者对方限速：挂个梯子，或者换个时间重新运行这个安装器。`n    （这行给站长看：$url）"
 }
 
 function Expand($archive, $dest) {
@@ -89,11 +123,11 @@ function Expand($archive, $dest) {
   if ($hasTar) {
     tar.exe -xf "$archive" -C "$dest"
     if ($LASTEXITCODE -ne 0) {
-      if ($isTar) { throw "解压失败: $archive" }
+      if ($isTar) { throw "下下来的文件打不开，多半是没下完。重新运行一次这个安装器（会重新下）。" }
       Expand-Archive -Path $archive -DestinationPath $dest -Force
     }
   } elseif ($isTar) {
-    throw "这台电脑没有 tar.exe（Win10 1803 以前的版本才会这样）。请升级 Windows 后重试。"
+    throw "这台电脑的 Windows 太老了（Win10 1803 以前），缺一个解压要用的系统组件。把 Windows 升级一下，再重新运行这个安装器。"
   } else {
     Expand-Archive -Path $archive -DestinationPath $dest -Force
   }
@@ -225,7 +259,7 @@ if (-not (Test-Path (Join-Path $NodeDir "node.exe"))) {
     $idx = curl.exe -fsSL "https://nodejs.org/dist/index.json" 2>$null | ConvertFrom-Json
     $v = ($idx | Where-Object { $_.lts -and ([version]($_.version.TrimStart("v"))) -ge $NODE_MIN } |
           Select-Object -First 1).version
-    if (-not $v) { throw "找不到可用的 Node（需要 22.15 以上）。换个网络环境再试。" }
+    if (-not $v) { throw "没找到能用的运行环境版本（要 Node 22.15 以上）。换个网络环境，再重新运行一次这个安装器。" }
     Fetch "https://nodejs.org/dist/$v/node-$v-win-x64.zip" "$env:TEMP\sf-node.zip"
   }
   Expand "$env:TEMP\sf-node.zip" "$env:TEMP\sf-node"
@@ -250,6 +284,7 @@ Step "安装 Pandoc（电子书格式转换）"
 if (-not (Test-Path (Join-Path $BinDir "pandoc.exe"))) {
   $rel = curl.exe -fsSL --connect-timeout 25 "https://api.github.com/repos/jgm/pandoc/releases/latest" 2>$null | ConvertFrom-Json
   $asset = $rel.assets | Where-Object { $_.name -match "windows-x86_64\.zip$" } | Select-Object -First 1
+  if (-not $asset) { throw "问不到格式转换工具的下载地址（GitHub 那边没应答）。换个网络，或者过一会儿重新运行一次这个安装器。" }
   Fetch $asset.browser_download_url "$env:TEMP\sf-pandoc.zip"
   Expand "$env:TEMP\sf-pandoc.zip" "$env:TEMP\sf-pandoc"
   $pdoc = Get-ChildItem "$env:TEMP\sf-pandoc" -Recurse -Filter "pandoc.exe" | Select-Object -First 1
@@ -261,22 +296,55 @@ Ok "Pandoc 就绪"
 # ---------------------------------------------------------------- dsh（DeepSeek Harness）
 Step "安装 dsh（翻译助手的大脑，DeepSeek 官方）"
 if (-not (Test-Path (Join-Path $NodeDir "dsh.cmd"))) {
-  & (Join-Path $NodeDir "npm.cmd") install -g "@deepseek-ai/dsh" --silent
-  if ($LASTEXITCODE -ne 0) { throw "dsh 安装失败" }
+  # 先走阿里云 npmmirror（国内快且稳），失败再退回官方 registry。
+  # 只在这一条命令上带 --registry，不动用户的 ~/.npmrc。
+  & (Join-Path $NodeDir "npm.cmd") install -g "@deepseek-ai/dsh" --silent --registry=https://registry.npmmirror.com
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "   镜像那边没装成，换官方源再试一次..." -ForegroundColor DarkGray
+    & (Join-Path $NodeDir "npm.cmd") install -g "@deepseek-ai/dsh" --silent
+  }
+  if ($LASTEXITCODE -ne 0) { throw "翻译助手的大脑没装上，两个下载源都没成。检查一下网络（可能要挂梯子），然后重新运行一次这个安装器。" }
 }
 Ok "dsh 就绪"
 
 # ---------------------------------------------------------------- 群星回廊程序
 Step "获取群星回廊程序"
+# 国内源优先。装机的人在国内，codeload 时好时坏而且没有可靠反代，这一步又是必成的
+# （没有它就没有程序）。所以自己在 Cloudflare R2 上放了一份，走 download.gnosaria.com
+# （国内可达），GitHub 留作兜底——R2 那份是发布时同步上去的，万一没同步成，GitHub 一定在。
+$MirrorBase = "https://download.gnosaria.com/shufang"
+
+# sha 和包必须来自同一个 commit。.app-sha 写下的是「现在装的是哪一版」，
+# 写错了下次启动更新器会拿它跟远端比，比出「已是最新」，用户就永远停在旧版，
+# 而且没有任何提示。所以两者同源：
+#   version.json 通了 → 包也从国内源拿；
+#   包没拿到（国内源半通不通）→ 回 codeload，同时把 sha 也重新从 GitHub 问一次，
+#   因为两边可能差一个 commit，配错了就是上面那个「永远停在旧版」。
+$sha = ""
+$verRaw = ((curl.exe -fsSL --max-time 8 "$MirrorBase/version.json" 2>$null) -join "").Trim()
+if ($verRaw) {
+  try { $sha = "" + (($verRaw | ConvertFrom-Json).sha) } catch { $sha = "" }
+}
+if ($sha -notmatch '^[0-9a-f]{40}$') { $sha = "" }
+
 # 用 zip 而不是 tar.gz：仓库里有中文文件名，Windows 自带的 tar.exe 解 tar.gz 会
 # 「Invalid empty pathname」炸掉；Expand-Archive（.NET）认 zip 的 UTF-8 文件名，稳。
-Fetch "https://codeload.github.com/$Owner/$Repo/zip/refs/heads/master" "$env:TEMP\sf-app.zip"
+# 国内源那份 zip 的顶层目录也叫 shufang-master\，跟 codeload 同构，下面解压这段两个源通用。
+$gotApp = $false
+if ($sha) {
+  curl.exe -fL --retry 2 --connect-timeout 25 -o "$env:TEMP\sf-app.zip" "$MirrorBase/shufang-master.zip" 2>$null
+  if ($LASTEXITCODE -eq 0 -and (Test-Path "$env:TEMP\sf-app.zip") -and (Get-Item "$env:TEMP\sf-app.zip").Length -gt 0) { $gotApp = $true }
+  if (-not $gotApp) { Write-Host "   国内源没通，改从 GitHub 拿" -ForegroundColor DarkGray; $sha = "" }
+}
+if (-not $gotApp) { Fetch "https://codeload.github.com/$Owner/$Repo/zip/refs/heads/master" "$env:TEMP\sf-app.zip" }
+if (-not $sha) {
+  $sha = ((curl.exe -fsSL -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$Owner/$Repo/commits/master") -join "").Trim()
+}
 if (Test-Path "$env:TEMP\sf-app") { Remove-Item -Recurse -Force "$env:TEMP\sf-app" }
 Expand-Archive -Path "$env:TEMP\sf-app.zip" -DestinationPath "$env:TEMP\sf-app" -Force
 $appInner = Get-ChildItem "$env:TEMP\sf-app" -Directory | Select-Object -First 1
 RemoveWithRetry $AppRepo
 Move-Item $appInner.FullName $AppRepo
-$sha = ((curl.exe -fsSL -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$Owner/$Repo/commits/master") -join "").Trim()
 if ($sha -match '^[0-9a-f]{40}$') { Set-Content -Path (Join-Path $AppDir ".app-sha") -Value $sha -NoNewline }
 Remove-Item -Recurse -Force "$env:TEMP\sf-app.zip", "$env:TEMP\sf-app" -ErrorAction SilentlyContinue
 Ok "已获取最新版"
@@ -284,7 +352,11 @@ Ok "已获取最新版"
 Step "安装网页程序依赖"
 Push-Location (Join-Path $AppRepo "webapp")
 & (Join-Path $NodeDir "npm.cmd") install --omit=dev --silent
+# npm 失败不抛异常，只给退出码。原来没看它，装了一半也说「就绪」，
+# 用户拿到的是一个双击就闪退的东西，而且日志里一个错字都没有。
+$__npmRc = $LASTEXITCODE
 Pop-Location
+if ($__npmRc -ne 0) { throw "网页程序的组件没装齐，这样装出来是打不开的。多半是网络问题：换个时间重新运行一次这个安装器。`n    （这行给站长看：npm 退出码 $__npmRc）" }
 Ok "网页程序就绪"
 
 # ---------------------------------------------------------------- 书库
@@ -319,9 +391,15 @@ if ($ObsidianInstalled) {
     Write-Host "   跳过了。网页界面照常能看能改。" -ForegroundColor DarkGray
   } else {
     try {
-      $orel = curl.exe -fsSL "https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest" 2>$null | ConvertFrom-Json
-      $oasset = $orel.assets | Where-Object { $_.name -match "^Obsidian-[\d.]+\.exe$" } | Select-Object -First 1
-      if (-not $oasset) { throw "没取到下载地址" }
+      # 别用 releases/latest：2026-09 起上游把「最新」挂成了只带安卓 apk 的发布，
+      # 桌面安装包在前一个发布里。翻最近几个，取第一个带 exe 的。
+      $orels = curl.exe -fsSL --connect-timeout 25 "https://api.github.com/repos/obsidianmd/obsidian-releases/releases?per_page=8" 2>$null | ConvertFrom-Json
+      $oasset = $null
+      foreach ($orel in @($orels)) {
+        $oasset = $orel.assets | Where-Object { $_.name -match "^Obsidian-[\d.]+\.exe$" } | Select-Object -First 1
+        if ($oasset) { break }
+      }
+      if (-not $oasset) { throw "问不到 Obsidian 的下载地址" }
       Fetch $oasset.browser_download_url "$env:TEMP\sf-obsidian.exe"
       # NSIS 静默、按用户安装，不要管理员
       Start-Process "$env:TEMP\sf-obsidian.exe" -ArgumentList "/S" -Wait
@@ -330,8 +408,10 @@ if ($ObsidianInstalled) {
       Ok "Obsidian 装好了"
     } catch {
       # 装不上不该拦住整个安装 —— 群星回廊本身完全能用
-      Write-Host "   Obsidian 这一步没成（$($_.Exception.Message)）。" -ForegroundColor Yellow
-      Write-Host "   不影响使用，联网后重跑一次安装器就能补上。" -ForegroundColor Yellow
+      # 这里捕到的可能是 .NET 抛的英文异常，原文只写进日志（Start-Transcript 会记下）
+      Write-Host "   Obsidian 这一步没装成。" -ForegroundColor Yellow
+      Write-Host "   不影响使用：联网之后重新运行一次这个安装器就能补上。" -ForegroundColor Yellow
+      Write-Host "   （这行给站长看：$($_.Exception.Message)）" -ForegroundColor DarkGray
     }
   }
 }
@@ -370,6 +450,35 @@ if ($PyExe) {
   & $PyExe -c "import pymupdf4llm" 2>$null | Out-Null
   if ($LASTEXITCODE -eq 0) {
     Ok "PDF 支持就绪（用你电脑上的 Python）"
+
+    # ---- 扫描版 PDF（认字）----
+    # 老书、影印本、图书馆扫的资料几乎全是「每一页都是图片」的 PDF，
+    # 抽不出文字层，得先认字。单问一句而不是默默装：这一步要下将近 100 MB，
+    # 家里的网慢的话会等很久，而且不读扫描件的人根本用不上。
+    #
+    # 用的是 rapidocr-onnxruntime（pip 装，不用另外的外部程序）。
+    # **它依赖 onnxruntime，而这台项目机上实测 onnxruntime 1.22/1.28 都 DLL load failed**
+    # ——上面钉死 pymupdf 版本就是为了躲开它。所以这里 fail-soft：
+    # 装不上或者 import 不了，只是没有扫描件支持，正常 PDF 一点不受影响。
+    $wantOcr = "" + (Read-Host "   要支持扫描版 PDF 吗？需要再下约 100 MB (y/N)")
+    if ($wantOcr -match "^[Yy]") {
+      Write-Host "   正在装认字组件（大约 100 MB，慢的话请耐心等）..." -ForegroundColor DarkGray
+      # 版本钉死，理由跟上面 pymupdf4llm 那条一样：这东西依赖 onnxruntime，
+      # 而本仓自己记着「onnxruntime 1.22/1.28 在本机 DLL load failed」。
+      # 1.4.4 拉下来的是 onnxruntime 1.18.1，项目机上实测能起
+      # （引擎 0.7s，一页 1.4s，中英文都认得出）。不钉的话今天装能跑、
+      # 过几个月新装的人拉到坏的那版，症状跟当年一模一样。
+      & $PyExe -m pip install --quiet --user "rapidocr-onnxruntime==1.4.4" 2>$null
+      & $PyExe -c "import rapidocr_onnxruntime" 2>$null | Out-Null
+      if ($LASTEXITCODE -eq 0) {
+        Ok "扫描版 PDF 也能读了"
+      } else {
+        Write-Host "   认字组件跑不起来，扫描版 PDF 暂时读不了（普通 PDF 不受影响）。" -ForegroundColor Yellow
+        Write-Host "   多半是缺「Microsoft Visual C++ 运行库」，装上再重跑一次本安装器试试。" -ForegroundColor Yellow
+      }
+    } else {
+      Write-Host "   跳过了。以后想读扫描版的书，重跑一次本安装器，这一步选 y 就行。" -ForegroundColor DarkGray
+    }
   } else {
     Write-Host "   PDF 组件装上了但跑不起来，PDF 格式的书暂时读不了（epub/txt/docx 不受影响）。" -ForegroundColor Yellow
   }
@@ -439,7 +548,8 @@ Ok "配置写好了"
 Step "安装自动更新器"
 $UpdaterPath = Join-Path $AppDir "update.ps1"
 $updaterText = @"
-# 群星回廊自动更新器 —— 每次启动时比对 GitHub 上 master 的 commit sha，变了就整份换掉 app\。
+# 群星回廊自动更新器 —— 每次启动时比对远端 master 的 commit sha，变了就整份换掉 app\。
+# 版本号先问国内源（download.gnosaria.com），问不到再问 GitHub。
 # 由安装器生成，不随仓库更新。失败一律静默放行，绝不能挡住用户启动。
 `$ErrorActionPreference = "Stop"
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
@@ -447,7 +557,14 @@ try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::
 `$AppRepo = "$AppRepo"
 `$ShaFile = Join-Path `$AppDir ".app-sha"
 try {
-  `$latest = ((curl.exe -fsSL --max-time 10 -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$Owner/$Repo/commits/master") -join "").Trim()
+  # 国内源优先：GitHub 在国内时通时不通，而这一步跑在每次启动上，不能等太久。
+  `$latest = ""
+  `$verRaw = ((curl.exe -fsSL --max-time 8 "$MirrorBase/version.json" 2>`$null) -join "").Trim()
+  if (`$verRaw) { try { `$latest = "" + ((`$verRaw | ConvertFrom-Json).sha) } catch { `$latest = "" } }
+  `$fromMirror = (`$latest -match '^[0-9a-f]{40}$')
+  if (-not `$fromMirror) {
+    `$latest = ((curl.exe -fsSL --max-time 10 -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$Owner/$Repo/commits/master") -join "").Trim()
+  }
   if (`$latest -notmatch '^[0-9a-f]{40}$') { return }
   if (-not `$latest) { return }
   `$current = ""
@@ -457,8 +574,23 @@ try {
   Write-Host "发现新版本，更新中..." -ForegroundColor Cyan
   `$zip = Join-Path `$env:TEMP "sf-up.zip"
   `$tmp = Join-Path `$env:TEMP "sf-up"
-  curl.exe -fsSL --max-time 120 -o "`$zip" "https://codeload.github.com/$Owner/$Repo/zip/refs/heads/master"
-  if (`$LASTEXITCODE -ne 0) { return }
+  # sha 和包必须是同一个 commit：下面会把 `$latest 写进 .app-sha，
+  # 写了跟实际装的包对不上的 sha，下次启动就比出「已是最新」，用户永远卡在这一版。
+  # 所以版本号哪来的、包就哪来的；国内源的包没拿到，才回 GitHub，
+  # 而且回退时把 sha 也重新从 GitHub 问一次（两边可能差一个 commit）。
+  `$got = `$false
+  if (`$fromMirror) {
+    curl.exe -fsSL --max-time 120 -o "`$zip" "$MirrorBase/shufang-master.zip"
+    if (`$LASTEXITCODE -eq 0) { `$got = `$true } else { Write-Host "国内源没通，改从 GitHub 拿" -ForegroundColor DarkGray }
+  }
+  if (-not `$got) {
+    if (`$fromMirror) {
+      `$latest = ((curl.exe -fsSL --max-time 10 -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$Owner/$Repo/commits/master") -join "").Trim()
+      if (`$latest -notmatch '^[0-9a-f]{40}$') { return }
+    }
+    curl.exe -fsSL --max-time 120 -o "`$zip" "https://codeload.github.com/$Owner/$Repo/zip/refs/heads/master"
+    if (`$LASTEXITCODE -ne 0) { return }
+  }
   if (Test-Path `$tmp) { Remove-Item -Recurse -Force `$tmp }
   # 用 zip + Expand-Archive：仓库有中文文件名，tar.exe 解 tar.gz 会炸
   Expand-Archive -Path `$zip -DestinationPath `$tmp -Force
@@ -481,7 +613,7 @@ try {
   } catch {
     if (Test-Path `$AppRepo) { Remove-Item -Recurse -Force `$AppRepo -ErrorAction SilentlyContinue }
     if (Test-Path `$backup) { Move-Item `$backup `$AppRepo }
-    Write-Host "更新失败，继续用当前版本" -ForegroundColor Yellow
+    Write-Host "这次没更新成，先用现在这个版本，功能都在。下次启动会再试一遍。" -ForegroundColor Yellow
   }
   Remove-Item -Recurse -Force `$zip, `$tmp -ErrorAction SilentlyContinue
 } catch {
@@ -553,10 +685,31 @@ pause
   Ok "桌面上有「启动群星回廊」了"
 }
 
+# 「复制群星回廊日志」：装好了但起不来的时候，用户唯一做得到的事。
+# 跟启动器一样是 VBS + 快捷方式（同一套 UTF-16 编码规矩，理由见上面），
+# 双击一下就把 install.log + app.log 的末尾放进剪贴板，弹一句「粘贴给站长」。
+# 它不认安装位置（日志固定在 ~\.shufang），所以模板里没有占位符要换。
+$CopySrc = Join-Path $PSScriptRoot "copylog-template.vbs"
+if (-not (Test-Path $CopySrc)) { $CopySrc = Join-Path $AppRepo "installer\copylog-template.vbs" }
+if (Test-Path $CopySrc) {
+  $CopyVbs = Join-Path $AppDir "复制日志.vbs"
+  $cv = [System.IO.File]::ReadAllText($CopySrc, [System.Text.Encoding]::UTF8)
+  [System.IO.File]::WriteAllText($CopyVbs, $cv, (New-Object System.Text.UnicodeEncoding($false, $true)))
+  $sc2 = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $Desktop "复制群星回廊日志.lnk"))
+  $sc2.TargetPath = "wscript.exe"
+  $sc2.Arguments = '"' + $CopyVbs + '"'
+  $sc2.WorkingDirectory = $AppDir
+  $sc2.Description = "出问题时双击：把群星回廊的日志复制到剪贴板，粘贴给站长"
+  if (Test-Path $IconPath) { $sc2.IconLocation = $IconPath }
+  $sc2.Save()
+  Ok "桌面上有「复制群星回廊日志」了（出问题时用）"
+}
+
 Write-Host ""
 Write-Host "==============================================" -ForegroundColor Green
 Write-Host "  安装完成！" -ForegroundColor Green
 Write-Host "  双击桌面「启动群星回廊」开始用。" -ForegroundColor Green
 Write-Host "==============================================" -ForegroundColor Green
+Write-Host "  如果之后启动出问题，双击桌面的『复制群星回廊日志』就能把日志复制到剪贴板。" -ForegroundColor Yellow
 try { Stop-Transcript | Out-Null } catch {}
 Read-Host "按回车关闭本窗口"

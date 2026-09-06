@@ -14,6 +14,12 @@
 $f="$env:TEMP\shufang-install.ps1";iwr https://raw.githubusercontent.com/URaux/shufang/master/installer/install.ps1 -OutFile $f -UseBasicParsing;powershell -NoProfile -ExecutionPolicy Bypass -File $f
 ```
 
+**国内网络用这条**（上面那行卡住不动、或者报连不上的话，换成这条，走国内能直连的下载源）：
+
+```powershell
+$f="$env:TEMP\shufang-install.ps1";iwr https://download.gnosaria.com/shufang/install.ps1 -OutFile $f -UseBasicParsing;powershell -NoProfile -ExecutionPolicy Bypass -File $f
+```
+
 不用管理员权限、不用装 winget，Node 和 Pandoc 都下载到你自己的 `~\.shufang` 目录里，不改系统。
 
 按提示走：中途会问要不要顺便装 Obsidian（不装也能用）、要不要 PDF 支持（要读 PDF 书就输 y），然后粘贴 API key（粘的时候屏幕上不显示，这是正常的）。装完桌面上出现「启动群星回廊」。
@@ -26,6 +32,12 @@ $f="$env:TEMP\shufang-install.ps1";iwr https://raw.githubusercontent.com/URaux/s
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/URaux/shufang/master/installer/install-mac.sh)"
+```
+
+**国内网络用这条**（上面那行卡住不动、或者报连不上的话，换成这条，走国内能直连的下载源）：
+
+```bash
+/bin/bash -c "$(curl -fsSL https://download.gnosaria.com/shufang/install-mac.sh)"
 ```
 
 不用输开机密码、不用装 Homebrew，所有东西都装在你自己的用户目录里。装完桌面上出现「启动群星回廊.command」，第一次运行若被系统拦，右键它选「打开」一次即可。
@@ -68,7 +80,7 @@ $f="$env:TEMP\shufang-install.ps1";iwr https://raw.githubusercontent.com/URaux/s
 - **双击 install.bat 窗口一闪就没了** — 你多半只下载了 bat 这一个文件，或者还在压缩包里没解压。用安装章节里的「粘一行命令」方式最省事。
 - **黑窗口关了网页就打不开了** — 正常，重新双击「启动群星回廊」。
 - **助手说额度不够** — DeepSeek 余额用完了，去 platform.deepseek.com 充值。翻一整本书一般也就几块钱。
-- **书是扫描版 PDF（每页是图片）** — 暂时啃不动，需要先用别的工具 OCR 成文字。
+- **书是扫描版 PDF（每页是图片）** — 能读，但要装「认字」组件：重跑一次安装器，在问「要支持扫描版 PDF 吗」那一步选 y（大约要下 100 MB）。装好之后传书跟平常一样，只是整理时会多花几分钟（三百页大约五到十分钟），进度条上会写「正在认字 42/300 页」。认得不清楚的页会在原文里标出来。
 - **Obsidian 第一次打开问「是否信任」** — 点信任。它只是个看笔记的软件，书库就是普通文件夹。
 - **想换电脑** — 把 `文档\书房` 文件夹整个拷走就行，书和译文都在里面。
 

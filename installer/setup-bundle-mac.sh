@@ -10,13 +10,29 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 PAYLOAD="$HERE/payload"
 APP_DIR_DEFAULT="$HOME/.shufang"
 VAULT_DEFAULT="$HOME/Documents/书房"
-LOG="/tmp/shufang-install.log"
-
-exec > >(tee "$LOG") 2>&1
+# 日志放 ~/.shufang/install.log 而不是 /tmp：用户找不到 /tmp（访达里根本不显示），
+# 「把日志发给帮你装的人」这句话对他们等于没说。桌面的「复制群星回廊日志」和程序里的
+# 「复制诊断日志」都从这儿读。追加而不是覆盖：上一次是怎么失败的经常正是线索。
+# 固定在 ~/.shufang 而不是安装位置：配置也在这儿，程序按这个位置找。
+LOG="$HOME/.shufang/install.log"
+mkdir -p "$HOME/.shufang"
+exec > >(tee -a "$LOG") 2>&1
+echo "---- 安装开始 $(date '+%Y-%m-%d %H:%M:%S') ----"
 
 step() { printf '\n\033[36m>> %s\033[0m\n' "$1"; }
 ok()   { printf '\033[32m   OK: %s\033[0m\n' "$1"; }
-die()  { printf '\n\033[31m[X] %s\033[0m\n日志在 %s，可以发给帮你装的人。\n' "$1" "$LOG"; exit 1; }
+# 出错时把日志末尾放进剪贴板：用户不会找文件，但会「粘贴」。只取最后 200 行，
+# 重跑多次之后全量粘进聊天窗口会卡。sleep 是等 tee 把最后几行落盘——它是异步的。
+die()  {
+  printf '\n\033[31m[X] %s\033[0m\n' "$1"
+  sleep 0.5
+  if [ -f "$LOG" ] && tail -n 200 "$LOG" | pbcopy 2>/dev/null; then
+    printf '\n\033[33m  出错了。错误信息已经复制到剪贴板，直接粘贴给站长就行。\033[0m\n\n'
+  else
+    printf '\n\033[33m  出错了。日志在 %s，把这个文件发给站长。\033[0m\n\n' "$LOG"
+  fi
+  exit 1
+}
 
 echo "=============================================="
 echo "  群星回廊 · 全量包安装 (macOS)"
@@ -150,8 +166,10 @@ else
     printf '\033[90m   跳过了。网页界面照常能看能改。\033[0m\n'
   else
     obs_ok=0
-    # 资产名是 Obsidian-<版本>.dmg
-    DMG=$(curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest \
+    # 资产名是 Obsidian-<版本>.dmg。
+    # 别用 releases/latest：2026-09 起上游把「最新」挂成了只带安卓 apk 的发布，
+    # 桌面安装包在前一个发布里。翻最近几个，第一个 dmg 就是它。
+    DMG=$(curl -fsSL "https://api.github.com/repos/obsidianmd/obsidian-releases/releases?per_page=8" \
       | grep -o 'https://[^"]*/Obsidian-[0-9.]*\.dmg' | head -1)
     if [ -n "$DMG" ] && curl -fL --progress-bar "$DMG" -o /tmp/shufang-obsidian.dmg; then
       MNT=$(hdiutil attach -nobrowse -readonly /tmp/shufang-obsidian.dmg | grep -o '/Volumes/.*' | head -1)
@@ -220,14 +238,40 @@ export PATH="\$APP_DIR/node/bin:\$APP_DIR/bin:\$PATH"
 # 结果是拿到 zip 安装的人永远停在打包那天的版本，重启多少次都不会更新，
 # 而且他不会收到任何提示，看起来就像「没有新版本」。
 # 两条安装路径必须给出同样的行为，否则「已经发布了」这句话对一半用户是假的。
+# 版本号先问国内源（download.gnosaria.com，Cloudflare，国内可达），问不到再问 GitHub。
 echo "检查更新中..."
-LATEST=\$(curl -fsSL --max-time 8 "https://api.github.com/repos/URaux/shufang/commits/master" 2>/dev/null | grep -m1 '"sha"' | cut -d'"' -f4)
+MIRROR="https://download.gnosaria.com/shufang"
+FROM_MIRROR=0
+LATEST=\$(curl -fsSL --max-time 8 "\$MIRROR/version.json" 2>/dev/null \\
+  | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\\([0-9a-f]\\{40\\}\\)".*/\\1/p' | head -1)
+if [ -n "\$LATEST" ]; then
+  FROM_MIRROR=1
+else
+  LATEST=\$(curl -fsSL --max-time 8 "https://api.github.com/repos/URaux/shufang/commits/master" 2>/dev/null | grep -m1 '"sha"' | cut -d'"' -f4)
+fi
 CURRENT=\$(cat "\$APP_DIR/.app-sha" 2>/dev/null || true)
 if [ -n "\$LATEST" ] && [ "\$LATEST" != "\$CURRENT" ]; then
   echo "发现新版本，更新中..."
-  # 下载**刚才那个 sha**，不是再要一次 master：
+  # sha 和包必须是同一个 commit，否则写进 .app-sha 的版本跟实际装的对不上，
+  # 下次启动比出「已是最新」，用户永远卡在这一版还收不到提示。所以版本号哪来的、包就哪来的。
+  # 国内源只有 master 一份包（没有按 sha 存档的地址），万一 version.json 和包之间
+  # 差了一次发布，下一次启动会再更新一遍，不会装坏——比拿不到包强。
+  # 回 GitHub 时仍然下载**刚才那个 sha**，不是再要一次 master：
   # 两次请求之间 master 可能已经往前走了，那样装到的东西和校验过的不是一份。
-  if curl -fsSL --max-time 60 "https://codeload.github.com/URaux/shufang/tar.gz/\$LATEST" -o /tmp/shufang-up.tgz; then
+  GOT=0
+  if [ "\$FROM_MIRROR" = 1 ]; then
+    if curl -fsSL --max-time 60 "\$MIRROR/shufang-master.tar.gz" -o /tmp/shufang-up.tgz; then
+      GOT=1
+    else
+      echo "国内源没通，改从 GitHub 拿"
+      LATEST=\$(curl -fsSL --max-time 8 "https://api.github.com/repos/URaux/shufang/commits/master" 2>/dev/null | grep -m1 '"sha"' | cut -d'"' -f4)
+    fi
+  fi
+  if [ "\$GOT" = 0 ] && [ -n "\$LATEST" ] \\
+     && curl -fsSL --max-time 60 "https://codeload.github.com/URaux/shufang/tar.gz/\$LATEST" -o /tmp/shufang-up.tgz; then
+    GOT=1
+  fi
+  if [ "\$GOT" = 1 ]; then
     rm -rf /tmp/shufang-up && mkdir -p /tmp/shufang-up
     SRC=""
     if tar -xzf /tmp/shufang-up.tgz -C /tmp/shufang-up 2>/dev/null; then
@@ -261,7 +305,12 @@ if [ -n "\$LATEST" ] && [ "\$LATEST" != "\$CURRENT" ]; then
 fi
 
 cd "\$APP_REPO/webapp" || exit 1
-node server.js &
+# 服务输出同时落到 ~/.shufang/app.log（不随安装位置走）：起不来的时候
+# 终端窗口一关线索就没了。追加写；超过 1MB 挪成 app.log.old，别让它无限长。
+LOG="\$HOME/.shufang/app.log"
+if [ "\$(stat -f%z "\$LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then mv -f "\$LOG" "\$LOG.old"; fi
+echo "==== start \$(date '+%Y-%m-%d %H:%M:%S') ====" >> "\$LOG"
+node server.js 2>&1 | tee -a "\$LOG" &
 SRV=\$!
 # 等端口起来再开浏览器
 for i in \$(seq 1 40); do
@@ -278,6 +327,28 @@ chmod +x "$LAUNCHER"
 xattr -d com.apple.quarantine "$LAUNCHER" 2>/dev/null || true
 ok "桌面上有「启动群星回廊.command」了"
 
+# 「复制群星回廊日志.command」：装好了但起不来的时候，用户唯一做得到的事。
+# 双击一下就把 install.log + app.log 的末尾放进剪贴板，弹一句「粘贴给站长」。
+# 日志固定在 ~/.shufang，不随安装位置走，所以这个文件不用烤任何路径进去。
+COPYLOG="$HOME/Desktop/复制群星回廊日志.command"
+cat > "$COPYLOG" <<'COPY_EOF'
+#!/bin/bash
+# 各取最后 200 行：日志可能几兆，整个粘进聊天窗口会卡死。
+D="$HOME/.shufang"
+{
+  found=0
+  for f in install.log app.log; do
+    if [ -f "$D/$f" ]; then found=1; echo "===== $f ====="; tail -n 200 "$D/$f"; fi
+  done
+  [ "$found" = 1 ] || echo "(没有找到日志文件：$D 里没有 install.log 和 app.log)"
+} | pbcopy
+osascript -e 'display dialog "日志已复制到剪贴板，粘贴给站长即可" buttons {"好"} default button 1 with title "群星回廊"' >/dev/null 2>&1 \
+  || echo "日志已复制到剪贴板，粘贴给站长即可"
+COPY_EOF
+chmod +x "$COPYLOG"
+xattr -d com.apple.quarantine "$COPYLOG" 2>/dev/null || true
+ok "桌面上有「复制群星回廊日志.command」了（出问题时用）"
+
 echo ""
 echo "=============================================="
 echo "  安装完成！"
@@ -285,3 +356,4 @@ echo "  程序在: $APP_DIR"
 echo "  书库在: $VAULT"
 echo "  双击桌面「启动群星回廊.command」开始用。"
 echo "=============================================="
+echo "  如果之后启动出问题，双击桌面的『复制群星回廊日志』就能把日志复制到剪贴板。"

@@ -241,7 +241,7 @@
      就把藏起来的那一格又显示回来了，于是两格平分高度，术语表只剩半屏。
      症状是「界面只占上半屏，下面一片空白」，看 CSS 根本看不出来，得去量计算值。 */
   .bench-pane[hidden] { display: none; }
-  #paneRites:not([hidden]) { overflow-y: auto; display: block; }
+  #paneComponents:not([hidden]) { overflow-y: auto; display: block; }
 
   /* 术语表 —— 左边一览，右边一条的全部。
      列表要能扫，所以一行只放最要紧的四样；剩下的（禁用译名、来源、全书实例）
@@ -256,7 +256,7 @@
   .tm-chips button, .tm-acts button { font: inherit; font-size: .82rem; padding: .28rem .6rem;
     border: 1px solid var(--line); border-radius: 999px; background: var(--card);
     color: var(--ink-soft); cursor: pointer; }
-  .tm-chips button.on { border-color: var(--accent); color: var(--accent); }
+  .tm-chips button.on, .tm-acts button.on { border-color: var(--accent); color: var(--accent); }
   .tm-chips b { font-weight: 600; margin-left: .25rem; opacity: .65; }
   .tm-acts { display: flex; gap: .25rem; margin-left: auto; }
 
@@ -287,6 +287,10 @@
   .tm-f textarea { resize: vertical; min-height: 2.6rem; }
   .tm-f .row { display: flex; gap: .4rem; }
   .tm-note { font-size: .76rem; color: var(--ink-mute); margin: -.5rem 0 1rem 4.9rem; }
+  /* 体系开关：一行一个，勾选框大一点——这是给不用键盘的人点的 */
+  .tm-sys { display: flex; align-items: center; gap: .55rem; padding: .35rem 0;
+    font-size: .95rem; cursor: pointer; }
+  .tm-sys input { accent-color: var(--accent); transform: scale(1.15); }
 
   .tm-occ { border-top: 1px solid var(--line); margin-top: 1.2rem; padding-top: .9rem; }
   .tm-occ .head { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .7rem;
@@ -339,10 +343,88 @@
     border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
   .rite-ask:hover { background: var(--card); color: var(--ink); border-color: var(--accent-soft); }
 
+  /* 门枢 —— 嵌站上那些纯观看的页面。
+     列表沿用抽签那套卡片：同一格里的两件事，长得不该像两个软件。 */
+  .sp-body { flex: 1; min-height: 0; overflow-y: auto; }
+  /* 进去之后整块交给 iframe，四周不留边、外层也不滚：
+     这些页面本来就是满屏动画，留一圈框会把它切成「网页里的一个小窗口」。
+     position 是给下面那层 .sp-veil 定位用的。 */
+  .sp-body.viewing { overflow: hidden; position: relative; }
+  /* 底色跟着应用走，不用黑。原来是黑的——那时候门后只有虫洞那一页满屏黑底动画，
+     配黑不闪。现在门后大半是米色的长页，黑底反而成了「一块黑屏」，
+     页面还没画出来的那一两秒看着就是坏了：这条真被当成 bug 报上来过。 */
+  .sp-frame { display: block; width: 100%; height: 100%; border: 0; background: var(--paper); }
+  /* 还没画出来的时候盖在上面的一层。iframe 挂上去只是开始下载，
+     整页画完还要一会儿，这中间它是一块空白，得有人说一句话。 */
+  .sp-veil { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: var(--paper); color: var(--ink-mute); font-size: .9rem; }
+  .sp-bar { flex: none; display: flex; align-items: center; gap: .7rem;
+    padding: .4rem .8rem; border-bottom: 1px solid var(--line);
+    font-size: .88rem; color: var(--ink-soft); }
+  /* 跟上面 .bench-pane[hidden] 同一个坑，这次是当场撞上的：
+     hidden 的 display:none 来自浏览器默认样式表，上面那句 display:flex 压得过它，
+     结果没进空间的时候列表上方也挂着一条「← 回列表」。截图才看得出来。 */
+  .sp-bar[hidden] { display: none; }
+  .sp-bar button { font: inherit; font-size: .84rem; padding: .25rem .75rem; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink-soft); cursor: pointer;
+    flex: none; }
+  .sp-bar button:hover { border-color: var(--accent-soft); color: var(--ink); }
+  /* 一句话的状态位。它占着那段 auto 边距，顺手把右边那两个按钮顶到最右。
+     窄屏上这条会先被挤扁：所以让它自己截断，别去挤按钮——话少看一句无妨，
+     按钮少一个就出不去了。按钮那条的 flex:none 是配套的，缺一不可。 */
+  .sp-note { margin-left: auto; font-size: .82rem; color: var(--ink-mute);
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 全屏送进去的是整格 #paneSpaces，工具条跟着一起进，所以要把它改成压在页面顶上的一条。
+     平时半透明，指过去或者键盘聚焦才实——不能干脆藏掉：藏了就只剩 Esc 一条出路。
+     用类名不用 :fullscreen 伪类：老 Safari 那边叫 :-webkit-full-screen，而选择器列表里
+     混进一个浏览器不认识的伪类，整条规则会被当作无效丢掉，得写两份。类名一份就够。 */
+  #paneSpaces.sp-full { position: relative; background: #000; }
+  #paneSpaces.sp-full .sp-bar { position: absolute; z-index: 2; top: 0; left: 0; right: 0;
+    background: var(--paper); opacity: .3; transition: opacity .18s; }
+  #paneSpaces.sp-full .sp-bar:hover { opacity: 1; }
+  /* :focus-visible 而不是 :focus-within：刚点完「全屏」，那个按钮还带着焦点，
+     用 :focus-within 的话这条会一直亮着，鼠标挪开也不暗——等于没做淡化。
+     用键盘 Tab 过来才算数。:has() 老浏览器不认，所以单开一条：
+     选择器列表里混一个不认识的东西，整条规则连 :hover 一起作废。 */
+  #paneSpaces.sp-full .sp-bar:has(:focus-visible) { opacity: 1; }
+  .sp-tip { margin-top: .7rem; font-size: .86rem; color: var(--ink-mute); }
+  /* 8-bit 神谕：八枚硬币排一行，一枚一枚落定。
+     每枚翻 260ms，八枚不到三秒——仪式感要有，但别让人干等。 */
+  .or-coins { display: flex; gap: .5rem; margin: .3rem 0 .5rem; }
+  .or-coin { width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--line);
+    background: var(--paper); display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, Consolas, monospace; font-size: .95rem; color: var(--ink-mute); }
+  .or-coin.spin { animation: or-flip .16s linear infinite; }
+  .or-coin.done { color: var(--accent); border-color: var(--accent-soft); }
+  @keyframes or-flip { from { transform: rotateX(0deg); } to { transform: rotateX(360deg); } }
+  .or-addr { font-family: ui-monospace, Consolas, monospace; letter-spacing: .22em;
+    font-size: .92rem; color: var(--ink-soft); }
+  .or-addr .src { letter-spacing: 0; margin-left: .6rem; font-size: .78rem; color: var(--ink-mute); }
+  .or-zh { font-size: 1.25rem; line-height: 2; margin: .9rem 0 .25rem; }
+  .or-greek { font-size: .95rem; line-height: 1.9; color: var(--ink-soft); }
+  .or-ref { font-size: .82rem; color: var(--ink-mute); margin-top: .35rem; }
+  .or-context { margin-top: .9rem; font-size: .9rem; line-height: 1.9; color: var(--ink-soft);
+    border-left: 2px solid var(--line); padding-left: .8rem; }
+  .or-read { margin-top: 1.1rem; border-top: 1px solid var(--line); padding-top: .9rem;
+    font-size: .96rem; line-height: 2; white-space: pre-wrap; }
+  .or-acts { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
+  .or-hint { font-size: .86rem; color: var(--ink-mute); line-height: 1.8; margin-top: .6rem; }
+  .or-old .item { border-top: 1px solid var(--line); padding: .55rem 0; font-size: .92rem; line-height: 1.8; }
+  .or-old .item .a { font-family: ui-monospace, Consolas, monospace; font-size: .76rem;
+    color: var(--ink-mute); letter-spacing: .12em; }
+  .or-box { font-family: ui-monospace, Consolas, monospace; font-size: .78rem; line-height: 1.7;
+    max-height: 11rem; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+    background: var(--paper); border: 1px dashed var(--line); border-radius: 8px;
+    padding: .6rem .7rem; margin-top: .7rem; }
+
   /* 设置：整页复用仪轨的 .rite-page/.rite-card/.rite-q/.rite-go，这里只补差的 */
   .set-state { font-size: .92rem; margin: 0 0 .7rem; color: var(--ink-soft); }
   .set-state b { color: var(--accent); font-weight: 600; }
   .set-state.err { color: #a3453a; }
+  /* 没配 key 时压在对话页顶上的一条。不是弹窗：弹窗关了就没了，这条一直在，配好才消失 */
+  .nokey { flex: none; display: flex; gap: .8rem; align-items: center; justify-content: center; flex-wrap: wrap;
+    padding: .55rem 1rem; font-size: .88rem; color: #7a4a1e; background: #f6e8cf; border-bottom: 1px solid #e6cf9f; }
+  .nokey button { font: inherit; padding: .2rem .8rem; border-radius: 999px; border: 1px solid #c9a870; background: #fff; color: #7a4a1e; cursor: pointer; }
   .set-box { font-family: ui-monospace, Consolas, monospace; font-size: .8rem; word-break: break-all;
     background: var(--paper); border: 1px dashed var(--line); border-radius: 8px; padding: .6rem .7rem; margin: .5em 0; }
   .set-row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
@@ -353,6 +435,9 @@
   .set-plain:hover { background: var(--paper); color: var(--ink); border-color: var(--accent-soft); }
   .set-plain.danger { border-color: #c9a09a; color: #a3453a; }
   .set-note { font-size: .8rem; color: var(--ink-mute); line-height: 1.7; margin: .6rem 0 0; }
+  .set-note.err { color: #a3453a; }
+  .ts-prog { height: 9px; background: var(--line); border-radius: 999px; overflow: hidden; margin: .5rem 0; }
+  .ts-prog i { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
   .set-switch { display: flex; align-items: center; gap: .55rem; font-size: .93rem; cursor: pointer; color: var(--ink); }
   .set-switch input { accent-color: var(--accent); transform: scale(1.15); }
 
@@ -367,7 +452,15 @@
     #reader .page { padding: 1.4rem 1.1rem 4rem; }
     #menuBtn { display: block; }
     header h1 { display: none; }
-    .tabs button { padding: .3rem .6rem; }
+    /* 390 宽的手机上实测：四个标签加⚙加☰放不下，「工坊」被挤出屏外、「工作台」切掉一半。
+       标签条自己可以横向滚（不显示滚动条），面包屑让位——它是说明，标签是出口。 */
+    header { gap: .4rem; padding: .5rem .6rem; }
+    header .crumb { flex: 1 1 auto; min-width: 0; }
+    .tabs { min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tabs button { padding: .3rem .55rem; font-size: .82rem; flex: none; }
+    /* 空态那两行提示原来一行到底，手机上从右边溢出去半句 */
+    .empty { padding: 4rem 1.2rem; white-space: normal; word-break: break-word; }
     #chatBody .msg { max-width: 94%; }
     .col { padding: 0 .9rem; }
     /* 窄屏放不下并排两栏：会话列表变成盖上来的一层，点顶栏的☰开关 */
@@ -419,6 +512,10 @@
 
   /* 上传 */
   .side-item.upload { color: var(--accent); font-weight: 600; }
+  /* 传书时选语言：只有扫描版外文书用得上，所以压成一行摆在进度条上面，
+     不做成「先问一句再上传」——那会给每一个传中文书的人平白多加一次点击。 */
+  .up-lang { display: flex; align-items: center; gap: .55rem; font-size: .82rem; color: var(--ink-mute); }
+  .up-lang select { width: auto; flex: 1; min-width: 0; padding: .3rem .5rem; font-size: .85rem; }
   .prog { height: 9px; background: var(--line); border-radius: 999px; overflow: hidden; margin: 1rem 0 .5rem; }
   .prog i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
   /* 后台作业卡片：入库在后台跑，聊天区只留这一张安静的卡，不刷过程气泡 */
@@ -468,11 +565,11 @@
   </header>
   <main>
     <aside id="sidebar"></aside>
-    <section id="reader"><div class="page"><div class="empty">📚<br/>左边选一本书开始看<br/>还没有书的话，去对话窗把书的文件拖给助手</div></div></section>
+    <section id="reader"><div class="page"><div class="empty">📚<br/>还没打开书。书架在左边（手机上点左上角 ☰）。<br/>第一次用，先点开《怎么用群星回廊》，三分钟看完。<br/>想读自己的书：去「对话」，把文件拖进去。</div></div></section>
     <section id="chat">
       <div id="msgs"></div>
       <div id="composer">
-        <textarea id="input" rows="2" placeholder="跟群星回廊助手说话，比如「翻第 3 章」"></textarea>
+        <textarea id="input" rows="2" placeholder="问这本书的问题，或者说「翻第 3 章」"></textarea>
         <button id="sendBtn">发送</button>
       </div>
     </section>
@@ -483,11 +580,12 @@
         <div id="sessionList"></div>
       </aside>
       <div id="chatMain">
+        <div id="noKey" class="nokey" hidden>还没配 DeepSeek 的 key，聊天和翻译都用不了。<button id="noKeyGo">去配一个</button></div>
         <div id="chatScroll"><div id="chatBody" class="col"></div></div>
         <div id="chatComposer">
           <div class="col">
             <button id="clipBtn" title="传一本书">📎</button>
-            <textarea id="input2" rows="3" placeholder="说点什么…（回车发送，Shift+回车换行）"></textarea>
+            <textarea id="input2" rows="3" placeholder="把书的文件拖进来，或者说「翻第 3 章」（回车发送，Shift+回车换行）"></textarea>
             <button id="sendBtn2">发送</button>
           </div>
           <div class="col chat-hint" id="chatHint"></div>
@@ -498,7 +596,8 @@
     <section id="bench">
       <nav class="bench-nav">
         <button data-pane="terms" class="on">术语表</button>
-        <button data-pane="rites">抽签</button>
+        <button data-pane="components">组件</button>
+        <button data-pane="spaces">门枢</button>
       </nav>
       <div class="bench-pane" id="paneTerms">
         <div class="tm-bar">
@@ -511,6 +610,7 @@
           </span>
           <span class="tm-acts">
             <button id="tmAdd" title="新增一条">＋</button>
+            <button id="tmSystems" title="这本书按哪几个领域的通行译法来">体系</button>
             <button id="tmExport" title="导出 CSV，Excel 直接打开">导出</button>
             <button id="tmImport" title="从 CSV 导入">导入</button>
             <input type="file" id="tmFile" accept=".csv,text/csv" hidden />
@@ -521,7 +621,16 @@
           <div class="tm-detail" id="tmDetail"></div>
         </div>
       </div>
-      <div class="bench-pane" id="paneRites" hidden><div class="rite-page" id="riteBody"></div></div>
+      <div class="bench-pane" id="paneComponents" hidden><div class="rite-page" id="compBody"></div></div>
+      <div class="bench-pane" id="paneSpaces" hidden>
+        <div class="sp-bar" id="spBar" hidden>
+          <button id="spBack">← 回列表</button><span id="spTitle"></span>
+          <span class="sp-note" id="spNote"></span>
+          <button id="spOpen" title="在你自己的浏览器里打开这个空间的首页。框里走到了哪一页，应用这边读不到，所以只能从头那一页开">在浏览器里打开</button>
+          <button id="spFull">全屏</button>
+        </div>
+        <div class="sp-body" id="spBody"></div>
+      </div>
     </section>
     <section id="settings"><div class="rite-page" id="setBody"></div></section>
     <section id="workshop"><div class="wk-page" id="wkBody"></div></section>
@@ -549,13 +658,115 @@
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
+  // 服务端回的 error 是给程序看的代号（no_such_book 这种），hint 才是给人看的话。
+  // 大多数接口两样都给，但有些接口只有代号——那时候 j.error 会被原样弹到屏幕上，
+  // 用户看到的是一串英文，既不知道出了什么事，更不知道下一步该干嘛。
+  //
+  // 这张表就是兜底：代号翻成人话，而且每句都带「接下来怎么办」。
+  // 加新接口的时候优先在服务端写 hint（那儿知道上下文，能说得更准），
+  // 这里只是最后一道网——但这道网必须一直在，因为漏一个用户就撞一个英文。
+  const ERR_CN = {
+    // —— 东西找不到了 ——
+    no_such_book: "这本书不在书架上了。回书架看看，可能刚被删掉或者改了名。",
+    no_such_file: "这一页找不到了。刷新一下页面再看。",
+    no_such_session: "这段对话已经不在了。左边挑另一段，或者新开一段。",
+    no_such_job: "这条任务已经不在了。刷新一下页面。",
+    no_such_term: "译名表里没有这个词了，可能刚被删掉。刷新一下这一页。",
+    no_such_chapter: "这一章找不到了。刷新一下页面再提建议。",
+    chapter_missing: "这一章的文件不在了，改不了。刷新一下页面看看还在不在。",
+    no_such_suggestion: "这条建议已经不在了，可能对方刚撤掉。刷新一下。",
+    no_such_plugin: "这个插件在工坊里找不到了（可能刚被下架）。点一下「同步」再看。",
+    no_such_skill: "本机没有这个技能。",
+    no_such_system: "本机没有这张体系表。",
+    not_shared: "这本书还没有共享出去。先在书名那一栏里点「共享」。",
+    no_workshop: "这台电脑还没有工坊。先建一个，或者用朋友给的邀请串加入。",
+
+    // —— 填的东西不对 ——
+    empty: "内容是空的，填点东西再提交。",
+    missing_fields: "还有没填的：仓库网址和钥匙两样都要。",
+    need_src: "得先填原文。",
+    need_proposed_or_reason: "「改成这样」和「为什么」至少填一个。",
+    no_author: "先留个名字，朋友才知道这条是谁提的。",
+    bad_target: "这一页还没保存过，或者文件已经不在了。",
+    bad_replacement: "要改的词和改成的词不能一样，也不能空着。",
+    bad_scope: "这条改不了：它来自工坊装的体系表。想覆盖就在本书里写一条同名的。",
+    bad_book_name: "这个书名带了不能用的字符，请发起人换个名字重新共享。",
+    bad_name: "这个名字不能用，换一个（别带斜杠和标点）。",
+    bad_path: "这个位置不对，刷新一下页面再试。",
+    bad_action: "这个操作不认识，刷新一下页面。",
+    bad_kind: "这种任务不认识，刷新一下页面。",
+    bad_type: "这种格式整理不了。只认 epub、txt、docx、pdf、md 这几种。",
+    bad_header: "表格第一行得有「原文」和「译名」两列。",
+    empty_csv: "这份表里没读到内容。",
+    empty_package: "这个包是空的，里面一个文件都没有。",
+    no_proposed_text: "这条建议只写了理由、没写改成什么，没法直接采纳。",
+    too_big: "内容太大了，分成几份再试。",
+    too_many: "条数到上限了，先删掉几条。",
+    too_many_files: "这个包里的文件太多了（最多 40 个）。",
+
+    // —— 状态不对 ——
+    busy: "上一件事还没做完，等它转完再点。",
+    already: "这台电脑已经有工坊了。",
+    already_decided: "这条建议已经有人处理过了。刷新一下看最新的。",
+    book_exists: "书架上已经有同名的书了，先把旧的改名或者删掉。",
+    changed: "这个文件刚才被改过了。先刷新看一眼新版本，再把你的修改贴回去。",
+    not_running: "这一条已经结束了。",
+    not_owner: "这件事得由建工坊的人来做。",
+    local_only: "这一项只能在运行「群星回廊」的那台电脑上看，手机上看不了。",
+    full: "这个工坊的位子满了，找发起人要个新邀请码。",
+
+    // —— 存不进去 / 读不出来 ——
+    write_failed: "没存上。看看这个文件是不是正被别的程序（比如 Obsidian）开着，关掉再试。",
+    create_failed: "没能新建，看看书库文件夹还在不在。",
+    delete_failed: "没能删掉，稍后再试一次。",
+    scan_failed: "扫描这本书的时候卡住了，稍后再试一次。",
+
+    // —— 联网、GitHub、组件 ——
+    engine_missing: "这个功能要用的组件还没装好。关掉启动窗口，再双击桌面上的「启动群星回廊」重开一次。",
+    offline: "连不上网。检查一下网络，联网后再点一次。",
+    not_github: "这个网址不像 GitHub 的仓库地址，对照一下再粘一次。",
+    repo_not_found_or_no_access: "找不到这个仓库，或者这把钥匙没有它的权限。核对一下仓库网址和 token。",
+    auth: "GitHub 不认这把钥匙。检查 token 是不是复制全了、有没有给这个仓库的 Contents 读写权限。",
+    clone_failed: "下载失败，检查网络后再试一次。",
+    verify_failed: "没能确认仓库是私密的（网络不通，或者钥匙权限不够）。稍后再试；建仓时记得选 Private。",
+    repo_public: "这个仓库是公开的。书的内容不能放进公开仓库——去 GitHub 的仓库 Settings 改成 Private。",
+    no_local_commits: "本地还没有可以上传的内容，先改点东西再同步。",
+    push_retries_exhausted: "反复上传都没成功，多半是网络不稳。过一会儿再点一次「同步」。",
+    register_failed: "连不上工坊服务器，联网后再点一次。",
+    claim_failed: "这个邀请码用不了，找对方重新发一次。",
+    submit_failed: "投稿没交上去，稍后再试一次。",
+    upload_failed: "上传中断了，再试一次。",
+    no_file: "没收到文件，重新选一次。",
+    bad_request: "这次请求没被认出来，刷新一下页面再试。",
+    bad_invite: "邀请串不完整，让对方重新发一次（要一整串，别漏掉开头和结尾）。",
+  };
+
+  // 把服务端的 error 代号翻成人话。
+  // 有几个老接口把中文直接写在 error 里（比如设置页那两条），那本来就是给人看的，
+  // 原样返回；纯英文代号而表里又没有的，返回空串，让调用处退回自己的兜底句子——
+  // 宁可说一句笼统的中文，也不能把 github_403 这种东西甩到用户脸上。
+  function humanize(code) {
+    const c = String(code == null ? "" : code).trim();
+    if (!c) return "";
+    if (ERR_CN[c]) return ERR_CN[c];
+    if (/^github_\d+$/.test(c)) return ERR_CN.repo_not_found_or_no_access;
+    return /^[\x20-\x7E]+$/.test(c) ? "" : c;
+  }
+
   async function api(url, body) {
-    const r = await fetch(url, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {}),
-    });
+    let r;
+    try {
+      r = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+    } catch {
+      // fetch 只在「根本连不上」的时候抛：程序被关掉了，或者手机跟电脑不在同一个网里。
+      // 原样往上抛的话用户看到的是浏览器那句英文的 Failed to fetch。
+      throw new Error("跟「群星回廊」断了联系。看看电脑上的启动窗口还开着没有，然后刷新这个页面。");
+    }
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.hint || j.error || "出错了");
+    if (!r.ok) throw new Error(j.hint || humanize(j.error) || "这一步没做成，稍等一下再试一次。");
     return j;
   }
 
@@ -565,13 +776,18 @@
     const parts = ['<div class="side-h">书架</div>'];
     if (!r.books.length) parts.push('<div class="side-item" style="cursor:default;color:var(--ink-mute)">还没有书</div>');
     for (const b of r.books) {
-      parts.push(`<button class="side-item" data-book="${encodeURIComponent(b.name)}">${esc(b.name)}<small>${b.chapters} 章 · <span class="done">已翻 ${b.translated}</span></small></button>`);
+      // 说明书那种只有「译文」没有原书的，标「N 章」会显示成「0 章 · 已翻 5」，看着像坏了
+      const meta = b.chapters ? `${b.chapters} 章 · <span class="done">已翻 ${b.translated}</span>` : `${b.translated} 篇`;
+      parts.push(`<button class="side-item" data-book="${encodeURIComponent(b.name)}">${esc(b.name)}<small>${meta}</small></button>`);
     }
     parts.push('<button class="side-item upload" id="uploadBook">📕 传一本书</button>');
     parts.push('<div class="side-h">协作</div>');
     parts.push('<button class="side-item" id="joinShared">📥 加入朋友共享的书</button>');
     sidebar.innerHTML = parts.join("");
     if (currentBook) renderBookMenu();
+    // 书架上只有说明书那一本（刚装好）时直接翻开它，别让人对着空白页猜该点哪。
+    // 只在读书页、且还没打开任何书的时候做——之后的每次刷新书架都不该抢页面。
+    if (!currentBook && view === "read" && r.books.length === 1 && r.books[0].name === "怎么用群星回廊") openBook(r.books[0].name);
   }
 
   // keepChat：这不是「用户点开了一本书」，只是助手干完活后刷新一下目录。
@@ -579,13 +795,18 @@
   async function openBook(name, opts) {
     const keep = !!(opts && opts.keepChat);
     const wasFile = currentFile;
+    // 助手每答完一句都会来刷一次这本书（它可能改了文件）。刷新会重新渲染正文，
+    // 而渲染的最后一步是 reader.scrollTop = 0 —— 于是读者每问一句，页面就被
+    // 弹回本章开头。这里在重渲染之前先把当前读到的位置记下来，刷完再放回去。
+    // 必须在任何 await 之前读：await 之后 DOM 可能已经不是原来那一屏了。
+    const keepFrac = keep ? readFrac() : 0;
     currentBook = await fetch("/api/book?name=" + encodeURIComponent(name)).then(r => r.json());
     if (!keep) { collabState = null; loadHistory(name); }
     refreshCollab(name);
     await loadMarks(name);
     renderBookMenu();
     if (keep) {
-      if (wasFile) openFile(wasFile);      // 停在原来那一章
+      if (wasFile) openFile(wasFile, null, keepFrac);   // 停在原来那一章、原来那一处
       return;
     }
     // 上次看到哪儿就从哪儿接着看——这才是重新打开一本书时想要的。
@@ -603,6 +824,16 @@
     } catch { }
   }
 
+  async function deleteBook() {
+    const name = currentBook && currentBook.name;
+    if (!name) return;
+    if (!confirm(`把《${name}》从书架上拿掉？\n\n不会真删：它会挪进书库的回收站，想找回去 .群星阅览室/回收站 里看。`)) return;
+    try { await api("/api/book/delete", { name }); }
+    catch (e) { alert(e.message || "这本书没能拿下书架，稍等一下再试一次。"); return; }
+    // 书没了，读书页上还开着它的某一章——最省事也最不会出错的收尾是整页重来
+    location.reload();
+  }
+
   function renderBookMenu() {
     const b = currentBook;
     const parts = [
@@ -614,6 +845,8 @@
     if (b.translated.length) {
       parts.push('<div class="side-h">译文</div>');
       for (const f of b.translated) parts.push(item(`Library/${b.name}/译文/${f}`, f.replace(/\.md$/, "")));
+      // 翻好的拿去别的阅读器看：浏览器直接下载，手机上也一样
+      parts.push(`<a class="side-item" href="/api/book/export?name=${encodeURIComponent(b.name)}" download style="text-decoration:none;color:var(--ink-soft)">📦 导出成 epub<small>丢进微信读书、Kindle 都能看</small></a>`);
     }
     if (b.original.length) {
       parts.push('<div class="side-h">原文</div>');
@@ -667,6 +900,8 @@
       }
     }
 
+    // 放在最底下，离常点的那些远一点。删的是「挪进回收站」，不是真删（见服务端）
+    parts.push(`<div class="side-h"></div><button class="side-item" id="delBook" style="color:var(--ink-mute)">🗑 删掉这本书</button>`);
     sidebar.innerHTML = parts.join("");
     function item(p, label) {
       const on = p === currentFile ? " on" : "";
@@ -747,11 +982,11 @@
         body: JSON.stringify({ book: currentBook.name, path: currentFile,
                                frac: readFrac(), label: docLabel(currentFile), note }),
       }).then(r => r.json());
-      if (r.error) { toast(r.hint || "没存上"); return; }
+      if (r.error) { toast(r.hint || humanize(r.error) || "书签没存上，稍等一下再点一次。"); return; }
       marks.unshift(r.mark);
       renderBookMenu();
       toast("书签存好了");
-    } catch { toast("没存上，网络断了？"); }
+    } catch { toast("书签没存上，跟「群星回廊」断了联系。看看启动窗口还开着没有。"); }
   }
 
   async function removeMark(id) {
@@ -804,7 +1039,9 @@
     .catch(() => { });
 
   function obsidianHref(rel) {
-    if (!obsidian.ok || !obsidian.vault || !rel) return "";
+    // 外接条目不在书库里，Obsidian 那边根本没有这个文件——
+    // 给出去只会是一个点了没反应的按钮，比没有按钮更糟。
+    if (!obsidian.ok || !obsidian.vault || !rel || rel.startsWith("@")) return "";
     return "obsidian://open?vault=" + encodeURIComponent(obsidian.vault)
       + "&file=" + encodeURIComponent(rel.replace(/\.md$/, ""));
   }
@@ -891,13 +1128,14 @@
   }
 
   sidebar.addEventListener("click", e => {
-    const el = e.target.closest("[data-book],[data-file],[data-sug],[data-jump],[data-unmark],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook");
+    const el = e.target.closest("[data-book],[data-file],[data-sug],[data-jump],[data-unmark],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook,#delBook");
     if (!el) return;
     // 删按钮压在跳转按钮上面，先判它，否则点叉会顺带跳过去
     if (el.dataset.unmark) { removeMark(el.dataset.unmark); return; }
     if (el.dataset.jump) { jumpTo(decodeURIComponent(el.dataset.jump), Number(el.dataset.frac) || 0); return; }
     if (el.id === "uploadBook") { pickFile(); return; }
     if (el.id === "backShelf") { currentBook = null; currentFile = null; collabState = null; loadHistory(null); loadShelf(); return; }
+    if (el.id === "delBook") { deleteBook(); return; }
     if (el.id === "joinShared") { joinWizard(); return; }
     if (el.id === "shareBook") { shareWizard(); return; }
     if (el.id === "showInvite") { showInvite(); return; }
@@ -1096,7 +1334,7 @@
     try {
       const r = await fetch("/api/collab/invite?book=" + encodeURIComponent(currentBook.name)).then(r => r.json());
       if (r.invite) showInviteString(r.invite);
-    } catch { }
+    } catch (e) { toast(e.message || "邀请码现在拿不到。看看网络通不通，过一会儿再点一次。"); }
   }
 
   function showInviteString(invite, ignored, what) {
@@ -1206,7 +1444,8 @@
     } catch { }
   }
 
-  const GREETING = "你好，我是群星回廊助手。把书拖进来我帮你整理；整理好了去书架点开，那本书的问题在书里面问。";
+  // 开场白不自我介绍，直接说手该往哪放：小白看的第一句话就是操作说明。
+  const GREETING = "把书的文件拖到这个框里（epub、pdf、txt、docx 都行），或者告诉我文件在哪，比如「桌面上有本 The Stranger.epub」。整理好了它会出现在左边书架上，想读哪章就说「翻第 3 章」。";
 
   function clearLane(lane) {
     lane.items.length = 0;
@@ -1230,7 +1469,7 @@
     for (const it of items) addMsg(lane, it.role === "user" ? "user" : "bot", it.text, it.html);
     if (!items.length) {
       addMsg(lane, "bot", scope
-        ? `这里是《${scope}》的对话，只聊这本书。想看哪章就说「翻第几章」，想翻译就说「翻译第几章」。`
+        ? `这个框只聊《${scope}》：问情节、问某个词什么意思、让它翻某一章都行，比如「翻第 3 章」。`
         : GREETING);
     }
     if (r && r.brain === "claude") {
@@ -1300,7 +1539,7 @@
       const title = prompt("给这段对话起个名字", cur);
       if (title === null) return;
       try { await api("/api/chat/session/rename", { id: el.dataset.ren, title }); }
-      catch (err) { alert(err.message || "改名没成功"); }
+      catch (err) { alert(err.message || "名字没改成，稍等一下再试一次。"); }
       return loadSessions();
     }
     if (el.dataset.del) {
@@ -1387,7 +1626,7 @@
         }
       }
     } catch {
-      addMsg(lane, "status", "网络断了，稍后重试。");
+      addMsg(lane, "status", "这句话没发出去，跟「群星回廊」断了联系。看看电脑上的启动窗口还开着没有，然后把刚才那句再发一次。");
     } finally {
       if (statusEl) dropMsg(lane, statusEl);
       setBusy(false);
@@ -1444,9 +1683,14 @@
     const name = esc(j.title || "这本书");
     const id = esc(j.id);
     const dismiss = `<button data-job="dismiss" data-id="${id}">知道了</button>`;
+    // 「停下」只在还没结束的卡上给。扫描件认字要跑几分钟，没有这个按钮的话
+    // 用户只能干等，或者去关那个黑窗口——后者会把整个软件一起带走。
+    const stop = j.cancelling
+      ? `<button disabled>正在停…</button>`
+      : `<button data-job="cancel" data-id="${id}">停下</button>`;
     if (j.state === "queued") {
       return jobCardHtml("spin", `《${name}》排着队`,
-        j.ahead ? `前面还有 ${j.ahead} 本，弄完就轮到它` : "马上开始");
+        j.ahead ? `前面还有 ${j.ahead} 本，弄完就轮到它` : "马上开始", stop);
     }
     if (j.state === "running") {
       // 章一切好书就能读了，摘要在后台慢慢补——没必要为了后半程让人干等
@@ -1454,20 +1698,20 @@
         const bits = [`一共 ${j.chapters} 章 · 摘要还在写`];
         if (j.stage) bits.push(esc(j.stage));
         return jobCardHtml("spin", `《${name}》已经可以开始读了`, bits.join(" · "),
-          `<button class="primary" data-job="open" data-id="${id}">去看看</button>`);
+          `<button class="primary" data-job="open" data-id="${id}">去看看</button>${stop}`);
       }
       const mins = j.startedAt ? Math.floor((Date.now() - j.startedAt) / 60000) : 0;
       const bits = [`预计 ${j.etaMin} 分钟`];
       if (mins >= 1) bits.push(`已 ${mins} 分钟`);
       if (j.stage) bits.push(esc(j.stage));
-      return jobCardHtml("spin", `正在整理《${name}》`, bits.join(" · "));
+      return jobCardHtml("spin", `正在整理《${name}》`, bits.join(" · "), stop);
     }
     if (j.state === "done") {
       return jobCardHtml("✓", `《${name}》整理好了`,
         `一共 ${j.chapters} 章，梗概和摘要都写好了`,
         `<button class="primary" data-job="open" data-id="${id}">去看看</button>${dismiss}`);
     }
-    return jobCardHtml("⚠️", `《${name}》没整理成`, esc(j.error || "中途出岔子了。"),
+    return jobCardHtml("⚠️", `《${name}》没整理成`, esc(j.error || "中途出岔子了，点「再试一次」重来一遍。"),
       `<button class="primary" data-job="retry" data-id="${id}">再试一次</button>${dismiss}`);
   }
 
@@ -1538,14 +1782,16 @@
       el.disabled = true;
       try {
         if (el.dataset.job === "dismiss") await api("/api/job/dismiss", { id });
-        else await api("/api/job", { kind: "ingest", file: j.file });
+        else if (el.dataset.job === "cancel") await api("/api/job/cancel", { id });
+        // 重试要把语言一起带上，不然选过的语言在「再试一次」这里悄悄丢掉
+        else await api("/api/job", { kind: "ingest", file: j.file, lang: j.lang || "" });
       } catch (err) { toast(err.message); }
       pollJobs();
     });
   }
 
-  async function startIngest(file) {
-    try { await api("/api/job", { kind: "ingest", file }); }
+  async function startIngest(file, lang) {
+    try { await api("/api/job", { kind: "ingest", file, lang: lang || "" }); }
     catch (e) { toast(`《${file}》传好了，但没能开始整理：${e.message}　你可以跟助手说一句「帮我整理入库」。`); }
     pollJobs();
   }
@@ -1573,11 +1819,31 @@
       return toast(`这个文件 ${(file.size / 1024 / 1024).toFixed(0)}MB，超过 ${MAX_MB}MB 传不了。`);
     }
 
+    // 语言这一问只对**扫描版外文书**有意义：认字的时候要换识别模型，
+    // 不然法语的 é ü、俄语的西里尔字母会被内置的中文模型抹平或认成拉丁字母。
+    // 有文字层的 PDF、epub、txt 根本不走认字那条路，选了也不起作用。
+    //
+    // 为什么放在上传进度这一屏，而不是上传前弹一句问：
+    // 上传前问 = 每个传中文书的人都要多点一次，而九成以上的书是中英文。
+    // 放在进度里就是零点击——默认值就是今天的行为。而**扫描件必然很大**
+    // （一页一张图，几十上百 MB），上传本来就要好几秒到几分钟，
+    // 真正需要选的人有的是时间选；小文件一闪而过的那些，本来也用不上。
+    const remembered = (() => { try { return localStorage.getItem("shufang.bookLang") || ""; } catch { return ""; } })();
+    const LANG_OPTS = [
+      ["", "中文 / 英文（默认）"], ["fr", "法语"], ["de", "德语"], ["es", "西班牙语"],
+      ["it", "意大利语"], ["pt", "葡萄牙语"], ["la", "拉丁语"], ["ru", "俄语"], ["ja", "日语"],
+    ];
     const m = modal(`
       <h3>正在上传《${esc(file.name)}》</h3>
+      <div class="up-lang">
+        <span>这本书是什么语言的</span>
+        <select id="mLang">${LANG_OPTS.map(([v, t]) =>
+      `<option value="${v}"${v === remembered ? " selected" : ""}>${t}</option>`).join("")}</select>
+      </div>
       <div class="prog"><i id="mBar"></i></div>
       <p class="hint" id="mPct">0%　·　别关这个页面</p>`);
     const bar = m.querySelector("#mBar"), pct = m.querySelector("#mPct");
+    const langSel = m.querySelector("#mLang");
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/upload");
@@ -1590,16 +1856,19 @@
     xhr.addEventListener("load", () => {
       let j = {};
       try { j = JSON.parse(xhr.responseText); } catch { }
+      // 必须在 closeModal 之前读：关掉之后 langSel 就从 DOM 里没了，value 也拿不到
+      const lang = langSel ? langSel.value : "";
+      try { localStorage.setItem("shufang.bookLang", lang); } catch { }   // 一架子外文书的人不用每本都选
       closeModal();
       if (xhr.status === 200 && j.ok) {
         loadShelf();
         setView("chat");
-        startIngest(j.name);     // 后台整理，不占聊天
+        startIngest(j.name, lang);     // 后台整理，不占聊天
       } else {
-        toast(j.hint || "上传失败了，再试一次。");
+        toast(j.hint || humanize(j.error) || "这本书没传上去，再选一次文件试试。");
       }
     });
-    xhr.addEventListener("error", () => { closeModal(); toast("网络断了，没传上去。"); });
+    xhr.addEventListener("error", () => { closeModal(); toast("传到一半断了，这本书没传上去。看看网络（手机的话要跟电脑在同一个 Wi-Fi 下），然后重新传一次。"); });
     xhr.addEventListener("abort", () => closeModal());
 
     const fd = new FormData();
@@ -1802,43 +2071,67 @@
     try {
       const r = await fetch("/api/workshop/invite").then(r => r.json());
       if (r.invite) showInviteString(r.invite, null, "加入工坊");
-    } catch { }
+    } catch (e) { toast(e.message || "邀请码现在拿不到。看看网络通不通，过一会儿再点一次。"); }
   }
 
   async function publishWizard() {
     if (!(await needAuthor())) return;
+    // 能发两类东西：技能（.claude/skills 下的目录）和体系表（译名表/体系-*.md）。
+    // 两类都没有的时候把两条路都说清楚——只说技能的话，
+    // 手上正好攒了一张体系表的人会以为工坊跟他没关系。
     const skills = (shopState && shopState.localSkills) || [];
-    if (!skills.length) {
-      toast("本机还没有可发布的技能。技能放在书库的 .claude/skills 文件夹里，一个文件夹一个技能（里面要有 SKILL.md）。");
+    const systems = (shopState && shopState.localSystems) || [];
+    if (!skills.length && !systems.length) {
+      toast("本机还没有可发的东西。技能放在书库的 .claude/skills 文件夹里（一个文件夹一个技能，里面要有 SKILL.md）；体系表放在书库的「译名表」文件夹里，文件名以「体系-」开头。");
       return;
     }
     // 走审核的工坊（社群/官方）成员拿的是只读钥匙，推不动仓库，这条路是投稿。
     // 措辞得跟着换：说「发布」而实际要等人审，用户会以为没成功。
     const ro = !!(shopState && shopState.readonly);
+    const kinds = [
+      skills.length ? { k: "skill", label: "技能", tip: "一套调教好的本事，装上之后助手就会了" } : null,
+      systems.length ? { k: "terms", label: "体系表", tip: "一个领域的通行译法，装上之后所有书都能引用" } : null,
+    ].filter(Boolean);
     const m = modal(`
       <h3>${ro ? "投稿到工坊" : "发布我的插件"}</h3>
       <p>${ro
-        ? "挑一个本机的技能交上去。这个工坊要过目才收，站长通过之后大家同步就能装。"
-        : "挑一个本机的技能发到工坊，朋友就能装上。同名再发一次就是升版本。"}</p>
-      <label>选一个技能</label>
-      <select id="mSkill">${skills.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select>
+        ? "挑一样本机的东西交上去。这个工坊要过目才收，站长通过之后大家同步就能装。"
+        : "挑一样本机的东西发到工坊，朋友就能装上。同名再发一次就是升版本。"}</p>
+      ${kinds.length > 1 ? `<label>发什么</label>
+      <select id="mKind">${kinds.map(k => `<option value="${k.k}">${k.label}</option>`).join("")}</select>` : ""}
+      <label id="mPickLabel">选一个</label>
+      <select id="mPick"></select>
       <label>给它起个好懂的名字</label>
       <input id="mName" maxlength="60" placeholder="比如：诗歌翻译腔调" />
       <label>一句话说明它能干嘛</label>
       <textarea id="mDesc" rows="3" maxlength="300" placeholder="比如：翻诗的时候保留押韵和断行，不出大白话。"></textarea>
       <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">${ro ? "投稿" : "发布"}</button></div>`);
+
+    const kindBox = m.querySelector("#mKind");
+    const pickBox = m.querySelector("#mPick");
     const nameBox = m.querySelector("#mName");
-    const skillBox = m.querySelector("#mSkill");
-    const fillName = () => { if (!nameBox.value.trim()) nameBox.value = skillBox.value; };
-    fillName();
-    skillBox.addEventListener("change", () => { nameBox.value = skillBox.value; });
+    const curKind = () => (kindBox ? kindBox.value : kinds[0].k);
+    // 换类型要连带换掉候选列表和标题，不然选着「体系表」下面列的还是技能，
+    // 发出去的东西跟用户以为的不是一个
+    const fillPick = () => {
+      const list = curKind() === "terms" ? systems : skills;
+      pickBox.innerHTML = list.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+      m.querySelector("#mPickLabel").textContent = curKind() === "terms" ? "选一张体系表" : "选一个技能";
+      nameBox.value = pickBox.value || "";
+    };
+    fillPick();
+    if (kindBox) kindBox.addEventListener("change", fillPick);
+    pickBox.addEventListener("change", () => { nameBox.value = pickBox.value; });
     m.querySelector("#mCancel").addEventListener("click", closeModal);
     m.querySelector("#mOk").addEventListener("click", async () => {
       const okBtn = m.querySelector("#mOk");
       okBtn.disabled = true; okBtn.textContent = ro ? "投稿中…" : "上传中…";
       try {
+        const kind = curKind();
         const r = await api("/api/workshop/publish", {
-          skillName: skillBox.value,
+          kind,
+          skillName: kind === "skill" ? pickBox.value : "",
+          systemName: kind === "terms" ? pickBox.value : "",
           name: nameBox.value.trim(),
           desc: m.querySelector("#mDesc").value.trim(),
         });
@@ -1848,7 +2141,7 @@
           ? `《${r.meta.name}》投上去了，等站长过目。通过之后大家同步就能看到。`
           : `《${r.meta.name}》已经发到工坊（v${r.meta.version}）。朋友那边同步后就能看到。`);
       } catch (err) {
-        okBtn.disabled = false; okBtn.textContent = "发布";
+        okBtn.disabled = false; okBtn.textContent = ro ? "投稿" : "发布";
         alert(err.message);
       }
     });
@@ -1890,7 +2183,9 @@
       .then(r => r.json()).catch(() => ({ entries: [] }));
     tm.entries = r.entries || [];
     tm.groups = r.groups || [];
+    tm.systems = r.systems || { installed: [], on: [] };
     tm.scan = {};
+    renderTmSystemsBtn();
     renderTmList();
     renderTmDetail();
     // 全书扫描要逐章对齐，慢，所以后补：表先出来，次数和冲突随后填进去。
@@ -1904,6 +2199,52 @@
         if (tm.sel) renderTmDetail();
       });
   }
+
+  // ---- 体系：这本书按哪几个领域的通行译法来 ----
+  // 三层表里最容易被忘掉的一层。装了体系表但没给这本书打开，那一层就是空的，
+  // 用户只会觉得「装了没用」——所以要有个看得见的开关，而不是让他去手改表头。
+  //
+  // 开关写回 glossary.md 表头那一行 `> 体系：…`，跟读的时候同一个地方。
+  function renderTmSystemsBtn() {
+    const b = $("tmSystems");
+    if (!b) return;
+    const s = tm.systems || { installed: [], on: [] };
+    const on = (s.on || []).filter(x => (s.installed || []).includes(x));
+    b.textContent = on.length ? `体系 ${on.length}` : "体系";
+    b.classList.toggle("on", on.length > 0);
+  }
+
+  function openTmSystems() {
+    const s = tm.systems || { installed: [], on: [] };
+    const inst = s.installed || [], on = new Set(s.on || []);
+    if (!inst.length) {
+      // 一张都没有的时候别弹一个空框——说清楚这东西是哪儿来的
+      return void modal(`
+        <h3>体系表</h3>
+        <p>体系表管的是<b>一个领域里的通行译法</b>——比如古希腊那一套里，
+        中文学界通行的是「赫拉克勒斯」而不是流行文化里的「海格力斯」。
+        这类词一本书一本书地纠正是没完的，用一张领域级的表兜住。</p>
+        <p>这台电脑上还没有体系表。它们从工坊装：去「工坊」那一格看看有没有人发过。</p>
+        <div class="row"><button class="primary" id="mClose">知道了</button></div>`)
+        .querySelector("#mClose").addEventListener("click", closeModal);
+    }
+    const m = modal(`
+      <h3>《${esc(tm.book)}》按哪几个体系读</h3>
+      <p>勾上的会作为<b>建议</b>参与翻译和校对：大脑看得见，但本书自己的译名表说了算。</p>
+      ${inst.map((n, i) => `<label class="tm-sys"><input type="checkbox" data-sys="${i}"${on.has(n) ? " checked" : ""}/> ${esc(n)}</label>`).join("")}
+      <div class="row"><button class="plain" id="mCancel">算了</button><button class="primary" id="mOk">好了</button></div>`);
+    m.querySelector("#mCancel").addEventListener("click", closeModal);
+    m.querySelector("#mOk").addEventListener("click", async () => {
+      const want = inst.filter((_, i) => m.querySelector(`[data-sys="${i}"]`).checked);
+      try {
+        await api("/api/terms/systems", { book: tm.book, systems: want });
+        closeModal();
+        await loadTerms(true);            // 合并结果变了，整张表重读
+      } catch (err) { alert(err.message || "体系没存上，稍等一下再点一次「好了」。"); }
+    });
+  }
+
+  $("tmSystems").addEventListener("click", openTmSystems);
 
   async function fillTmBooks() {
     const sel = $("tmBook");
@@ -2162,82 +2503,285 @@
     if (row) row.scrollIntoView({ block: "nearest" });
   });
 
-  // ------------------------------------------------------------------ 抽签
-  // 读书之外的那类东西：求签、解读，以后可能还有别的。
-  // 现在只有接口，具体签库还在另一个项目里做——所以这里的每一项都可能是
-  // 「待开放」状态，界面要能如实显示而不是装作能用。
-  //
-  // 关键设计：抽完的结果**一键送进当前对话**。用户抽到一签之后最想做的是
-  // 问「这什么意思」，如果求签是个孤岛、解读要自己复制粘贴，这功能就白做了。
-  let riteList = null;
-
-  async function loadRites(force) {
-    if (riteList && !force) return renderRites();
-    try { riteList = (await fetch("/api/rites").then(r => r.json())).rites || []; }
-    catch { riteList = []; }
-    renderRites();
+  // 组件 —— 工作台第三格。列表从 /api/components 来；空就说空，别摆占位卡。
+  // 这一格原来是抽签（荷马签、8-bit 神谕），两样都下了，格子改名留着给工坊装的组件用。
+  let compList = null;
+  async function loadComponents(force) {
+    if (compList && !force) return renderComponents();
+    try { compList = (await fetch("/api/components").then(r => r.json())).components || []; }
+    catch { compList = []; }
+    renderComponents();
   }
-
-  function renderRites() {
-    const host = $("riteBody");
-    if (!riteList.length) {
-      host.innerHTML = `<div class="rite-card off"><h3>还没有可用的抽签</h3>
-        <p>之后会在这里放求签、解读这类东西。</p></div>`;
+  function renderComponents() {
+    const host = $("compBody");
+    if (!compList.length) {
+      host.innerHTML = `<div class="rite-card off"><h3>组件库还是空的</h3>
+        <p>组件从工坊来：装上一个，这里就会出现。</p></div>`;
       return;
     }
-    host.innerHTML = riteList.map(r => {
-      const id = esc(r.id);
-      if (!r.ready) {
-        return `<div class="rite-card off"><h3>${esc(r.name)}</h3>
-          <p>${esc(r.desc)}</p><div class="soon">还在准备，暂时用不了</div></div>`;
-      }
-      const q = (r.inputs || []).find(i => i.key === "question");
-      return `<div class="rite-card" data-rite="${id}">
-        <h3>${esc(r.name)}</h3><p>${esc(r.desc)}</p>
-        ${q ? `<input class="rite-q" data-q="${id}" placeholder="${esc(q.placeholder || "")}">` : ""}
-        <button class="rite-go" data-draw="${id}">抽一次</button>
-        <div class="rite-out" data-out="${id}" style="display:none"></div>
-      </div>`;
+    host.innerHTML = compList.map(c => {
+      let act;
+      if (!c.ready) act = `<div class="soon">${esc(c.hint || "暂时用不了")}</div>`;
+      else if (c.kind === "package" && !c.installed) act = `<button class="rite-go" data-act="install" data-id="${esc(c.id)}">安装</button>`;
+      else if (c.kind === "package") act = (c.canOpen ? `<button class="rite-go" data-open="${esc(c.id)}" data-kind="local">打开</button> ` : `<span class="soon">已装好，助手已经会用了</span> `)
+        + (c.update ? `<button class="rite-ask" data-act="install" data-id="${esc(c.id)}">更新</button> ` : "")
+        + `<button class="rite-ask" data-act="uninstall" data-id="${esc(c.id)}">卸载</button>`;
+      else act = `<button class="rite-go" data-open="${esc(c.id)}" data-kind="${esc(c.kind)}" data-url="${esc(c.url || "")}">打开</button>`;
+      return `<div class="rite-card${c.ready ? "" : " off"}"><h3>${esc(c.name)}${c.version ? ` <small style="color:var(--ink-mute);font-weight:400">${esc(c.version)}</small>` : ""}</h3><p>${esc(c.desc)}</p>${act}<div class="soon" data-msg="${esc(c.id)}"></div></div>`;
     }).join("");
   }
-
-  $("riteBody").addEventListener("click", async e => {
-    const el = e.target.closest("[data-draw],[data-ask]");
-    if (!el) return;
-
-    if (el.dataset.ask) {
-      // 送进对话让助手解读。切到对话视图，把签文当成用户的一句话发出去。
-      const msg = decodeURIComponent(el.dataset.ask);
-      setView("chat");
-      // 等对话那条 lane 就位再发，否则消息会落进还没建好的会话
-      const wait = chatLane.loaded ? Promise.resolve() : new Promise(r => setTimeout(r, 600));
-      await wait;
-      input2.value = "";
-      sendText(msg, chatLane);
+  // 站上来的 embed 组件在这一格里打开（跟门枢一个样子：一条工具栏 + 一整块 iframe）；
+  // 本地装的走 /components/<编号>/，入口页由服务端按目录给，路径从来不经过请求。
+  $("compBody").addEventListener("click", e => {
+    const back = e.target.closest("button[data-comp-back]");
+    if (back) { renderComponents(); return; }
+    const act = e.target.closest("button[data-act]");
+    if (act) {
+      // 装/卸都是几秒到一两分钟的事，按钮当场变灰、旁边写一句，完了整页重拉
+      const id = act.dataset.id, msg = $("compBody").querySelector(`[data-msg="${CSS.escape(id)}"]`);
+      act.disabled = true;
+      if (msg) msg.textContent = act.dataset.act === "install" ? "正在下载安装…" : "正在卸载…";
+      api(`/api/components/${act.dataset.act}`, { id })
+        .then(r => { if (!r.ok && msg) msg.textContent = r.hint || "没成功，再试一次。"; return loadComponents(true); })
+        .catch(() => { if (msg) msg.textContent = "跟程序断了联系，刷新一下页面。"; act.disabled = false; });
       return;
     }
-
-    const id = el.dataset.draw;
-    const out = $("riteBody").querySelector(`[data-out="${CSS.escape(id)}"]`);
-    const qEl = $("riteBody").querySelector(`[data-q="${CSS.escape(id)}"]`);
-    el.disabled = true; el.textContent = "抽签中…";
-    let r = null;
-    try { r = await api("/api/rites/draw", { id, question: qEl ? qEl.value : "" }); }
-    catch (err) { alert(err.message || "抽签没成功"); }
-    el.disabled = false; el.textContent = "再抽一次";
-    if (!r) return;
-    if (r.pending) { out.style.display = "block"; out.innerHTML = `<p>${esc(r.hint)}</p>`; return; }
-
-    const card = (r.items || [])[0] || {};
-    out.style.display = "block";
-    out.innerHTML =
-      (r.dice ? `<div class="rite-dice">${r.dice.join(" · ")}</div>` : "") +
-      `<div class="rite-text">${esc(card.text || card.greek || "")}</div>` +
-      (card.ref ? `<div class="rite-ref">${esc(card.ref)}</div>` : "") +
-      (r.as_message
-        ? `<button class="rite-ask" data-ask="${encodeURIComponent(r.as_message)}">让助手解读这一签</button>`
-        : "");
+    const b = e.target.closest("button[data-open]");
+    if (!b) return;
+    if (b.dataset.kind === "embed" && /^https:\/\//.test(b.dataset.url)) {
+      $("compBody").innerHTML = `<div class="sp-bar"><button data-comp-back>← 回列表</button><span>${esc(b.textContent === "打开" ? b.closest(".rite-card").querySelector("h3").textContent : "")}</span></div>
+        <iframe class="sp-frame" style="height:calc(100% - 3rem)" sandbox="allow-scripts allow-same-origin allow-popups allow-forms" referrerpolicy="no-referrer" src="${esc(b.dataset.url)}"></iframe>`;
+      return;
+    }
+    window.open(`/components/${encodeURIComponent(b.dataset.open)}/`, "_blank");
   });
+
+  let spaceList = null;
+  let spaceOpen = null;                 // 正看着哪个空间，没进就是 null
+  let spaceSeq = 0;                     // 进入的号码牌：探网回来时人已经走了就作废，见 enterSpace()
+  // 工具条上那句小字。平时说的是常驻那一句，临时有话（比如全屏没进去）先说临时的，
+  // 过几秒换回来——两句话共用一个位置，省得为一句偶尔出现的话在工具条上排第二行。
+  //
+  // 常驻这句要说的是：框里有些事做不成，别让人对着一个按不动的按钮猜。
+  // 只举了用户真会撞上的那两件（圣灵通道的资格核验、瓦达尔瓜佳那页的加群），
+  // 不解释 sandbox——那是我们的事，不是他的事。
+  const SP_HINT = "核验资格、加群这些要去浏览器里做。";
+  let spNoteTimer = 0;
+  function spSay(text) {
+    clearTimeout(spNoteTimer);
+    $("spNote").textContent = text || SP_HINT;
+    if (text) spNoteTimer = setTimeout(() => { $("spNote").textContent = SP_HINT; }, 6000);
+  }
+
+  async function loadSpaces(force) {
+    if (spaceList && !force) return showSpaces();
+    try { spaceList = (await fetch("/api/spaces").then(r => r.json())).spaces || []; }
+    catch { spaceList = []; }
+    showSpaces();
+  }
+
+  // 注册表里只有一处的时候不摆列表：点「门枢」就该直接站在那一页上，
+  // 中间那一屏「进去看看」是白点一下——只有一个选项的菜单不是菜单。
+  // 列表那套没删：注册表那边再加一条 register()，它自己就回来了。
+  const solo = () => (spaceList || []).length === 1;
+  function showSpaces() { return solo() ? enterSpace(spaceList[0].id) : renderSpaces(); }
+
+  // 连不连得上。要在**挂 iframe 之前**问清楚：iframe 是跨源的，加载失败读不到
+  // 状态码，而 onload 对着浏览器自己那张报错页照样会触发——等它告诉我们，
+  // 用户已经先看见一个白框或者一句英文报错了。
+  //
+  // 不单靠 navigator.onLine：它只说网卡连没连上，连着一个上不了外网的 WiFi
+  // （宾馆、公司访客网）时它照样是 true。所以那个只用来省一次请求，
+  // 真正算数的是 no-cors 探一下——拿不到内容，但连不上会 reject，够判断了。
+  function reachable(url) {
+    if (navigator.onLine === false) return Promise.resolve(false);
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 6000);
+    return fetch(url, { mode: "no-cors", cache: "no-store", signal: ac.signal })
+      .then(() => true).catch(() => false)
+      .finally(() => clearTimeout(timer));
+  }
+
+  function renderSpaces() {
+    const host = $("spBody");
+    $("spBar").hidden = true;
+    host.classList.remove("viewing");
+    if (!spaceList.length) {
+      host.innerHTML = `<div class="rite-page"><div class="rite-card off">
+        <h3>还没有可看的地方</h3><p>之后会在这里放一些看着舒服的页面。</p></div></div>`;
+      return;
+    }
+    host.innerHTML = `<div class="rite-page">` + spaceList.map(s => `
+      <div class="rite-card">
+        <h3>${esc(s.name)}</h3><p>${esc(s.desc)}</p>
+        <button class="rite-go" data-enter="${esc(s.id)}">进去看看</button>
+        <div class="sp-tip" data-tip="${esc(s.id)}" hidden></div>
+      </div>`).join("") + `</div>`;
+  }
+
+  async function enterSpace(id) {
+    const s = (spaceList || []).find(x => x.id === id);
+    if (!s) return;
+    // 从列表进来的话，「正在连…」和连不上那句话都挂在那张卡片上；直接进来的没有卡片，
+    // 就整块写一屏。探网要等几秒，断网更是等不来——这两处都不能只给一个白框。
+    const one = solo();
+    const my = ++spaceSeq;                // 这一次进入的号码牌，见下面探完网那处
+    const btn = $("spBody").querySelector(`[data-enter="${CSS.escape(id)}"]`);
+    const tip = $("spBody").querySelector(`[data-tip="${CSS.escape(id)}"]`);
+    if (tip) tip.hidden = true;
+    if (btn) { btn.disabled = true; btn.textContent = "正在连…"; }
+    if (one) $("spBody").innerHTML = `<div class="rite-page"><div class="rite-card off"><h3>正在连…</h3></div></div>`;
+    const ok = !s.online || await reachable(s.url);
+    if (btn) { btn.disabled = false; btn.textContent = "进去看看"; }
+    // 探完网才发现这几秒里又发起过一次进入——那这一次就作废。
+    // 不作废的话两次都往下走，后一次的 host.innerHTML = "" 会把前一次刚挂上、
+    // 还在下载的 iframe 拆掉：控制台留一条 ERR_ABORTED，屏幕上白闪一下。
+    // 按钮在上一行已经恢复过了才 return——不然那颗「进去看看」会永远停在「正在连…」。
+    if (my !== spaceSeq) return;
+    if (!ok) {
+      if (tip) { tip.hidden = false; tip.textContent = "现在连不上，等有网了再来。"; }
+      if (one) $("spBody").innerHTML = `<div class="rite-page"><div class="rite-card">
+        <h3>现在连不上</h3><p>这道门在网上，等有网了再来。</p>
+        <button class="rite-go" data-enter="${esc(s.id)}">再试一次</button></div></div>`;
+      return;
+    }
+    if (benchPane !== "spaces" || view !== "bench") return;   // 探网这几秒里人已经走了
+
+    spaceOpen = id;
+    const host = $("spBody");
+    host.innerHTML = "";
+    host.classList.add("viewing");
+    const f = document.createElement("iframe");
+    f.className = "sp-frame";
+    // sandbox 只放行脚本：门后那几件作品是 canvas 动画和掷骰，没有脚本就剩一块黑屏。
+    // 不给 allow-same-origin（跨源本来也拿不到）、不给 allow-popups、
+    // 不给 allow-top-navigation——嵌进来的页面不该能把用户的整个窗口带走。
+    //
+    // 门枢是一整张有链接的门户页，这三条挡不住它：sandbox 管的是顶层跳转，
+    // 框内导航（总门 → 某条通道 → 通道自己那件作品）换的是这个 iframe 本身，照常走。
+    // 挡住的只有两处，都实测过，都是取舍不是 bug：
+    //   · target="_blank" 的外链（门枢里只有瓦达尔瓜佳那页一个加群链接）点了没反应，
+    //     控制台记一句 blocked。要放行得给 allow-popups——为了一个链接把新窗口的口子
+    //     开给整个框，不值。
+    //   · 圣灵通道那个「核验」按钮按下去没反应：它是个 <form>，没有 allow-forms 的话
+    //     浏览器在派发 submit 事件之前就把提交拦了，页面自己的处理函数根本没机会跑。
+    //     就算补上 allow-forms 也到不了头：没有 allow-same-origin，框里是个不透明源，
+    //     它那句 credentials:"same-origin" 带不上 cookie，照样认不出登录着的账户。
+    // 放宽 sandbox 治不了这两条，只会把失败推后一步，所以不放宽；出路是工具条上那个
+    // 「在浏览器里打开」——那两件事到真浏览器里都做得成。工具条那句小字就是说给它们的。
+    // 以后加别的空间照这两条验一遍：外链脚本要能跑，别指望 localStorage 和 cookie。
+    f.setAttribute("sandbox", "allow-scripts");
+    // 全屏是父页面对着 #paneSpaces 调的，本来用不着这条；给它是为了框里的页面
+    // 哪天自己带了全屏按钮也能按得动。allow 是权限策略，只开 fullscreen 一项，
+    // 跟上面那行 sandbox 是两套东西，不会把 sandbox 放宽半点。
+    f.setAttribute("allow", "fullscreen");
+    f.setAttribute("referrerpolicy", "no-referrer");
+    f.src = s.url;
+    host.appendChild(f);
+    // 挂上去只是开始下载，整页画出来还得一会儿——这台机器上探完网到画完大约 1.3 秒，
+    // 网慢的时候更久。这中间 iframe 就是一块空白，什么都不说的话看着像卡死了。
+    // 所以盖一层说一句「正在打开…」，等它的 load 事件再撤。
+    //
+    // 撤这一层必须有兜底。跨源的 load 只能告诉我们「浏览器画完了点什么」，
+    // 万一它一直不来（网络卡在半路），这层不撤就把人永远挡在门外——
+    // 撤了至少工具条还在，「在浏览器里打开」那条路是通的。
+    const veil = document.createElement("div");
+    veil.className = "sp-veil";
+    veil.textContent = "正在打开…";
+    host.appendChild(veil);
+    const dropVeil = () => veil.remove();
+    f.addEventListener("load", dropVeil, { once: true });
+    setTimeout(dropVeil, 20000);
+    // 直接进来的那种：名字不写了——上头那条格子标签已经写着「门枢」，
+    // 底下这一页自己也顶着大字标题，再报一遍名字是第三遍。
+    // 「回列表」同理收掉：只有一处可看的时候，退回去的那个列表就是它自己。
+    $("spTitle").textContent = one ? "" : s.name;
+    $("spBack").hidden = one;
+    spSay("");
+    $("spBar").hidden = false;
+  }
+
+  // 「在浏览器里打开」——框里做不成的事，到真浏览器里就都能做：那边有 cookie、
+  // 表单提交得了、外链开得出新标签页。圣灵通道的资格核验和加群链接就靠这一条出去。
+  //
+  // 开的只能是这个空间登记的那个地址，也就是这道门的头一页。用户在框里已经走到
+  // 哪条通道了，这边一个字都读不到——跨源、又没给 allow-same-origin，
+  // iframe 的 location 本来就不让读。与其猜一个地址，不如老实开头一页，
+  // 按钮的 title 里也这么写着；标题不敢写成「打开这一页」。
+  //
+  // window.open 是这个文件里已有的开外链方式（工坊那边去 GitHub 建仓就是这么开的），
+  // 不另起一套。尤其不能让服务端 shell 出去 start/open：那只会在**跑服务的那台电脑**上
+  // 弹窗，而这软件是可以用手机连过来看的——手机上点了就等于没反应。
+  $("spOpen").addEventListener("click", () => {
+    const s = (spaceList || []).find(x => x.id === spaceOpen);
+    if (s) window.open(s.url, "_blank");
+  });
+
+  // ── 全屏 ──────────────────────────────────────────────
+  // 送进全屏的是整格 #paneSpaces，不是那个 iframe：只送 iframe 的话，工具条上那几个
+  // 按钮（「退出全屏」，多于一处的时候还有「回列表」）全被留在屏幕外面，
+  // 不用键盘的人就出不来了。
+  //
+  // Esc 不接。全屏的时候浏览器把 Esc 截在自己那一层，压根不派给页面；真去接一个，
+  // 没全屏时它照样响，就成了「按 Esc 退出空间」——那是另一件事，没人要过。
+  // 这里只听 fullscreenchange，把按钮上的字和那层样式对回去（Esc 退出也会触发它）。
+  const spPane = $("paneSpaces");
+  const fsNow = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+
+  function syncFull() {
+    const on = fsNow() === spPane;
+    spPane.classList.toggle("sp-full", on);
+    $("spFull").textContent = on ? "退出全屏" : "全屏";
+    $("spFull").title = on ? "按 Esc 也能退出" : "铺满整块屏幕，Esc 退出";
+  }
+  document.addEventListener("fullscreenchange", syncFull);
+  document.addEventListener("webkitfullscreenchange", syncFull);   // 老 Safari
+
+  function exitFull() {
+    if (fsNow() !== spPane) return;
+    // 退出可能被拒（比如已经不在全屏了），吞掉——退不出来也没有第二步要做。
+    Promise.resolve((document.exitFullscreen || document.webkitExitFullscreen).call(document)).catch(() => { });
+  }
+
+  // 支持不了就把按钮收掉，别摆一个按不动的。
+  if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) $("spFull").hidden = true;
+
+  $("spFull").addEventListener("click", () => {
+    spSay("");
+    if (fsNow() === spPane) return exitFull();
+    const req = spPane.requestFullscreen || spPane.webkitRequestFullscreen;
+    // 进不去就说一句，页面照常看——全屏是加分项，不是进空间的前提。
+    Promise.resolve().then(() => req.call(spPane))
+      .catch(() => spSay("全屏被挡了，先这么看吧。"));
+  });
+  syncFull();                              // 顺手把 title 那句提示补上，省得只有按过一次才有
+
+  // 离开就把 iframe **摘掉**，不是藏起来。满屏 canvas 动画藏起来照样在跑，
+  // GPU 一直烧着——这软件是用来啃书的，不是屏保。
+  // 先把 src 换成 about:blank 再 remove：光 remove 的话，浏览器可能还留着
+  // 那个已脱离文档的 iframe（有引用就不回收），动画未必真停。
+  function leaveSpace() {
+    // 先作废还在探网的那一次。这一句要在下面那个 return 前面：人走的时候
+    // 多半还没挂上 iframe（spaceOpen 还是 null），正是最该拦住它的时候——
+    // 不拦的话它几秒后回来，往一个已经切走的格子里挂一页。
+    spaceSeq++;
+    if (!spaceOpen) return;
+    spaceOpen = null;
+    exitFull();                            // 全屏着走人会剩一屏铺满的空格子，怪
+    const f = $("spBody").querySelector("iframe");
+    if (f) { f.src = "about:blank"; f.remove(); }
+    // 只管摘，不管接着画什么。切走这一格的时候画了也没人看；
+    // 想要那张列表的只有「回列表」，让点它的人自己去要（见下面）。
+    $("spBar").hidden = true;
+    $("spBody").classList.remove("viewing");
+    $("spBody").innerHTML = "";
+  }
+
+  $("spBody").addEventListener("click", e => {
+    const b = e.target.closest("[data-enter]");
+    if (b) enterSpace(b.dataset.enter);
+  });
+  $("spBack").addEventListener("click", () => { leaveSpace(); renderSpaces(); });
 
   // ------------------------------------------------------------------ 设置
   // 骨架只搭一次；每次进来只刷新动态的字，不动输入框——不然正打一半的 key 会被清掉
@@ -2250,6 +2794,7 @@
         <div class="set-row">
           <input id="setKey" class="rite-q" type="password" placeholder="sk- 开头的一串，粘贴到这里" autocomplete="new-password" />
           <button id="setKeySave" class="rite-go">保存</button>
+          <button id="setKeyTest" class="set-plain" title="问一下 DeepSeek 这把 key 通不通、还有多少钱">测一下</button>
         </div>
         <p class="set-note">在 platform.deepseek.com 注册后创建。保存立刻生效，不用重启。</p>
       </div>
@@ -2262,6 +2807,12 @@
           <button id="setRotate" class="set-plain danger">重新生成口令</button>
         </div>
         <p class="set-note">「重新生成口令」用在链接发错了人的时候：旧链接全部作废，手机要用新链接重新打开一次。</p>
+      </div>
+      <div class="rite-card">
+        <h3>在外面也能用</h3>
+        <p>在公司、在路上、用手机流量的时候，也想连回家里这台电脑看书——装一个 Tailscale 就行。
+          它走的是两台设备之间的直连加密通道，书和译文不经过任何第三方服务器，也不用在路由器上开端口。</p>
+        <div id="tsWizard"><p class="set-note">正在看这台电脑装没装 Tailscale…</p></div>
       </div>
       <div class="rite-card">
         <h3>端口</h3>
@@ -2277,9 +2828,22 @@
         <p class="set-note">开着的时候，所有访问一律要口令，本机也不例外。没挂公网就别开。</p>
       </div>
       <div class="rite-card">
+        <h3>实验功能</h3>
+        <label class="set-switch"><input type="checkbox" id="setSpaces" /> 在工作台里显示「门枢」（把站上的几个页面嵌进来看）</label>
+        <p class="set-note">还在试的东西，默认关着。开关只管这台电脑的界面，不动书库。</p>
+      </div>
+      <div class="rite-card">
         <h3>书库位置</h3>
         <div class="set-box" id="setVault">—</div>
         <p class="set-note">想把书库搬去别的盘：重跑一遍安装器，在问位置时填新地方即可，书不会丢。</p>
+      </div>
+      <div class="rite-card">
+        <h3>出问题了？</h3>
+        <p>点一下，把程序版本、设置和最近的运行记录复制到剪贴板，然后粘贴给站长。</p>
+        <div class="set-row">
+          <button id="setDiag" class="set-plain">复制诊断日志</button>
+        </div>
+        <p class="set-note" id="setDiagNote">复制出来的内容里不含密钥和口令，可以放心发。</p>
       </div>`;
 
     const keyState = (html, err) => { const el = $("setKeyState"); el.innerHTML = html; el.classList.toggle("err", !!err); };
@@ -2294,12 +2858,23 @@
           body: JSON.stringify({ key: k }),
         });
         const d = await r.json();
-        if (!r.ok) { keyState(esc(d.error || "没保存上，再试一次。"), true); return; }
+        // 这个接口把要说的话直接放在 error 里（是中文），humanize 会原样放行；
+        // 万一哪天改成了代号，也不至于把英文弹到屏幕上
+        if (!r.ok) { keyState(esc(d.hint || humanize(d.error) || "这个 key 没保存上，检查一下再粘一次。"), true); return; }
         $("setKey").value = "";
         fillSettings(d);
         keyState(`换好了，现在用的是 <b>${esc(d.keyMasked)}</b>。`);
       } catch { keyState("没保存上（网络问题？），再试一次。", true); }
       finally { $("setKeySave").disabled = false; }
+    });
+
+    // 框里有字就测框里的（还没保存也能先测），没字就测已经存着的那把
+    $("setKeyTest").addEventListener("click", async () => {
+      const k = $("setKey").value.trim();
+      $("setKeyTest").disabled = true; keyState("正在问 DeepSeek…");
+      try { const r = await api("/api/settings/test-key", k ? { key: k } : {}); keyState(esc(r.hint), !r.ok); }
+      catch { keyState("跟程序断了联系，刷新一下页面。", true); }
+      finally { $("setKeyTest").disabled = false; }
     });
 
     $("setCopyLan").addEventListener("click", () => {
@@ -2331,9 +2906,18 @@
         const d = await r.json();
         $("setPortNote").textContent = r.ok
           ? (d.restart ? "已保存。重启后生效：关掉启动窗口，再双击桌面「启动群星回廊」。" : "端口没变。")
-          : (d.error || "没保存上。");
-      } catch { $("setPortNote").textContent = "没保存上（网络问题？），再试一次。"; }
+          : (d.hint || humanize(d.error) || "端口没保存上，换个 1024 到 65535 之间的数字再试。");
+      } catch { $("setPortNote").textContent = "端口没保存上，跟「群星回廊」断了联系。看看启动窗口还开着没有。"; }
       finally { $("setPortSave").disabled = false; }
+    });
+
+    $("setSpaces").addEventListener("change", () => {
+      const on = $("setSpaces").checked;
+      applyFlags({ spacesEnabled: on });
+      fetch("/api/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spacesEnabled: on }),
+      }).catch(() => { });
     });
 
     $("setRemote").addEventListener("change", () => {
@@ -2342,6 +2926,51 @@
         body: JSON.stringify({ remoteAccess: $("setRemote").checked }),
       }).catch(() => { });
     });
+
+    // 写剪贴板分两条路。navigator.clipboard 只在「安全上下文」里有（https 或 localhost），
+    // 手机是走 http://192.168.x.x 进来的，那上面这个对象干脆是 undefined——
+    // 上面几个「复制链接」按钮在手机上没反应就是这个原因。
+    // 退回老办法：塞进一个 textarea 选中，execCommand("copy")。过时，但到处都能用。
+    // textarea 得真的在页面上、能被选中（display:none 的选不中），挪到角落隐身就行。
+    async function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        try { await navigator.clipboard.writeText(text); return true; } catch { }
+      }
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;";
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      ta.setSelectionRange(0, ta.value.length);   // iOS 的 select() 不一定选全
+      let done = false;
+      try { done = document.execCommand("copy"); } catch { }
+      ta.remove();
+      return done;
+    }
+
+    $("setDiag").addEventListener("click", async () => {
+      const note = $("setDiagNote");
+      $("setDiag").disabled = true;
+      note.textContent = "正在整理…";
+      try {
+        const r = await fetch("/api/diag");
+        if (!r.ok) throw new Error();
+        const text = await r.text();
+        // 拿到文本再复制，中间隔了一次 await：浏览器给点击留的「用户授权」窗口有几秒，
+        // 本机请求远不到这个数。真不让复制（个别老浏览器），就把内容摆出来让人手动选。
+        if (await copyText(text)) { note.textContent = "已复制，粘贴给站长"; return; }
+        let box = $("setDiagBox");
+        if (!box) {
+          box = document.createElement("textarea");
+          box.id = "setDiagBox"; box.className = "rite-q"; box.rows = 8; box.readOnly = true;
+          note.after(box);
+        }
+        box.value = text;
+        note.textContent = "这个浏览器不让网页写剪贴板。长按下面这块全选、复制，再粘贴给站长。";
+      } catch { note.textContent = "没拿到日志（服务没在跑？）。用桌面上的「复制群星回廊日志」试试。"; }
+      finally { $("setDiag").disabled = false; }
+    });
   }
 
   function fillSettings(s) {
@@ -2349,13 +2978,94 @@
       ? `现在用的是 <b>${esc(s.keyMasked)}</b>，要换就贴一个新的：`
       : `<b>还没配 key</b>——聊天和翻译都靠它，配一个吧：`;
     $("setLan").textContent = s.lanUrl || "没找到局域网地址（电脑可能没连网）";
+    renderTs();
     if (document.activeElement !== $("setPort")) $("setPort").value = s.port;
     if (s.actualPort && s.actualPort !== s.port) {
       $("setPortNote").textContent = `配置的端口 ${s.port} 被别的程序占了，现在实际用的是 ${s.actualPort}。`;
     }
     $("setRemote").checked = !!s.remoteAccess;
+    $("setSpaces").checked = !!s.spacesEnabled;
+    applyFlags(s);
     $("setVault").textContent = s.vaultPath || "—";
   }
+
+  // 「在外面也能用」向导。状态全从 /api/tailscale 来，前端只按状态画卡，不自己判断：
+  //   没装        → 一键装：服务端下官方安装包并拉起（带进度），失败给官网链接兜底
+  //   装了没登录  → 一个「登录」按钮，打开 Tailscale 给的登录网页
+  //   通了        → 链接 + 复制 + 手机怎么装
+  // 没通之前隔几秒再问一次：装完、登完，卡片自己换过来，用户不用刷新——
+  // 装 Tailscale 的人多半不知道「刷新」是什么。
+  let tsTimer = 0;
+  async function renderTs() {
+    const box = $("tsWizard");
+    if (!box) return;
+    let s;
+    try { s = await fetch("/api/tailscale").then(r => r.json()); }
+    catch { box.innerHTML = `<p class="set-note">现在看不出装没装，过一会儿再打开这一页。</p>`; return; }
+    const inst = s.install || { phase: "idle" };
+    const busy = inst.phase === "downloading" || inst.phase === "launching";
+    const ok = s.installed && s.state === "running" && s.url;
+    let html;
+    if (!s.installed && inst.phase === "downloading") {
+      const pct = inst.total ? Math.round(inst.got / inst.total * 100) : 0;
+      html = `<p>正在下载 Tailscale 安装包${inst.total ? `：${pct}%` : "…"}</p>
+        <div class="ts-prog"><i style="width:${pct}%"></i></div>
+        <p class="set-note">三十多 MB，慢的话要一两分钟。别关这一页，也别再点一次。</p>`;
+    } else if (!s.installed && (inst.phase === "launching" || inst.phase === "launched")) {
+      html = `<p>安装窗口已经弹出来了（可能被这个窗口挡在后面）。按它的提示装完，回到这一页就好。</p>
+        <p class="set-note">Windows 会问一句「是否允许此应用更改你的设备」，点「是」。装完它会自己打开登录网页，登一下。</p>`;
+    } else if (!s.installed) {
+      html = `<div class="set-row"><button class="rite-go" data-ts="install">一键安装 Tailscale</button></div>
+        ${inst.phase === "failed"
+          ? `<p class="set-note err">刚才没下下来（${esc(inst.error || "网络不通")}）。可以去 <a href="https://tailscale.com/download" target="_blank" rel="noopener">官网下载页</a> 手动装，装完回到这一页。</p>`
+          : `<p class="set-note">装的是官方原版安装包，免费。装好登录一次；手机上也装一个、登同一个账号，之后在哪都能连回来。</p>`}`;
+    } else if (ok) {
+      html = `<p>通了。手机上装好 Tailscale、登同一个账号，然后打开这个链接（打开一次会记住）：</p>
+        <div class="set-box" id="setTs">${esc(s.url)}</div>
+        <div class="set-row"><button class="set-plain" data-ts="copy" data-url="${esc(s.url)}">复制链接</button></div>
+        <details class="set-note"><summary>手机上怎么装</summary>
+          <p>iPhone：App Store 搜 Tailscale，或者 <a href="${esc(s.phone.ios)}" target="_blank" rel="noopener">点这里</a>。</p>
+          <p>安卓：去 <a href="${esc(s.phone.android)}" target="_blank" rel="noopener">这一页</a> 点最新的 apk 装上（国内手机没有 Google Play，直接装这个）。</p>
+          <p>装好后登<b>同一个账号</b>（微信、Google、GitHub 都行），把开关打开，再点上面那个链接。</p>
+        </details>`;
+    } else {
+      html = `<p>Tailscale 装好了，还差登录。</p>
+        <div class="set-row"><button class="rite-go" data-ts="login">登录 Tailscale</button></div>
+        <p class="set-note">会打开一个登录网页，用微信、Google 或 GitHub 账号都行。登完回到这一页，链接就会出现。手机上要登同一个账号。</p>`;
+    }
+    box.innerHTML = html;
+    clearTimeout(tsTimer);
+    if (view === "settings" && !ok) tsTimer = setTimeout(renderTs, busy ? 1500 : 4000);
+  }
+  // 三个按钮都是动态画出来的，事件挂在整页上
+  $("setBody").addEventListener("click", async e => {
+    const b = e.target.closest("button[data-ts]");
+    if (!b) return;
+    const kind = b.dataset.ts;
+    if (kind === "copy") {
+      const url = b.dataset.url || "";
+      const done = () => { b.textContent = "已复制 ✓"; setTimeout(() => { b.textContent = "复制链接"; }, 1600); };
+      // 手机上走 http 时没有 clipboard API，退回老办法：选中再 execCommand
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(url).then(done, () => {});
+      else {
+        const ta = document.createElement("textarea"); ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); done(); } catch { }
+        ta.remove();
+      }
+      return;
+    }
+    b.disabled = true;
+    try {
+      if (kind === "install") { await fetch("/api/tailscale/install", { method: "POST" }); }
+      else if (kind === "login") {
+        const r = await fetch("/api/tailscale/login", { method: "POST" }).then(r => r.json());
+        if (r.url) window.open(r.url, "_blank", "noopener");
+        else $("tsWizard").insertAdjacentHTML("beforeend", `<p class="set-note err">没拿到登录链接。右下角托盘里找 Tailscale 的图标，点它登录也一样。</p>`);
+      }
+    } catch { }
+    renderTs();
+  });
 
   async function loadSettings() {
     if (!setReady) { renderSettings(); setReady = true; }
@@ -2363,8 +3073,27 @@
   }
 
   // ------------------------------------------------------------------ 视图切换
+  // 实验功能的开关落到界面上。门枢关着时工作台不显示那一格；正停在门枢里被关掉，就退回术语表。
+  function applyFlags(s) {
+    const on = !!(s && s.spacesEnabled);
+    const btn = document.querySelector('.bench-nav button[data-pane="spaces"]');
+    if (btn) btn.hidden = !on;
+    if (!on && benchPane === "spaces") { benchPane = "terms"; if (view === "bench") openBench(); }
+  }
+
+  // 没配 key 就在对话页顶上挂一条。每次进对话页查一次——配好了这条自己消失，不用刷新
+  async function checkKey() {
+    try {
+      const st = await fetch("/api/settings").then(r => r.json());
+      $("noKey").hidden = !!st.keyMasked;
+    } catch { }
+  }
+  $("noKeyGo").addEventListener("click", () => setView("settings"));
+
   function setView(v) {
     view = v;
+    if (v === "chat") checkKey();
+    if (v !== "settings") clearTimeout(tsTimer);   // 向导的轮询只在设置页活着
     document.body.className = "view-" + v;
     $("tabRead").classList.toggle("on", v === "read");
     $("tabChat").classList.toggle("on", v === "chat");
@@ -2380,6 +3109,9 @@
       } else scrollLane(chatLane);
       if (window.innerWidth > 860) input2.focus();
     }
+    // 切走也要把嵌着的页面卸掉，不只是切格子的时候——不然从「门枢」
+    // 直接跳去读书，那一屏动画会在后台接着转。
+    if (v !== "bench") leaveSpace();
     if (v === "bench") openBench();
     if (v === "settings") loadSettings();
     if (v === "workshop") loadShop(true);
@@ -2397,8 +3129,11 @@
     document.querySelectorAll(".bench-nav button").forEach(b =>
       b.classList.toggle("on", b.dataset.pane === benchPane));
     $("paneTerms").hidden = benchPane !== "terms";
-    $("paneRites").hidden = benchPane !== "rites";
-    if (benchPane === "rites") loadRites();
+    $("paneComponents").hidden = benchPane !== "components";
+    $("paneSpaces").hidden = benchPane !== "spaces";
+    if (benchPane !== "spaces") leaveSpace();
+    if (benchPane === "components") loadComponents();
+    else if (benchPane === "spaces") loadSpaces();
     else loadTerms();
   }
   document.querySelector(".bench-nav").addEventListener("click", e => {
@@ -2418,6 +3153,8 @@
   loadShelf();
   loadShop(false);
   pollJobs();
+  // 实验功能的开关在配置里，启动时问一次再决定工作台摆几格
+  fetch("/api/settings").then(r => r.json()).then(applyFlags).catch(() => { });
 })();
 </script>
 </body>

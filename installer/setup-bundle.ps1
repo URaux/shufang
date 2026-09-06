@@ -12,28 +12,89 @@ param(
 $ErrorActionPreference = "Stop"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 try { chcp 65001 > $null } catch {}
-$LogPath = Join-Path $env:TEMP "shufang-install.log"
-try { Start-Transcript -Path $LogPath -Force | Out-Null } catch {}
+# 配置文件固定在 ~\.shufang（几 KB，程序按这个位置找配置；大东西都在你选的地方）
+$ConfigDir  = Join-Path $env:USERPROFILE ".shufang"
+$ConfigPath = Join-Path $ConfigDir "config.json"
+# 日志也放 ~\.shufang，不放 %TEMP%：目标用户不知道 %TEMP% 是什么，资源管理器默认还藏着
+# AppData，「把日志发给帮你装的人」这句话对他们等于没说。固定在这儿，桌面的
+# 「复制群星回廊日志」和程序里的「复制诊断日志」都从同一个地方读。
+# 追加而不是覆盖：装失败重跑是常态，上一次是怎么失败的经常正是线索。
+$LogPath = Join-Path $ConfigDir "install.log"
+New-Item -ItemType Directory -Force $ConfigDir | Out-Null
+try { Start-Transcript -Path $LogPath -Append | Out-Null } catch {}
+Write-Host "---- 安装开始 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') ----" -ForegroundColor DarkGray
+
+# 出错时把日志末尾放进剪贴板。用户不会找文件、不会截整个窗口，但「粘贴」是会的——
+# 这是失败信息能到站长手里的唯一可靠通道。只取最后 200 行：重跑多次之后日志很长，
+# 全量粘进聊天窗口会卡。必须定义在 trap 前面：trap 里调它，而函数要执行到定义那行才存在。
+function CopyLogToClipboard() {
+  try { Stop-Transcript | Out-Null } catch {}     # 先停，不然末尾几行还在缓冲区里
+  try {
+    $tail = Get-Content $LogPath -Tail 200 -Encoding UTF8 -ErrorAction Stop
+    Set-Clipboard -Value ($tail -join [Environment]::NewLine)
+    Write-Host ""
+    Write-Host "  ============================================================" -ForegroundColor Yellow
+    Write-Host "  出错了。错误信息已经复制到剪贴板，直接粘贴给站长就行。" -ForegroundColor Yellow
+    Write-Host "  ============================================================" -ForegroundColor Yellow
+  } catch {
+    Write-Host ""
+    Write-Host "  出错了。日志在 $LogPath，把这个文件发给站长。" -ForegroundColor Yellow
+  }
+}
 
 trap {
   Write-Host ""
   Write-Host "[X] 安装中途出错了: $($_.Exception.Message)" -ForegroundColor Red
-  Write-Host "    日志在 $LogPath，可以把它发给帮你装的人。" -ForegroundColor Yellow
-  try { Stop-Transcript | Out-Null } catch {}
+  CopyLogToClipboard
   Read-Host "按回车关闭"
   exit 1
 }
 
 $Payload = Join-Path $PSScriptRoot "payload"
 if (-not (Test-Path (Join-Path $Payload "node\node.exe"))) {
-  Write-Host "[X] 找不到安装材料（payload 文件夹）。" -ForegroundColor Red
-  Write-Host "    你可能是在压缩包里面直接双击的——先把整个压缩包解压出来，再运行。" -ForegroundColor Yellow
+  Write-Host "[X] 少了安装要用的文件，装不了。" -ForegroundColor Red
+  Write-Host "    你多半是在压缩包里面直接双击的——先把整个压缩包解压出来（右键「全部解压」），再从解压出来的文件夹里运行一次。" -ForegroundColor Yellow
   Read-Host "按回车关闭"
   exit 1
 }
 
 function Step($m) { Write-Host ""; Write-Host ">> $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "   OK: $m" -ForegroundColor Green }
+
+function NormalizePath([string]$p) {
+  # 中文输入法打出来的冒号是全角「：」。PowerShell 不认它作盘符分隔符，
+  # 「D：\文件」就不是绝对路径了，会被当成相对路径拼到当前目录后面 ——
+  # 一路装到第 180 行复制运行环境时才炸，报的还是一串没人看得懂的路径
+  # （实测：未能找到路径 "...\解压目录\D：\文件\node\node_modules\..."）。
+  # 所以在这里当场换回半角，把问题挡在输入的那一刻。
+  if (-not $p) { return $p }
+  $p = $p.Trim().Trim('"').Trim("'")
+  foreach ($pair in @(@('：', ':'), @('＼', '\'), @('／', '/'), @('．', '.'), @('　', ' '))) {
+    $p = $p.Replace($pair[0], $pair[1])
+  }
+  # 全角英文字母（盘符打成 Ｄ 的）
+  $sb = New-Object System.Text.StringBuilder
+  foreach ($ch in $p.ToCharArray()) {
+    $c = [int][char]$ch
+    if (($c -ge 0xFF21 -and $c -le 0xFF3A) -or ($c -ge 0xFF41 -and $c -le 0xFF5A)) {
+      [void]$sb.Append([char]($c - 0xFEE0))
+    } else { [void]$sb.Append($ch) }
+  }
+  # 「D: \文件」这种冒号后头多打了空格的，同样不算绝对路径
+  return ([regex]::Replace($sb.ToString(), '^([A-Za-z]):[\s]+\\', '$1:\')).Trim()
+}
+
+function ReadPath([string]$prompt, [string]$fallback) {
+  # 归一化之后还不是绝对路径就重问，不要带着一个坏路径往下走。
+  for ($i = 1; $i -le 3; $i++) {
+    $v = NormalizePath ("" + (Read-Host $prompt))
+    if (-not $v) { return $fallback }
+    if ([System.IO.Path]::IsPathRooted($v)) { return $v }
+    Write-Host "   「$v」不是一个完整路径。" -ForegroundColor Yellow
+    Write-Host "   最常见的原因是冒号打成了全角「：」——请切到英文输入法，写成 D:\群星回廊 这样。" -ForegroundColor Yellow
+  }
+  throw "位置填了三次都不是完整路径。请切到英文输入法后重新运行安装器。"
+}
 
 function RemoveWithRetry($path) {
   # Windows 关掉进程后文件句柄要过一会儿才释放，直接删常报「正在使用中」。
@@ -43,7 +104,8 @@ function RemoveWithRetry($path) {
   }
   # 还删不掉就改名让路，下次启动前清理
   try { Rename-Item $path "$path.old-$(Get-Random)" -ErrorAction Stop } catch {
-    throw "有程序正占着 $path。请把所有群星回廊窗口关掉（或重启电脑）后重新安装。"
+    # 同 install.ps1：路径对用户没用，要紧的是「关窗口再来一次」
+    throw "有文件正被别的程序占着，装不进去。把所有群星回廊的窗口都关掉（或者直接重启一次电脑），然后重新运行这个安装器。"
   }
 }
 
@@ -108,8 +170,11 @@ if ($InstallDir) {
   Write-Host "程序装到哪？（程序本体 + 运行环境，约 700MB）"
   ShowDrives $NEED_APP_MB
   Write-Host "直接回车用默认: $DefaultApp"
-  $AppDir = ("" + (Read-Host "安装位置")).Trim().Trim('"')
-  if (-not $AppDir) { $AppDir = $DefaultApp }
+  $AppDir = ReadPath "安装位置" $DefaultApp
+}
+$AppDir = NormalizePath $AppDir
+if (-not [System.IO.Path]::IsPathRooted($AppDir)) {
+  throw "安装位置「$AppDir」不是完整路径（冒号是不是打成了全角「：」？）。请写成 D:\群星回廊 这样。"
 }
 if ($AppDir -match '[\u4e00-\u9fff]') {
   # 中文路径本身没问题，但个别 npm 包对非 ASCII cwd 犯病，提示一句不拦着
@@ -122,8 +187,6 @@ New-Item -ItemType Directory -Force $AppDir | Out-Null
 # ---------------------------------------------------------------- 读老配置
 # 升级场景：key / token / 端口 / 书库位置都沿用，别让人重填一遍。
 # token 尤其重要——它变了的话，手机上存的那个带 ?t= 的链接就全失效了。
-$ConfigDir  = Join-Path $env:USERPROFILE ".shufang"
-$ConfigPath = Join-Path $ConfigDir "config.json"
 $OldCfg = $null
 if (Test-Path $ConfigPath) {
   try {
@@ -148,13 +211,14 @@ if ($VaultDir) {
   Write-Host "书库放到哪？（你的书、译文、笔记都在这，会越来越大）"
   ShowDrives $NEED_VAULT_MB
   Write-Host "直接回车用默认: $DefaultVault"
-  $Vault = ("" + (Read-Host "书库位置")).Trim().Trim('"')
-  if (-not $Vault) { if ($OldVault) { $Vault = $OldVault } else { $Vault = $DefaultVault } }
+  $__vd = $DefaultVault
+  if ($OldVault) { $__vd = $OldVault }
+  $Vault = ReadPath "书库位置" $__vd
 }
-
-# 配置文件固定在 ~\.shufang（几 KB，程序按这个位置找配置；大东西都在你选的地方）
-$ConfigDir = Join-Path $env:USERPROFILE ".shufang"
-New-Item -ItemType Directory -Force $ConfigDir | Out-Null
+$Vault = NormalizePath $Vault
+if (-not [System.IO.Path]::IsPathRooted($Vault)) {
+  throw "书库位置「$Vault」不是完整路径（冒号是不是打成了全角「：」？）。请写成 D:\书库 这样。"
+}
 
 $NodeDir = Join-Path $AppDir "node"
 $BinDir  = Join-Path $AppDir "bin"
@@ -189,7 +253,7 @@ foreach ($piece in @("node", "bin")) {
 # 包是我们自己打的，装的时候确认一下，别让坏包静悄悄发出去。
 $nodeVer = (& (Join-Path $NodeDir "node.exe") --version) -replace "^v", ""
 if ([version]$nodeVer -lt [version]"22.15.0") {
-  throw "这个安装包里的 Node 是 $nodeVer，太旧了（要 22.15 以上，聊天功能依赖它）。请重新下载安装包。"
+  throw "这个安装包是坏的：里面带的运行环境太旧，装完聊天会用不了。去重新下载一份安装包再装。`n    （这行给站长看：包内 Node $nodeVer，需要 22.15 以上）"
 }
 Ok "运行环境就绪（$NodeDir，Node $nodeVer）"
 
@@ -275,19 +339,31 @@ if ($ObsidianInstalled) {
     Write-Host "   跳过了。网页界面照常能看能改。" -ForegroundColor DarkGray
   } else {
     try {
-      $orel = curl.exe -fsSL "https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest" 2>$null | ConvertFrom-Json
-      $oasset = $orel.assets | Where-Object { $_.name -match "^Obsidian-[\d.]+\.exe$" } | Select-Object -First 1
-      if (-not $oasset) { throw "没取到下载地址" }
+      # 别用 releases/latest：2026-09 起上游把「最新」挂成了只带安卓 apk 的发布，
+      # 桌面安装包在前一个发布里。翻最近几个，取第一个带 exe 的。
+      $orels = curl.exe -fsSL --connect-timeout 25 "https://api.github.com/repos/obsidianmd/obsidian-releases/releases?per_page=8" 2>$null | ConvertFrom-Json
+      $oasset = $null
+      foreach ($orel in @($orels)) {
+        $oasset = $orel.assets | Where-Object { $_.name -match "^Obsidian-[\d.]+\.exe$" } | Select-Object -First 1
+        if ($oasset) { break }
+      }
+      if (-not $oasset) { throw "问不到 Obsidian 的下载地址" }
       curl.exe -fL --retry 2 --connect-timeout 25 -o "$env:TEMP\sf-obsidian.exe" $oasset.browser_download_url
-      if ($LASTEXITCODE -ne 0) { throw "下载没完成" }
+      # GitHub 直连不通就走 gh-proxy.com 反代（原始地址整个跟在后面）
+      if ($LASTEXITCODE -ne 0) {
+        curl.exe -fL --retry 2 --connect-timeout 25 -o "$env:TEMP\sf-obsidian.exe" "https://gh-proxy.com/$($oasset.browser_download_url)"
+      }
+      if ($LASTEXITCODE -ne 0) { throw "Obsidian 没下下来（网络不通或者对方限速）" }
       Start-Process "$env:TEMP\sf-obsidian.exe" -ArgumentList "/S" -Wait
       Remove-Item -Force "$env:TEMP\sf-obsidian.exe" -ErrorAction SilentlyContinue
       $ObsidianInstalled = $true
       Ok "Obsidian 装好了"
     } catch {
       # 装不上不该拦住整个安装 —— 群星回廊本身完全能用
-      Write-Host "   Obsidian 这一步没成（$($_.Exception.Message)）。" -ForegroundColor Yellow
-      Write-Host "   不影响使用，联网后重跑一次安装器就能补上。" -ForegroundColor Yellow
+      # 这里捕到的可能是 .NET 抛的英文异常，原文只写进日志
+      Write-Host "   Obsidian 这一步没装成。" -ForegroundColor Yellow
+      Write-Host "   不影响使用：联网之后重新运行一次这个安装器就能补上。" -ForegroundColor Yellow
+      Write-Host "   （这行给站长看：$($_.Exception.Message)）" -ForegroundColor DarkGray
     }
   }
 }
@@ -345,6 +421,10 @@ Ok "配置写好了"
 # ---------------------------------------------------------------- 自动更新器（有网时用，没网静默跳过）
 Step "安装自动更新器"
 $Owner = "URaux"; $Repo = "shufang"
+# 国内源。装机的人在国内，GitHub 时通时不通，自己在 Cloudflare R2 上放了一份
+# （download.gnosaria.com，国内可达），GitHub 兜底。两条安装路径的更新器必须一致，
+# 否则「已经发布了」这句话对一半用户是假的。
+$MirrorBase = "https://download.gnosaria.com/shufang"
 $UpdaterPath = Join-Path $AppDir "update.ps1"
 $updaterText = @"
 `$ErrorActionPreference = "Stop"
@@ -353,7 +433,14 @@ try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::
 `$AppRepo = "$AppRepo"
 `$ShaFile = Join-Path `$AppDir ".app-sha"
 try {
-  `$latest = ((curl.exe -fsSL --max-time 10 -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$Owner/$Repo/commits/master") -join "").Trim()
+  # 版本号先问国内源，问不到再问 GitHub
+  `$latest = ""
+  `$verRaw = ((curl.exe -fsSL --max-time 8 "$MirrorBase/version.json" 2>`$null) -join "").Trim()
+  if (`$verRaw) { try { `$latest = "" + ((`$verRaw | ConvertFrom-Json).sha) } catch { `$latest = "" } }
+  `$fromMirror = (`$latest -match '^[0-9a-f]{40}$')
+  if (-not `$fromMirror) {
+    `$latest = ((curl.exe -fsSL --max-time 10 -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$Owner/$Repo/commits/master") -join "").Trim()
+  }
   if (`$latest -notmatch '^[0-9a-f]{40}$') { return }
   if (-not `$latest) { return }
   `$current = ""
@@ -362,8 +449,22 @@ try {
   Write-Host "发现新版本，更新中..." -ForegroundColor Cyan
   `$zip = Join-Path `$env:TEMP "sf-up.zip"
   `$tmp = Join-Path `$env:TEMP "sf-up"
-  curl.exe -fsSL --max-time 120 -o "`$zip" "https://codeload.github.com/$Owner/$Repo/zip/refs/heads/master"
-  if (`$LASTEXITCODE -ne 0) { return }
+  # sha 和包必须同源：`$latest 待会要写进 .app-sha，写了跟实际装的包对不上的 sha，
+  # 下次启动会比出「已是最新」，用户永远卡在这一版还收不到任何提示。
+  # 所以版本号哪来的、包就哪来的；国内源的包没拿到才回 GitHub，回退时 sha 也重新问一次。
+  `$got = `$false
+  if (`$fromMirror) {
+    curl.exe -fsSL --max-time 120 -o "`$zip" "$MirrorBase/shufang-master.zip"
+    if (`$LASTEXITCODE -eq 0) { `$got = `$true } else { Write-Host "国内源没通，改从 GitHub 拿" -ForegroundColor DarkGray }
+  }
+  if (-not `$got) {
+    if (`$fromMirror) {
+      `$latest = ((curl.exe -fsSL --max-time 10 -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$Owner/$Repo/commits/master") -join "").Trim()
+      if (`$latest -notmatch '^[0-9a-f]{40}$') { return }
+    }
+    curl.exe -fsSL --max-time 120 -o "`$zip" "https://codeload.github.com/$Owner/$Repo/zip/refs/heads/master"
+    if (`$LASTEXITCODE -ne 0) { return }
+  }
   if (Test-Path `$tmp) { Remove-Item -Recurse -Force `$tmp }
   # 用 zip + Expand-Archive：仓库有中文文件名，tar.exe 解 tar.gz 会炸
   Expand-Archive -Path `$zip -DestinationPath `$tmp -Force
@@ -383,7 +484,7 @@ try {
   } catch {
     if (Test-Path `$AppRepo) { Remove-Item -Recurse -Force `$AppRepo -ErrorAction SilentlyContinue }
     if (Test-Path `$backup) { Move-Item `$backup `$AppRepo }
-    Write-Host "更新失败，继续用当前版本" -ForegroundColor Yellow
+    Write-Host "这次没更新成，先用现在这个版本，功能都在。下次启动会再试一遍。" -ForegroundColor Yellow
   }
   Remove-Item -Recurse -Force `$zip, `$tmp -ErrorAction SilentlyContinue
 } catch {
@@ -451,6 +552,26 @@ pause
   Ok "桌面上有「启动群星回廊」了"
 }
 
+# 「复制群星回廊日志」：装好了但起不来的时候，用户唯一做得到的事。
+# 跟启动器一样是 VBS + 快捷方式（同一套 UTF-16 编码规矩，理由见上面），
+# 双击一下就把 install.log + app.log 的末尾放进剪贴板，弹一句「粘贴给站长」。
+# 它不认安装位置（日志固定在 ~\.shufang），所以模板里没有占位符要换。
+$CopySrc = Join-Path $PSScriptRoot "copylog-template.vbs"
+if (-not (Test-Path $CopySrc)) { $CopySrc = Join-Path $AppRepo "installer\copylog-template.vbs" }
+if (Test-Path $CopySrc) {
+  $CopyVbs = Join-Path $AppDir "复制日志.vbs"
+  $cv = [System.IO.File]::ReadAllText($CopySrc, [System.Text.Encoding]::UTF8)
+  [System.IO.File]::WriteAllText($CopyVbs, $cv, (New-Object System.Text.UnicodeEncoding($false, $true)))
+  $sc2 = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $Desktop "复制群星回廊日志.lnk"))
+  $sc2.TargetPath = "wscript.exe"
+  $sc2.Arguments = '"' + $CopyVbs + '"'
+  $sc2.WorkingDirectory = $AppDir
+  $sc2.Description = "出问题时双击：把群星回廊的日志复制到剪贴板，粘贴给站长"
+  if (Test-Path $IconPath) { $sc2.IconLocation = $IconPath }
+  $sc2.Save()
+  Ok "桌面上有「复制群星回廊日志」了（出问题时用）"
+}
+
 Write-Host ""
 Write-Host "==============================================" -ForegroundColor Green
 Write-Host "  安装完成！" -ForegroundColor Green
@@ -458,5 +579,6 @@ Write-Host "  程序在: $AppDir" -ForegroundColor Green
 Write-Host "  书库在: $Vault" -ForegroundColor Green
 Write-Host "  双击桌面「启动群星回廊」开始用。" -ForegroundColor Green
 Write-Host "==============================================" -ForegroundColor Green
+Write-Host "  如果之后启动出问题，双击桌面的『复制群星回廊日志』就能把日志复制到剪贴板。" -ForegroundColor Yellow
 try { Stop-Transcript | Out-Null } catch {}
 if (-not ($InstallDir -and $ApiKey)) { Read-Host "按回车关闭本窗口" }
