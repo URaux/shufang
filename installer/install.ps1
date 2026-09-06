@@ -488,6 +488,24 @@ if ($PyExe) {
   Write-Host "   想读 PDF：去 python.org 装一个 Python，再重跑一次本安装器就行。" -ForegroundColor Yellow
 }
 
+# 粘 API key 时带进来的脏东西比想象中多：网页上复制会捎上不断行空格、零宽字符、方向标记、BOM；
+# 中文输入法开着全角会把 sk- 打成「ｓｋ－」；手动跨行选中会夹一个换行；有人连两边的引号一起复制走。
+# 这些用户自己看不见——屏幕上就是一串正常的 key——所以先尽力洗干净再判，别只甩一句「格式不对」。
+function Get-CleanKey([string]$s) {
+  if (-not $s) { return "" }
+  $s = $s -replace '[\u200B-\u200F\u2028\u2029\u2060\uFEFF]', ''
+  $sb = New-Object System.Text.StringBuilder
+  foreach ($ch in $s.ToCharArray()) {
+    $c = [int][char]$ch
+    if ($c -ge 0xFF01 -and $c -le 0xFF5E) { [void]$sb.Append([char]($c - 0xFEE0)) } else { [void]$sb.Append($ch) }
+  }
+  $s = $sb.ToString()
+  $s = $s -replace '[\u2010-\u2015\u2212\u30FC]', '-'
+  $s = $s -replace '\s', ''
+  $s = $s -replace '^[''"\u2018\u201C\u300C\u300E\u300A]+', ''
+  $s = $s -replace '[''"\u2019\u201D\u300D\u300F\u300B]+$', ''
+  return $s
+}
 # ---------------------------------------------------------------- API key
 # 这一段全程关掉日志记录：key 绝不能落进 shufang-install.log，
 # 因为出错时我们会让用户把那个日志发给帮他装的人。
@@ -504,9 +522,16 @@ if ($key) {
 while (-not ($key -match "^(sk-|enc:v1:)")) {
   $sec  = Read-Host "   粘贴你的 DeepSeek API key" -AsSecureString
   $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
-  try   { $key = ([Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)).Trim() }
+  try   { $key = Get-CleanKey ([Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)) }
   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-  if (-not ($key -match "^sk-")) { Write-Host "   看起来不太对，应该是 sk- 开头的一串。再试一次。" -ForegroundColor Yellow }
+    if (-not ($key -match "^sk-")) {
+      if (-not $key)             { Write-Host "   什么都没粘进来。用鼠标右键粘贴（或 Ctrl+V），再回车。" -ForegroundColor Yellow }
+      elseif ($key.Length -lt 12){ Write-Host "   只有 $($key.Length) 个字符，多半没复制全。用 DeepSeek 网页上的复制按钮整段拷一次。" -ForegroundColor Yellow }
+      else {
+        $head = $key.Substring(0, [Math]::Min(8, $key.Length))
+        Write-Host "   这串是「$head…」开头的，不是 sk-。DeepSeek 的 key 一定 sk- 开头——是不是把 key 的名字、或者网页上别的一段复制过来了？" -ForegroundColor Yellow
+      }
+    }
 }
 
 # 本地服务器的访问令牌，用加密随机数（局域网里手机也拿它进来，别用弱随机）

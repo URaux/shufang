@@ -205,6 +205,28 @@ else
   printf '\033[33m   想读 PDF：去 python.org 装一个 Python，再重新运行一次这个安装器就行。\033[0m\n'
 fi
 
+# 粘 API key 时带进来的脏东西比想象中多：网页上复制会捎上不断行空格、零宽字符、方向标记、BOM；
+# 中文输入法开着全角会把 sk- 打成「ｓｋ－」；手动跨行选中会夹一个换行；有人连两边的引号一起复制走。
+# 用户自己看不见——屏幕上就是一串正常的 key——所以先尽力洗干净再判，别只甩一句「格式不对」。
+# 用 node 洗：上面刚装好，一定在；洗法跟 webapp/server.js 的 normalizeKey 保持一致。
+# 不用 python3：macOS 上 /usr/bin/python3 可能只是个占位，一跑会弹「安装开发者工具」。
+clean_key() {
+  if [ -x "$NODE_DIR/bin/node" ]; then
+    printf '%s' "$1" | "$NODE_DIR/bin/node" -e '
+let s = require("fs").readFileSync(0, "utf8");
+s = s.replace(/[\u200B-\u200F\u2028\u2029\u2060\uFEFF]/g, "");
+s = s.replace(/[\uFF01-\uFF5E]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+s = s.replace(/[\u2010-\u2015\u2212\u30FC]/g, "-");
+s = s.replace(/\s+/g, "");
+s = s.replace(/^["\u2018\u201C`\u300C\u300E\u300A]+/, "");
+s = s.replace(/["\u2019\u201D`\u300D\u300F\u300B]+$/, "");
+process.stdout.write(s);
+'
+  else
+    printf '%s' "$1" | tr -d '[:space:]'
+  fi
+}
+
 # ---------------------------------------------------------------- API key
 step "配置 DeepSeek"
 echo "   需要一个 DeepSeek API key（在 platform.deepseek.com 注册后创建，sk- 开头）。"
@@ -216,7 +238,16 @@ while [[ ! "$KEY" =~ ^(sk-|enc:v1:) ]]; do
   # -s 不回显：整个安装过程在 tee 抄录日志，key 绝不能落进 /tmp/shufang-install.log
   read -rs KEY </dev/tty
   echo ""
-  [[ "$KEY" =~ ^sk- ]] || echo "   看起来不太对，应该是 sk- 开头的一串。再试一次。"
+  KEY="$(clean_key "$KEY")"
+  if [[ ! "$KEY" =~ ^sk- ]]; then
+    if [ -z "$KEY" ]; then
+      echo "   什么都没粘进来。用 Cmd+V 粘贴，再回车。"
+    elif [ ${#KEY} -lt 12 ]; then
+      echo "   只有 ${#KEY} 个字符，多半没复制全。用 DeepSeek 网页上的复制按钮整段拷一次。"
+    else
+      echo "   这串是「$(printf '%.8s' "$KEY")…」开头的，不是 sk-。DeepSeek 的 key 一定 sk- 开头——是不是复制到别的东西了？"
+    fi
+  fi
 done
 
 # ---------------------------------------------------------------- 程序本体

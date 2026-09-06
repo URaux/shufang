@@ -9,3 +9,11 @@ dist-build/
 .dist-worktree/
 .smoke-test/
 
+
+# 打 exe 的中间产物与产物（bundle.zip 150MB、exe 140MB），不进仓
+dist-bundle/
+# wrangler 在仓根留下的缓存（R2 同步那步）
+.wrangler/
+
+# 卡片渲染的中间产物（原始截图/未叠纹的成品），不进仓
+docs/xhs-cards/_build/_tmp/

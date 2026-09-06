@@ -2503,20 +2503,27 @@
     if (row) row.scrollIntoView({ block: "nearest" });
   });
 
-  // 组件 —— 工作台第三格。列表从 /api/components 来；空就说空，别摆占位卡。
-  // 这一格原来是抽签（荷马签、8-bit 神谕），两样都下了，格子改名留着给工坊装的组件用。
-  let compList = null;
+  // 组件 —— 工作台第三格。列表从 /api/components 来（站上的官方清单，跟工坊不是一回事：
+  // 工坊是朋友之间递技能，组件是站长放出来的插件）；空就说空，别摆占位卡。
+  // 这一格原来是抽签（荷马签、8-bit 神谕），两样都下了，格子改名留给组件。
+  let compList = null, compOnline = true;
   async function loadComponents(force) {
     if (compList && !force) return renderComponents();
-    try { compList = (await fetch("/api/components").then(r => r.json())).components || []; }
-    catch { compList = []; }
+    try {
+      const r = await fetch("/api/components").then(r => r.json());
+      compList = r.components || []; compOnline = r.online !== false;
+    } catch { compList = []; compOnline = false; }
     renderComponents();
   }
   function renderComponents() {
     const host = $("compBody");
     if (!compList.length) {
-      host.innerHTML = `<div class="rite-card off"><h3>组件库还是空的</h3>
-        <p>组件从工坊来：装上一个，这里就会出现。</p></div>`;
+      // 两种空要分开说：站上确实还没放，和根本没连上站。后者要给出路。
+      host.innerHTML = compOnline
+        ? `<div class="rite-card off"><h3>组件库还是空的</h3>
+        <p>组件是站上放出来的官方插件，上架了这里就会出现，不用你做什么。</p></div>`
+        : `<div class="rite-card off"><h3>现在连不上站</h3>
+        <p>组件清单在网上，等网络好一点再打开这一格看看。读书和翻译不受影响。</p></div>`;
       return;
     }
     host.innerHTML = compList.map(c => {
