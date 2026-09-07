@@ -2898,7 +2898,9 @@
     $("setVerApply").addEventListener("click", async () => {
       const btn = $("setVerApply");
       btn.disabled = true;
-      verState("正在更新，程序会自己关掉再开回来，这个页面会断开一下…");
+      // 接棒那一步（等本进程退出 → 起启动器）依赖一个活到我们死后的小程序，这在不同机器上不是百分百可靠。
+      // 所以话要说全：正常情况它自己回来；万一没回来，用户知道下一步该干什么，而不是干等。
+      verState("正在更新，程序会自己关掉再开回来，这个页面会断开一下…等半分钟还没动静，就双击桌面上的「群星回廊」，一样会装上新版。");
       try {
         const r = await fetch("/api/update/apply", { method: "POST" }).then(x => x.json());
         if (!r.ok) { btn.disabled = false; return verState(r.hint || "没更新成。", true); }
