@@ -74,6 +74,12 @@
   /* 阅读区 */
   #reader { flex: 1; overflow-y: auto; min-width: 0; }
   #reader .page { max-width: 46rem; margin: 0 auto; padding: 2.2rem 1.4rem 5rem; }
+  /* 原书里抽出来的插图。老书的图常常只有两三百像素宽，放大了糊，所以不强行撑满，
+     只封一个上限；比正文窄的就按原大小居中。手机上按屏宽收。 */
+  #reader .page img { display: block; max-width: 100%; height: auto; margin: 1.2em auto; border-radius: 4px; }
+  #reader .page img[alt]:not([alt=""]) { margin-bottom: .4em; }
+  #reader .page p > img + em { display: block; text-align: center; color: var(--ink-mute); font-size: .86rem; }
+  .msg.md img { max-width: 100%; height: auto; border-radius: 4px; }
   .editbar { display: flex; align-items: center; gap: .5rem; margin: -.8rem 0 1.4rem; flex-wrap: wrap; }
   .editbar button { font: inherit; font-size: .85rem; padding: .3rem .8rem; border-radius: 999px;
     border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
