@@ -10,6 +10,24 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# native 命令（pip / python / curl / npm 这些）的 stderr，在 PowerShell 5.1 里会被包成
+# ErrorRecord；而本脚本开头是 $ErrorActionPreference = "Stop"，于是**哪怕只是一句 WARNING**
+# 也会被当成终止错误，把整个安装打断。有用户就卡在 pip 那句无害的提示上：
+#   WARNING: The script pymupdf.exe is installed in ...\Scripts which is not on PATH.
+# 一句「装好了但那个目录不在 PATH 里」，跟我们要的功能一点关系都没有（我们是 python -c 导入，
+# 不走命令行脚本），却让他整个装不上。
+# 所以凡是调外部程序，都从这儿走：临时把 Stop 降成 Continue，成没成只看退出码。
+function Invoke-Native {
+  param([Parameter(Mandatory = $true)][string]$Exe, [string[]]$Arguments = @())
+  $old = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    & $Exe @Arguments 2>&1 | Out-Null
+    return $LASTEXITCODE
+  } finally { $ErrorActionPreference = $old }
+}
+
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 try { chcp 65001 > $null } catch {}
 # 配置文件固定在 ~\.shufang（几 KB，程序按这个位置找配置；大东西都在你选的地方）
@@ -315,10 +333,11 @@ if ($PyExe) {
   # 结果是 import 直接崩、PDF 支持静默消失，报错用户完全看不懂。0.0.27 不碰它。
   # 底座也一起钉：只钉 pymupdf4llm 的话 pymupdf 会浮动到新版，等于没钉。
   # --user：装进用户自己的包目录，不碰系统站点目录，也不需要管理员。
-  & $PyExe -m pip install --quiet --user "pymupdf4llm==0.0.27" "pymupdf==1.26.3" 2>$null
+  Invoke-Native $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "pymupdf4llm==0.0.27", "pymupdf==1.26.3") | Out-Null
   # 装完真 import 一次再说「就绪」—— 上面那个 onnxruntime 的坑正是「装上了但 import 就崩」
-  & $PyExe -c "import pymupdf4llm" 2>$null | Out-Null
-  if ($LASTEXITCODE -eq 0) {
+  # 直接拿返回码判，别再指望 $LASTEXITCODE 跨过函数调用还是原来那个
+  $pdfOk = (Invoke-Native $PyExe @("-c", "import pymupdf4llm")) -eq 0
+  if ($pdfOk) {
     Ok "PDF 支持就绪（用你电脑上的 Python）"
   } else {
     Write-Host "   PDF 组件装上了但跑不起来，PDF 格式的书暂时读不了（epub/txt/docx 不受影响）。" -ForegroundColor Yellow
