@@ -219,16 +219,26 @@ echo "   需要一个 DeepSeek API key（platform.deepseek.com 注册后创建�
 echo "   粘贴时屏幕不显示，这是正常的——粘完直接回车。"
 KEY="$OLD_KEY"
 [ -n "$KEY" ] && ok "沿用你上次填的 key（想换：删掉 $CONFIG 再装一遍）"
+KEY_TRIES=0
 while [[ ! "$KEY" =~ ^(sk-|enc:v1:) ]]; do
+  KEY_TRIES=$((KEY_TRIES + 1))
   printf '   粘贴你的 DeepSeek API key: '
-  read -rs KEY </dev/tty
-  echo ""
+  if [ "$KEY_TRIES" -eq 1 ]; then
+    # -s 不回显：整个安装过程在 tee 抄录日志，key 绝不能落进 /tmp/shufang-install.log
+    read -rs KEY </dev/tty
+    echo ""
+  else
+    # 有用户反馈：往不回显的输入里粘贴只进去一个字符，最后只能一个个手打。
+    # 屏幕上什么都不显示，人根本看不出粘漏了。第二次起改成回显，粘完自己能看见对不对。
+    # 代价是 key 会出现在屏幕和日志里——两害相权，装不上更糟。
+    read -r KEY </dev/tty
+  fi
   KEY="$(clean_key "$KEY")"
   if [[ ! "$KEY" =~ ^sk- ]]; then
     if [ -z "$KEY" ]; then
       echo "   什么都没粘进来。用 Cmd+V 粘贴，再回车。"
     elif [ ${#KEY} -lt 12 ]; then
-      echo "   只有 ${#KEY} 个字符，多半没复制全。用 DeepSeek 网页上的复制按钮整段拷一次。"
+      echo "   只读到 ${#KEY} 个字符——粘贴多半没进去全。下一次会把输入显示出来。"
     else
       echo "   这串是「$(printf '%.8s' "$KEY")…」开头的，不是 sk-。DeepSeek 的 key 一定 sk- 开头——是不是复制到别的东西了？"
     fi

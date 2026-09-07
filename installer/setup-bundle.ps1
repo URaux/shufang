@@ -400,15 +400,28 @@ if ($ApiKey -match "^sk-") {
   Write-Host "   需要一个 DeepSeek API key（在 platform.deepseek.com 注册后创建，sk- 开头）。"
   Write-Host "   粘贴时屏幕上不会显示，这是正常的——粘完直接回车。" -ForegroundColor DarkGray
   $key = ""
+  $keyTries = 0
   while (-not ($key -match "^sk-")) {
-    $sec  = Read-Host "   粘贴你的 DeepSeek API key" -AsSecureString
-    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
-    try   { $key = Get-CleanKey ([Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)) }
-    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+    $keyTries++
+    if ($keyTries -eq 1) {
+      # 第一次用隐藏输入：key 不该显示在屏幕上，也不该落进抄录下来的日志里。
+      $sec  = Read-Host "   粘贴你的 DeepSeek API key" -AsSecureString
+      $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+      try   { $key = Get-CleanKey ([Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)) }
+      finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+    } else {
+      # 有用户反馈：往隐藏输入框里粘贴只进去一个字符，最后只能一个个手打。
+      # 隐藏输入在不同终端、不同输入法下对粘贴的处理不一样，屏幕上又什么都不显示，
+      # 人根本看不出粘漏了。所以第二次起换成明文输入框——粘完自己就能看见对不对。
+      Write-Host "   换个能看见的输入框（key 会显示在屏幕上，装完把窗口关掉就行）。" -ForegroundColor DarkGray
+      $key = Get-CleanKey ("" + (Read-Host "   粘贴你的 DeepSeek API key"))
+    }
     if (-not ($key -match "^sk-")) {
-      if (-not $key)             { Write-Host "   什么都没粘进来。用鼠标右键粘贴（或 Ctrl+V），再回车。" -ForegroundColor Yellow }
-      elseif ($key.Length -lt 12){ Write-Host "   只有 $($key.Length) 个字符，多半没复制全。用 DeepSeek 网页上的复制按钮整段拷一次。" -ForegroundColor Yellow }
-      else {
+      if (-not $key) {
+        Write-Host "   什么都没粘进来。用鼠标右键粘贴（或 Ctrl+V），再回车。" -ForegroundColor Yellow
+      } elseif ($key.Length -lt 12) {
+        Write-Host "   只读到 $($key.Length) 个字符——粘贴多半没进去全。下一次会换成能看见的输入框。" -ForegroundColor Yellow
+      } else {
         $head = $key.Substring(0, [Math]::Min(8, $key.Length))
         Write-Host "   这串是「$head…」开头的，不是 sk-。DeepSeek 的 key 一定 sk- 开头——是不是把 key 的名字、或者网页上别的一段复制过来了？" -ForegroundColor Yellow
       }

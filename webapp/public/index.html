@@ -2800,10 +2800,11 @@
         <p class="set-state" id="setKeyState">…</p>
         <div class="set-row">
           <input id="setKey" class="rite-q" type="password" placeholder="sk- 开头的一串，粘贴到这里" autocomplete="new-password" />
+          <button id="setKeyEye" class="set-plain" type="button" title="看一眼粘进去的是什么">看一眼</button>
           <button id="setKeySave" class="rite-go">保存</button>
           <button id="setKeyTest" class="set-plain" title="问一下 DeepSeek 这把 key 通不通、还有多少钱">测一下</button>
         </div>
-        <p class="set-note">在 platform.deepseek.com 注册后创建。保存立刻生效，不用重启。</p>
+        <p class="set-note">在 platform.deepseek.com 注册后创建。保存立刻生效，不用重启。<span id="setKeyCount"></span></p>
       </div>
       <div class="rite-card">
         <h3>手机访问</h3>
@@ -2855,6 +2856,22 @@
 
     const keyState = (html, err) => { const el = $("setKeyState"); el.innerHTML = html; el.classList.toggle("err", !!err); };
 
+    // 粘贴出问题时最要命的是「看不见」：密码框里几个圆点跟三十几个圆点长得差不多。
+    // 有用户粘进去只有一个字符，试了半天最后一个个手打完。把字数摆出来，再给个「看一眼」。
+    const keyCount = () => {
+      const el = $("setKeyCount"); if (!el) return;
+      const n = $("setKey").value.trim().length;
+      el.textContent = n ? `　已输入 ${n} 个字符${n < 12 ? "（太短了，多半没粘全）" : ""}` : "";
+      el.style.color = n && n < 12 ? "#a3453a" : "var(--ink-mute)";
+    };
+    $("setKey").addEventListener("input", keyCount);
+    $("setKeyEye").addEventListener("click", () => {
+      const el = $("setKey"), hidden = el.type === "password";
+      el.type = hidden ? "text" : "password";
+      $("setKeyEye").textContent = hidden ? "藏起来" : "看一眼";
+      el.focus();
+    });
+
     $("setKeySave").addEventListener("click", async () => {
       const k = $("setKey").value.trim();
       if (!k) { keyState("先把 key 粘到框里再点保存。", true); return; }
@@ -2869,6 +2886,7 @@
         // 万一哪天改成了代号，也不至于把英文弹到屏幕上
         if (!r.ok) { keyState(esc(d.hint || humanize(d.error) || "这个 key 没保存上，检查一下再粘一次。"), true); return; }
         $("setKey").value = "";
+        keyCount();
         fillSettings(d);
         keyState(`换好了，现在用的是 <b>${esc(d.keyMasked)}</b>。`);
       } catch { keyState("没保存上（网络问题？），再试一次。", true); }
