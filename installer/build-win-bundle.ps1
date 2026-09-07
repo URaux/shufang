@@ -27,7 +27,14 @@ $Root = Split-Path $PSScriptRoot -Parent
 if (-not $App) { $App = Join-Path $Root "dist-build" }
 foreach ($p in @($Node, $Bin, $App)) { if (-not (Test-Path $p)) { throw "缺来源目录：$p" } }
 if (-not (Test-Path (Join-Path $Node "node.exe"))) { throw "$Node 里没有 node.exe" }
-if (-not (Test-Path (Join-Path $Node "node_modules\@deepseek-ai\dsh"))) { throw "$Node 里没有 dsh（node_modules\@deepseek-ai\dsh）" }
+# 只看目录在不在是不够的：这台机器上 dsh 的目录一直在，里面却没有 lib/，
+# 打出去的包因此带着一个跑不起来的大脑，用户装完聊天永远起不来（ERR_MODULE_NOT_FOUND）。
+# 所以这里直接把它跑一次——能报出版本号才算数。
+$dshEntry = Join-Path $Node ("node_modules" + [IO.Path]::DirectorySeparatorChar + "@deepseek-ai" + [IO.Path]::DirectorySeparatorChar + "dsh" + [IO.Path]::DirectorySeparatorChar + "lib" + [IO.Path]::DirectorySeparatorChar + "bin.js")
+if (-not (Test-Path $dshEntry)) { throw "$Node 里的 dsh 不完整（没有 lib\bin.js）。先修好它再打包：npm i -g @deepseek-ai/dsh --prefix `"$Node`"" }
+$dshVer = (& (Join-Path $Node "node.exe") $dshEntry --version 2>&1 | Select-Object -Last 1)
+if ($LASTEXITCODE -ne 0 -or -not ("$dshVer" -match "[0-9]")) { throw "$Node 里的 dsh 跑不起来：$dshVer" }
+Write-Host "   dsh $dshVer 可用"
 if (-not (Test-Path (Join-Path $Bin "pandoc.exe"))) { throw "$Bin 里没有 pandoc.exe" }
 if (-not (Test-Path (Join-Path $App "webapp\server.js"))) { throw "$App 不像程序目录（没有 webapp\server.js）" }
 

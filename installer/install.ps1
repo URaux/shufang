@@ -295,16 +295,24 @@ Ok "Pandoc 就绪"
 
 # ---------------------------------------------------------------- dsh（DeepSeek Harness）
 Step "安装 dsh（翻译助手的大脑，DeepSeek 官方）"
-if (-not (Test-Path (Join-Path $NodeDir "dsh.cmd"))) {
+# 判据必须是「主程序在不在」，不能只看 dsh.cmd。
+# dsh.cmd 是 npm 生成的转发脚本，装到一半也会留下它；只看它就会跳过安装，
+# 留下一个跑不起来的大脑，而且要等用户第一次聊天才发现（报错还是英文的 ERR_MODULE_NOT_FOUND）。
+$dshEntry = Join-Path $NodeDir ("node_modules" + [IO.Path]::DirectorySeparatorChar + "@deepseek-ai" + [IO.Path]::DirectorySeparatorChar + "dsh" + [IO.Path]::DirectorySeparatorChar + "lib" + [IO.Path]::DirectorySeparatorChar + "bin.js")
+if (-not (Test-Path $dshEntry)) {
+  # --prefix 是关键：npm 的全局前缀可能被用户改到别处（`npm config set prefix`，
+  # 装过 nvm 或者跟着教程配过全局目录的人都可能有）。不写 --prefix 的话，
+  # dsh 会被装进那个目录，我们这边一个文件都没有，聊天永远起不来。实测栽过。
   # 先走阿里云 npmmirror（国内快且稳），失败再退回官方 registry。
   # 只在这一条命令上带 --registry，不动用户的 ~/.npmrc。
-  & (Join-Path $NodeDir "npm.cmd") install -g "@deepseek-ai/dsh" --silent --registry=https://registry.npmmirror.com
+  & (Join-Path $NodeDir "npm.cmd") install -g "@deepseek-ai/dsh" --prefix $NodeDir --silent --registry=https://registry.npmmirror.com
   if ($LASTEXITCODE -ne 0) {
     Write-Host "   镜像那边没装成，换官方源再试一次..." -ForegroundColor DarkGray
-    & (Join-Path $NodeDir "npm.cmd") install -g "@deepseek-ai/dsh" --silent
+    & (Join-Path $NodeDir "npm.cmd") install -g "@deepseek-ai/dsh" --prefix $NodeDir --silent
   }
   if ($LASTEXITCODE -ne 0) { throw "翻译助手的大脑没装上，两个下载源都没成。检查一下网络（可能要挂梯子），然后重新运行一次这个安装器。" }
 }
+if (-not (Test-Path $dshEntry)) { throw "翻译助手的大脑装完还是找不到主程序。多半是 npm 把它装到别的目录去了（npm config get prefix 看一眼）。" }
 Ok "dsh 就绪"
 
 # ---------------------------------------------------------------- 群星回廊程序
