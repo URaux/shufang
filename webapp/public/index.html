@@ -2870,6 +2870,22 @@
         <p class="set-note" id="setDiagNote">复制出来的内容里不含密钥和口令，可以放心发。手机上用「导出成文件」更省事。</p>
       </div>
       <div class="rite-card">
+        <h3>接口和模型</h3>
+        <p class="set-note" style="margin:0 0 .6rem">默认用 DeepSeek 官方。用中转站、公益站、或者本机跑的模型，在这里改；只要是 OpenAI 兼容的接口都行。三个都留空就是回到默认。</p>
+        <div class="set-row">
+          <input id="setBase" class="rite-q" placeholder="接口地址，如 https://xxx.com/v1" />
+        </div>
+        <div class="set-row">
+          <input id="setModel" class="rite-q" placeholder="主模型名（翻译、梗概用）" />
+          <input id="setFast" class="rite-q" placeholder="快模型名（章节摘要用）" />
+        </div>
+        <div class="set-row">
+          <button id="setApiSave" class="rite-go">保存</button>
+          <button id="setApiTest" class="set-plain">测一下</button>
+        </div>
+        <p class="set-note" id="setApiNote">改完立刻生效；聊天那条要关掉重开才换过来。</p>
+      </div>
+      <div class="rite-card">
         <h3>书架上没有《怎么用群星回廊》？</h3>
         <p>说明书只在第一次启动时放一次，删掉就不会自己长回来。想要就点这里放回去。</p>
         <div class="set-row">
@@ -3034,6 +3050,35 @@
       return done;
     }
 
+    // 接口和模型。三个框都是「空 = 用默认」，所以清空保存就是回到 DeepSeek 官方。
+    const apiNote = (t, err) => { const el = $("setApiNote"); if (!el) return; el.textContent = t; el.classList.toggle("err", !!err); };
+    function fillApi(s) {
+      const d = s.defaults || {};
+      $("setBase").value = s.baseUrl || "";  $("setBase").placeholder = "接口地址，留空＝" + (d.baseUrl || "官方");
+      $("setModel").value = s.model || "";   $("setModel").placeholder = "主模型，留空＝" + (d.model || "默认");
+      $("setFast").value = s.fastModel || ""; $("setFast").placeholder = "快模型，留空＝" + (d.fastModel || "默认");
+    }
+    $("setApiSave").addEventListener("click", async () => {
+      $("setApiSave").disabled = true;
+      apiNote("正在保存…");
+      try {
+        const r = await api("/api/settings", {
+          baseUrl: $("setBase").value, model: $("setModel").value, fastModel: $("setFast").value,
+        });
+        if (r && r.error) { apiNote(r.hint || r.error, true); }
+        else { fillApi(r); apiNote("保存好了。整理书、写摘要立刻用新的；聊天那条要关掉重开才换过来。"); }
+      } catch (e) { apiNote(e.message || "没保存成。", true); }
+      finally { $("setApiSave").disabled = false; }
+    });
+    $("setApiTest").addEventListener("click", async () => {
+      $("setApiTest").disabled = true;
+      apiNote("正在问一句…");
+      try {
+        const r = await api("/api/settings/test-key", {});
+        apiNote(r.hint || (r.ok ? "通了。" : "没通。"), !r.ok);
+      } catch (e) { apiNote(e.message || "没测成。", true); }
+      finally { $("setApiTest").disabled = false; }
+    });
     $("setGuide").addEventListener("click", async () => {
       const note = $("setGuideNote");
       $("setGuide").disabled = true;
@@ -3079,6 +3124,8 @@
     if (s.actualPort && s.actualPort !== s.port) {
       $("setPortNote").textContent = `配置的端口 ${s.port} 被别的程序占了，现在实际用的是 ${s.actualPort}。`;
     }
+    // 三个框正在被人编辑的时候别覆盖掉（设置页会定时刷新）
+    if (![$("setBase"), $("setModel"), $("setFast")].includes(document.activeElement)) fillApi(s);
     $("setRemote").checked = !!s.remoteAccess;
     $("setSpaces").checked = !!s.spacesEnabled;
     applyFlags(s);
