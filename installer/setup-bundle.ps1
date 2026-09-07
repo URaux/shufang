@@ -242,10 +242,20 @@ if ($stopped -gt 0) { Start-Sleep -Seconds 2; Ok "已关掉 $stopped 个正在�
 
 # ---------------------------------------------------------------- 落料
 Step "安放运行环境（Node + Pandoc + dsh，已内置）"
+# 用 robocopy 而不是 Copy-Item：Windows 的 260 字符全路径上限。
+# dsh 的依赖树里最长的相对路径两百来字符，Copy-Item 一碰到就抛「未能找到路径 ... 的一部分」，
+# 而且是**拷到一半**抛——用户看到一句报错，装完却以为成了，聊天永远起不来
+# （日志里是 Cannot find package @deepseek-ai/dsh-app-boot）。有用户就这么栽的。
+# robocopy 原生支持长路径，退出码 0-7 都算成功。
+function CopyTreeLong($from, $to) {
+  $null = & robocopy $from $to /E /NFL /NDL /NJH /NJS /NP /R:2 /W:1
+  if ($LASTEXITCODE -ge 8) { throw "拷贝失败（robocopy $LASTEXITCODE）：$from" }
+  $global:LASTEXITCODE = 0
+}
 foreach ($piece in @("node", "bin")) {
   $dest = Join-Path $AppDir $piece
   RemoveWithRetry $dest
-  Copy-Item (Join-Path $Payload $piece) $dest -Recurse
+  CopyTreeLong (Join-Path $Payload $piece) $dest
 }
 # dsh 的会话存储要 Node 22.15 才有的 zstd 接口。版本低了 dsh 一启动就抛
 # 「does not provide an export named 'createZstdDecompress'」——表现是聊天完全
@@ -255,11 +265,17 @@ $nodeVer = (& (Join-Path $NodeDir "node.exe") --version) -replace "^v", ""
 if ([version]$nodeVer -lt [version]"22.15.0") {
   throw "这个安装包是坏的：里面带的运行环境太旧，装完聊天会用不了。去重新下载一份安装包再装。`n    （这行给站长看：包内 Node $nodeVer，需要 22.15 以上）"
 }
+# 拷完当场验一眼 dsh 是不是完整的。以前拷贝半途失败也照样往下走，
+# 用户装完才发现聊天用不了，而且报错是英文的 ERR_MODULE_NOT_FOUND，没人看得懂。
+$dshBoot = Join-Path $NodeDir "node_modules\@deepseek-ai\dsh\node_modules\@deepseek-ai\dsh-app-boot"
+$dshBin  = Join-Path $NodeDir "node_modules\@deepseek-ai\dsh\lib\bin.js"
+if (-not (Test-Path $dshBin)) { throw "助手没装全（缺 dsh 主程序）。把安装器放到路径短一点的地方（比如 D:\ 根目录）再装一次。" }
+if (-not (Test-Path $dshBoot)) { throw "助手没装全（缺 dsh 的依赖）。多半是路径太长拷贝中断了：把安装器放到路径短一点的地方（比如 D:\ 根目录）再装一次。" }
 Ok "运行环境就绪（$NodeDir，Node $nodeVer）"
 
 Step "安放程序本体"
 RemoveWithRetry $AppRepo
-Copy-Item (Join-Path $Payload "app") $AppRepo -Recurse
+CopyTreeLong (Join-Path $Payload "app") $AppRepo
 Ok "程序就绪（$AppRepo）"
 
 Step "建书库"

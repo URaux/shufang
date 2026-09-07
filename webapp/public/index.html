@@ -2865,8 +2865,17 @@
         <p>点一下，把程序版本、设置和最近的运行记录复制到剪贴板，然后粘贴给站长。</p>
         <div class="set-row">
           <button id="setDiag" class="set-plain">复制诊断日志</button>
+          <a id="setDiagFile" class="set-plain" href="/api/diag/download" download>导出成文件</a>
         </div>
-        <p class="set-note" id="setDiagNote">复制出来的内容里不含密钥和口令，可以放心发。</p>
+        <p class="set-note" id="setDiagNote">复制出来的内容里不含密钥和口令，可以放心发。手机上用「导出成文件」更省事。</p>
+      </div>
+      <div class="rite-card">
+        <h3>书架上没有《怎么用群星回廊》？</h3>
+        <p>说明书只在第一次启动时放一次，删掉就不会自己长回来。想要就点这里放回去。</p>
+        <div class="set-row">
+          <button id="setGuide" class="set-plain">把说明书放回书架</button>
+        </div>
+        <p class="set-note" id="setGuideNote"></p>
       </div>`;
 
     // 版本 / 更新。这一格三种状态：已是最新、有新版（露出按钮）、查不到（如实说查不到，
@@ -3023,6 +3032,17 @@
       return done;
     }
 
+    $("setGuide").addEventListener("click", async () => {
+      const note = $("setGuideNote");
+      $("setGuide").disabled = true;
+      note.textContent = "正在放回去…";
+      try {
+        const r = await api("/api/guide/restore", {});
+        note.textContent = r.hint || (r.ok ? "放回去了。" : "没成功。");
+        note.classList.toggle("err", !r.ok);
+      } catch { note.textContent = "没成功，刷新一下再试。"; note.classList.add("err"); }
+      finally { $("setGuide").disabled = false; }
+    });
     $("setDiag").addEventListener("click", async () => {
       const note = $("setDiagNote");
       $("setDiag").disabled = true;

@@ -60,6 +60,23 @@ Mirror $Bin (Join-Path $Pkg "payload\bin")
 Write-Host ">> 程序本体"
 Mirror $App (Join-Path $Pkg "payload\app") @("node_modules", ".git")
 
+# 清掉纯开发期的文件。两个理由，第二个是硬伤：
+#   一、体积——三千多个 .map、四千多个 .d.ts，运行时一个都用不上；
+#   二、路径长度——Windows 的 260 字符上限是按**全路径**算的。实测载荷里最长的相对路径 209 字符，
+#      解到 %TEMP%\shufang-setup（前缀 55 字符）就是 264，正好越界。有用户就卡在这儿：
+#      「安装中途出错了：未能找到路径 ...getchatcompletionfieldoptions...post.d.ts.map 的一部分」，
+#      而且**装了一半**——dsh 的依赖没拷全，装完聊天永远起不来（ERR_MODULE_NOT_FOUND）。
+#      名字最长的那批恰恰就是 .d.ts.map，删掉它们等于把最长的那截砍掉。
+Write-Host ">> 清理载荷里的开发文件（.map / .d.ts）"
+$before = (Get-ChildItem (Join-Path $Pkg "payload") -Recurse -File).Count
+Get-ChildItem (Join-Path $Pkg "payload") -Recurse -File -Include *.map, *.d.ts -ErrorAction SilentlyContinue |
+  Remove-Item -Force -ErrorAction SilentlyContinue
+$after = (Get-ChildItem (Join-Path $Pkg "payload") -Recurse -File).Count
+Write-Host "   删掉 $($before - $after) 个文件"
+$longest = (Get-ChildItem (Join-Path $Pkg "payload") -Recurse -File |
+            ForEach-Object { $_.FullName.Length - $Pkg.Length } | Measure-Object -Maximum).Maximum
+Write-Host "   载荷里最长相对路径 $longest 字符（解压目录再长也不该超过 260）"
+
 Write-Host ">> 压成 bundle.zip（几万个文件，要一两分钟）"
 Compress-Archive -Path (Join-Path $Pkg "*") -DestinationPath $Zip -CompressionLevel Optimal
 $zipMB = [math]::Round((Get-Item $Zip).Length / 1MB, 1)
@@ -67,6 +84,8 @@ Write-Host "   bundle.zip $zipMB MB"
 }
 
 # run.bat：只有 ASCII，别让 cmd 的代码页问题掺和进来。
+# 解到盘根的 sf-setup 而不是 %TEMP%\shufang-setup：后者前缀就 55 个字符，
+# 加上载荷里两百来字符的相对路径直接越过 Windows 的 260 上限，安装会半途而废。
 # 解压用 Windows 自带的 tar.exe（libarchive）：三万五千个文件 16 秒；Expand-Archive 同一个包十分钟都解不完，
 # 用户会以为死了。CLAUDE.md 里说 tar.exe 会炸的是 tar.gz 里的中文名；zip 的 UTF-8 文件名它认得好好的
 # （实测「安装群星回廊.vbs」「怎么用群星回廊」原样出来）。没有 tar.exe 的老机器（Win10 1803 以前）退回 Expand-Archive。
@@ -75,7 +94,7 @@ $bat = @'
 @echo off
 setlocal
 title Shufang Setup
-set "T=%TEMP%\shufang-setup"
+set "T=%SystemDrive%\sf-setup"
 if exist "%T%" rmdir /s /q "%T%"
 mkdir "%T%"
 echo Unpacking installer, please wait...
