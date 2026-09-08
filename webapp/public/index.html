@@ -434,6 +434,9 @@
   .set-box { font-family: ui-monospace, Consolas, monospace; font-size: .8rem; word-break: break-all;
     background: var(--paper); border: 1px dashed var(--line); border-radius: 8px; padding: .6rem .7rem; margin: .5em 0; }
   .set-row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  /* 又是 .bench-pane[hidden] 那个坑（这个文件里第三处了）：类选择器的
+     display:flex 压得过 [hidden] 的 UA 规则，藏起来的那行照样显示。 */
+  .set-row[hidden] { display: none; }
   .set-row .rite-q { flex: 1; min-width: 11rem; width: auto; }
   .set-row .rite-go { margin-top: 0; }
   .set-plain { font: inherit; padding: .42rem 1.1rem; border-radius: 999px;
@@ -830,6 +833,21 @@
     } catch { }
   }
 
+  // 「读一遍插图」。要花钱，所以先问一句——问的时候把张数说出来，
+  // 用户对「120 张」的感觉比对「一点钱」准得多。
+  async function captionBook() {
+    const b = currentBook;
+    if (!b || !b.name) return;
+    if (!confirm(`把《${b.name}》的 ${b.images} 张插图都读一遍？\n\n`
+      + `读完的说明会写在图旁边，翻译和聊书时助手就用得上了。\n`
+      + `这一步要调用读图模型，会花一点钱。`)) return;
+    try {
+      await api("/api/job", { kind: "captions", book: b.name });
+      // 进度和结果都在任务卡上，跟传书是同一套；这里只负责让它立刻出现
+      pollJobs();
+    } catch (e) { alert(e.message || "没能开始，稍等一下再试一次。"); }
+  }
+
   async function deleteBook() {
     const name = currentBook && currentBook.name;
     if (!name) return;
@@ -858,6 +876,16 @@
       parts.push('<div class="side-h">原文</div>');
       for (const f of b.original) parts.push(item(`Library/${b.name}/00-原书/${f}`, f.replace(/\.md$/, "")));
     }
+    // 插图。这颗按钮只在「这本书有图 + 读图功能开着」时出现：
+    // 给用户一个点了只会报错的按钮，比没有按钮更糟。
+    // 入库时会自动看一遍，所以这里是给「先攒了书、后来才配读图」的人补的。
+    if (b.images && b.visionOn) {
+      parts.push('<div class="side-h">插图</div>');
+      if (b.captioned) parts.push(item(`Library/${b.name}/插图/图说.md`, "🖼 图说"));
+      parts.push(`<button class="side-item" id="capBook">👁 ${b.captioned ? "重新读一遍插图" : "读一遍插图"}`
+        + `<small>${b.images} 张 · 要花一点钱</small></button>`);
+    }
+
     for (const [dir, label] of [["笔记", "笔记"], ["讨论", "讨论"]]) {
       const files = b[dir === "笔记" ? "notes" : "discussions"];
       if (files.length) {
@@ -1134,7 +1162,7 @@
   }
 
   sidebar.addEventListener("click", e => {
-    const el = e.target.closest("[data-book],[data-file],[data-sug],[data-jump],[data-unmark],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook,#delBook");
+    const el = e.target.closest("[data-book],[data-file],[data-sug],[data-jump],[data-unmark],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook,#delBook,#capBook");
     if (!el) return;
     // 删按钮压在跳转按钮上面，先判它，否则点叉会顺带跳过去
     if (el.dataset.unmark) { removeMark(el.dataset.unmark); return; }
@@ -1142,6 +1170,7 @@
     if (el.id === "uploadBook") { pickFile(); return; }
     if (el.id === "backShelf") { currentBook = null; currentFile = null; collabState = null; loadHistory(null); loadShelf(); return; }
     if (el.id === "delBook") { deleteBook(); return; }
+    if (el.id === "capBook") { captionBook(); return; }
     if (el.id === "joinShared") { joinWizard(); return; }
     if (el.id === "shareBook") { shareWizard(); return; }
     if (el.id === "showInvite") { showInvite(); return; }
@@ -1478,7 +1507,7 @@
         ? `这个框只聊《${scope}》：问情节、问某个词什么意思、让它翻某一章都行，比如「翻第 3 章」。`
         : GREETING);
     }
-    if (r && r.brain === "claude") {
+    if (r && r.noHistory) {
       addMsg(lane, "status", "历史在助手自己的会话里，这里只显示本次启动后的消息。");
     }
   }
@@ -2799,6 +2828,68 @@
   // ------------------------------------------------------------------ 设置
   // 骨架只搭一次；每次进来只刷新动态的字，不动输入框——不然正打一半的 key 会被清掉
   let setReady = false;
+  // 下面这几个「把配置填回框里」的函数必须待在 renderSettings **外面**。
+  // 踩过一次：它们本来写在 renderSettings 里，而 fillSettings 在外层——
+  // 调用时是 ReferenceError，又正好被 loadSettings 的 try/catch 吞掉，
+  // 于是接口地址、模型名、远程访问开关、书库路径全都不显示，页面还一声不吭。
+  // 别再挪回去。
+
+  // 接口和模型。三个框都是「空 = 用默认」，所以清空保存就是回到 DeepSeek 官方。
+  const apiNote = (t, err) => { const el = $("setApiNote"); if (!el) return; el.textContent = t; el.classList.toggle("err", !!err); };
+  function fillApi(s) {
+    if (!$("setBase")) return;              // 设置页还没渲染过就没什么可填的
+    const d = s.defaults || {};
+    $("setBase").value = s.baseUrl || "";  $("setBase").placeholder = "接口地址，留空＝" + (d.baseUrl || "官方");
+    $("setModel").value = s.model || "";   $("setModel").placeholder = "主模型，留空＝" + (d.model || "默认");
+    $("setFast").value = s.fastModel || ""; $("setFast").placeholder = "快模型，留空＝" + (d.fastModel || "默认");
+  }
+
+  // 谁来当大脑。选项列表由后端给（server.js 里 BRAINS 那张表），前端只管画——
+  // 以后加一条大脑，这里一个字都不用改。
+  const brainNote = (x, err) => { const el = $("setBrainNote"); if (!el) return; el.textContent = x; el.classList.toggle("err", !!err); };
+  let brainList = [];
+  function syncBrainRow(showNote) {
+    if (!$("setBrain")) return;
+    const id = $("setBrain").value;
+    // 只有「自定义命令」才需要那个输入框，别的时候藏起来——多一个看不懂的框
+    // 就多一个让人犹豫的东西。
+    $("setBrainCmdRow").hidden = id !== "custom";
+    const b = brainList.find(x => x.id === id);
+    if (showNote && b && b.note) brainNote(b.note);
+  }
+  function fillBrain(s) {
+    const sel = $("setBrain");
+    if (!sel) return;
+    brainList = s.brains || [];
+    const want = brainList.map(b => b.id).join(",");
+    if (sel.dataset.ids !== want) {
+      sel.innerHTML = brainList.map(b => `<option value="${esc(b.id)}">${esc(b.label)}</option>`).join("");
+      sel.dataset.ids = want;
+    }
+    sel.value = s.brain || "claude";
+    if (document.activeElement !== $("setBrainCmd")) $("setBrainCmd").value = s.brainCmd || "";
+    syncBrainRow(false);
+  }
+
+  // 读图。两个框都是「空 = 关掉」。地址留空时后端会去借上面那个自定义接口
+  // （官方 DeepSeek 没有视觉模型，那种情况不借），所以状态得由后端说了算。
+  const visNote = (x, err, sticky) => {
+    const el = $("setVisNote"); if (!el) return;
+    el.textContent = x; el.classList.toggle("err", !!err);
+    if (sticky) el.dataset.sticky = "1";
+  };
+  function fillVision(s) {
+    if (!$("setVisBase")) return;
+    if (document.activeElement !== $("setVisBase")) $("setVisBase").value = s.visionBase || "";
+    if (document.activeElement !== $("setVisModel")) $("setVisModel").value = s.visionModel || "";
+    // 用户刚点过保存/试一下的话，那句话比状态更该留在屏幕上
+    if (!$("setVisNote").dataset.sticky) {
+      visNote(s.visionOn
+        ? (s.visionBorrowed ? "开着。地址没填，用的是上面「接口和模型」那个。" : "开着。")
+        : "关着。填一个会看图的模型名就开了。");
+    }
+  }
+
   function renderSettings() {
     $("setBody").innerHTML = `
       <div class="rite-card">
@@ -2884,6 +2975,36 @@
           <button id="setApiTest" class="set-plain">测一下</button>
         </div>
         <p class="set-note" id="setApiNote">改完立刻生效；聊天那条要关掉重开才换过来。</p>
+      </div>
+      <div class="rite-card">
+        <h3>谁来当大脑</h3>
+        <p class="set-note" style="margin:0 0 .6rem">默认那条随程序装好，配上 key 就能用。已经在用 Codex 或 Claude Code 的话，可以让它们来接管——用你自己的账号和模型，不花上面那把 key 的钱。不确定的话别动这里。</p>
+        <div class="set-row">
+          <select id="setBrain" class="rite-q"></select>
+        </div>
+        <div class="set-row" id="setBrainCmdRow" hidden>
+          <input id="setBrainCmd" class="rite-q" placeholder="一条能在终端里直接跑通的命令" />
+        </div>
+        <div class="set-row">
+          <button id="setBrainSave" class="rite-go">保存</button>
+          <button id="setBrainTest" class="set-plain">试一下</button>
+        </div>
+        <p class="set-note" id="setBrainNote"></p>
+      </div>
+      <div class="rite-card">
+        <h3>读图</h3>
+        <p class="set-note" style="margin:0 0 .6rem">助手本身看不见图。书里的插图、表格、符印、手抄页，对它只是一行占位，正文说「如图三所示」它就只能干瞪眼。填一个会看图的模型，传书的时候每张图会被看一遍，说明写在图旁边，翻译和聊书都用得上。默认关着，因为看图要额外花钱。</p>
+        <div class="set-row">
+          <input id="setVisBase" class="rite-q" placeholder="读图接口地址（留空＝跟上面同一个）" />
+        </div>
+        <div class="set-row">
+          <input id="setVisModel" class="rite-q" placeholder="读图模型名，比如 qwen3-vl-32b-instruct" />
+        </div>
+        <div class="set-row">
+          <button id="setVisSave" class="rite-go">保存</button>
+          <button id="setVisTest" class="set-plain">试一下</button>
+        </div>
+        <p class="set-note" id="setVisNote"></p>
       </div>
       <div class="rite-card">
         <h3>书架上没有《怎么用群星回廊》？</h3>
@@ -3050,14 +3171,6 @@
       return done;
     }
 
-    // 接口和模型。三个框都是「空 = 用默认」，所以清空保存就是回到 DeepSeek 官方。
-    const apiNote = (t, err) => { const el = $("setApiNote"); if (!el) return; el.textContent = t; el.classList.toggle("err", !!err); };
-    function fillApi(s) {
-      const d = s.defaults || {};
-      $("setBase").value = s.baseUrl || "";  $("setBase").placeholder = "接口地址，留空＝" + (d.baseUrl || "官方");
-      $("setModel").value = s.model || "";   $("setModel").placeholder = "主模型，留空＝" + (d.model || "默认");
-      $("setFast").value = s.fastModel || ""; $("setFast").placeholder = "快模型，留空＝" + (d.fastModel || "默认");
-    }
     $("setApiSave").addEventListener("click", async () => {
       $("setApiSave").disabled = true;
       apiNote("正在保存…");
@@ -3078,6 +3191,54 @@
         apiNote(r.hint || (r.ok ? "通了。" : "没通。"), !r.ok);
       } catch (e) { apiNote(e.message || "没测成。", true); }
       finally { $("setApiTest").disabled = false; }
+    });
+    $("setBrain").addEventListener("change", () => syncBrainRow(true));
+    $("setBrainSave").addEventListener("click", async () => {
+      $("setBrainSave").disabled = true;
+      brainNote("正在保存…");
+      try {
+        const r = await api("/api/settings", { brain: $("setBrain").value, brainCmd: $("setBrainCmd").value });
+        if (r && r.error) brainNote(r.hint || r.error, true);
+        else {
+          fillBrain(r);
+          // 聊天那条是现起进程的，下一句就换过来；但正在跑的后台任务还在用旧的。
+          brainNote("换好了。下一句聊天就用新的；正在跑的整理任务还是用原来那个跑完。");
+        }
+      } catch (e) { brainNote(e.message || "没保存成。", true); }
+      finally { $("setBrainSave").disabled = false; }
+    });
+    $("setBrainTest").addEventListener("click", async () => {
+      $("setBrainTest").disabled = true;
+      brainNote("正在看看…");
+      try {
+        const r = await api("/api/settings/test-brain", { brain: $("setBrain").value, brainCmd: $("setBrainCmd").value });
+        brainNote(r.hint || (r.ok ? "能用。" : "用不了。"), !r.ok);
+      } catch (e) { brainNote(e.message || "没测成。", true); }
+      finally { $("setBrainTest").disabled = false; }
+    });
+    $("setVisSave").addEventListener("click", async () => {
+      $("setVisSave").disabled = true;
+      visNote("正在保存…", false, true);
+      try {
+        const r = await api("/api/settings", { visionBase: $("setVisBase").value, visionModel: $("setVisModel").value });
+        if (r && r.error) visNote(r.hint || r.error, true, true);
+        else {
+          $("setVisNote").dataset.sticky = "";
+          fillVision(r);
+          // 已经在书库里的书不会自动补图说——那要重新看一遍所有图，是一笔用户没同意花的钱
+          visNote(r.visionOn ? "开了。从下一本传进来的书开始看图。" : "关了。", false, true);
+        }
+      } catch (e) { visNote(e.message || "没保存成。", true, true); }
+      finally { $("setVisSave").disabled = false; }
+    });
+    $("setVisTest").addEventListener("click", async () => {
+      $("setVisTest").disabled = true;
+      visNote("正在给它看一张图…", false, true);
+      try {
+        const r = await api("/api/settings/test-vision", { visionBase: $("setVisBase").value, visionModel: $("setVisModel").value });
+        visNote(r.hint || (r.ok ? "能看图。" : "看不了。"), !r.ok, true);
+      } catch (e) { visNote(e.message || "没测成。", true, true); }
+      finally { $("setVisTest").disabled = false; }
     });
     $("setGuide").addEventListener("click", async () => {
       const note = $("setGuideNote");
@@ -3126,6 +3287,8 @@
     }
     // 三个框正在被人编辑的时候别覆盖掉（设置页会定时刷新）
     if (![$("setBase"), $("setModel"), $("setFast")].includes(document.activeElement)) fillApi(s);
+    if (document.activeElement !== $("setBrain")) fillBrain(s);
+    fillVision(s);
     $("setRemote").checked = !!s.remoteAccess;
     $("setSpaces").checked = !!s.spacesEnabled;
     applyFlags(s);
@@ -3212,7 +3375,11 @@
 
   async function loadSettings() {
     if (!setReady) { renderSettings(); setReady = true; }
-    try { fillSettings(await fetch("/api/settings").then(r => r.json())); } catch { }
+    // 这个 catch 曾经是光秃秃的 {}，代价是：fillSettings 里一句 ReferenceError
+    // 被它整个吞掉，设置页所有已存的值都不显示，而页面一声不吭，整整一版没人发现。
+    // 现在至少往控制台留一行——排错的人打开 F12 就看得见。
+    try { fillSettings(await fetch("/api/settings").then(r => r.json())); }
+    catch (e) { console.error("[设置] 填页面时出错：", e); }
   }
 
   // ------------------------------------------------------------------ 视图切换
