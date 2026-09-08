@@ -36,6 +36,32 @@ function Invoke-Native {
   } finally { $ErrorActionPreference = $old }
 }
 
+# 同上，但把对方说的话留下来。
+#
+# 为什么要有这一个：所有 native 调用都 | Out-Null 之后，一旦「装上了却 import 不了」，
+# 屏幕上只有一句「跑不起来」，没有任何线索——用户问「为什么」，我们也答不上来，
+# 只能猜。有用户就卡在这一步来回换 Python 换了半天。**恰恰是失败的时候最需要那几行字。**
+function Invoke-NativeSay {
+  param([Parameter(Mandatory = $true)][string]$Exe, [string[]]$Arguments = @())
+  $old = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $out = & $Exe @Arguments 2>&1 | Out-String
+    return @{ Code = $LASTEXITCODE; Out = ("" + $out).Trim() }
+  } finally { $ErrorActionPreference = $old }
+}
+
+# 出错时把原文摊出来（掐到前几行，别刷屏）。英文看不懂不要紧，
+# 用户把这几行发给站长，站长一眼就知道是缺运行库、是网不通、还是版本不对。
+function Show-Why {
+  param([string]$Title, [string]$Text, [int]$Lines = 6)
+  if (-not $Text) { return }
+  Write-Host "   $Title" -ForegroundColor DarkGray
+  foreach ($l in (($Text -split "`r?`n") | Where-Object { $_.Trim() } | Select-Object -First $Lines)) {
+    Write-Host "     $l" -ForegroundColor DarkGray
+  }
+}
+
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 try { chcp 65001 > $null } catch {}
 # 配置文件固定在 ~\.shufang（几 KB，程序按这个位置找配置）；大东西装哪由用户选
@@ -486,10 +512,11 @@ if ($PyExe) {
   # 结果是 import 直接崩、PDF 支持静默消失，报错用户完全看不懂。0.0.27 不碰它。
   # 底座也一起钉：只钉 pymupdf4llm 的话 pymupdf 会浮动到新版，等于没钉。
   # --user：装进用户自己的包目录，不碰系统站点目录，也不需要管理员。
-  Invoke-Native $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "pymupdf4llm==0.0.27", "pymupdf==1.26.3") | Out-Null
+  $pipPdf = Invoke-NativeSay $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "pymupdf4llm==0.0.27", "pymupdf==1.26.3")
   # 装完真 import 一次再说「就绪」—— 上面那个 onnxruntime 的坑正是「装上了但 import 就崩」
   # 直接拿返回码判，别再指望 $LASTEXITCODE 跨过函数调用还是原来那个
-  $pdfOk = (Invoke-Native $PyExe @("-c", "import pymupdf4llm")) -eq 0
+  $pdfProbe = Invoke-NativeSay $PyExe @("-c", "import pymupdf4llm; print('ok')")
+  $pdfOk = $pdfProbe.Code -eq 0
   if ($pdfOk) {
     Ok "PDF 支持就绪（用你电脑上的 Python）"
 
@@ -521,11 +548,12 @@ if ($PyExe) {
       # （引擎 0.7s，一页 1.4s，中英文都认得出）。不钉的话今天装能跑、
       # 过几个月新装的人拉到坏的那版，症状跟当年一模一样。
       Invoke-Native $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "rapidocr-onnxruntime==1.4.4") | Out-Null
-      $ocrOk = (Invoke-Native $PyExe @("-c", "import rapidocr_onnxruntime")) -eq 0
-      if ($ocrOk) {
+      $ocrProbe = Invoke-NativeSay $PyExe @("-c", "import rapidocr_onnxruntime; print('ok')")
+      if ($ocrProbe.Code -eq 0) {
         Ok "扫描版 PDF 也能读了"
       } else {
         Write-Host "   认字组件跑不起来，扫描版 PDF 暂时读不了（普通 PDF 不受影响）。" -ForegroundColor Yellow
+        Show-Why "它报的错：" $ocrProbe.Out
         Write-Host "   多半是缺「Microsoft Visual C++ 运行库」，装上再重跑一次本安装器试试。" -ForegroundColor Yellow
       }
     } elseif (-not $ocrTooNew) {
@@ -533,6 +561,10 @@ if ($PyExe) {
     }
   } else {
     Write-Host "   PDF 组件装上了但跑不起来，PDF 格式的书暂时读不了（epub/txt/docx 不受影响）。" -ForegroundColor Yellow
+    Write-Host "   用的是这个 Python：$PyExe" -ForegroundColor DarkGray
+    Show-Why "它报的错（把这几行发给站长就能定位）：" $pdfProbe.Out
+    Write-Host "   常见原因：缺「Microsoft Visual C++ 运行库」（搜一下 vc_redist.x64.exe 装上），" -ForegroundColor Yellow
+    Write-Host "   或者刚才下载组件时网没通。装好再重跑一次本安装器。" -ForegroundColor Yellow
   }
 } else {
 

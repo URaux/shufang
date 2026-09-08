@@ -1438,8 +1438,11 @@
 
   function makeLane(host, scrollEl, rich) {
     // hiddenJobs：这条对话已经翻篇的作业卡。换一段对话就把当时跑完的那些收起来。
+    // streaming / abort 记在 lane 上而不是全局：读书那边问一句，
+    // 不该把对话那边的输入框一起锁上（服务端现在也是一条通道一把锁）。
     return { items: [], host, scroll: scrollEl, rich, scope: null, session: "",
-             loaded: false, seq: 0, hiddenJobs: new Set() };
+             loaded: false, seq: 0, hiddenJobs: new Set(),
+             streaming: false, abort: null, btn: null };
   }
   // 两条都渲染 markdown。读书栏原来是纯文本，但手机上 #chat 是隐藏的
   // （见 CSS 的窄屏分支），手机用户唯一能用的就是读书栏——
@@ -1599,35 +1602,40 @@
     }
   });
 
-  let streaming = false;
-  let chatAbort = null;        // 正在跑的那一条，用来「停下」
+  // 哪条通道用哪颗键。读书那栏是 sendBtn，对话那栏是 sendBtn2。
+  readLane.btn = sendBtn;
+  chatLane.btn = sendBtn2;
 
-  // 助手在写的时候，发送键变成「停下」而不是变灰。
+  // 助手在写的时候，那条通道的发送键变成「停下」而不是变灰。
   //
   // 为什么必须有出口：有用户碰上过一条请求挂在那儿转了四分钟不动，而按钮是灰的、
   // 回车也不响应——他没有任何办法，只能去关整个程序。服务端本来就认客户端断线
-  //（res 一 close 就把大脑子进程杀掉、把忙碌标记清掉），差的只是前端给个按钮。
-  function setBusy(on) {
-    streaming = on;
-    for (const b of [sendBtn, sendBtn2]) {
-      b.textContent = on ? "停下" : "发送";
-      b.classList.toggle("stopping", on);
-      b.disabled = false;                 // 别再变灰：变灰就等于没有出口
+  //（res 一 close 就把大脑整棵进程树杀掉、把那条通道的锁放掉），差的只是这颗按钮。
+  //
+  // 按 lane 记：读书那边在写，不该把对话那边的键也变成「停下」。
+  function setBusy(lane, on) {
+    lane.streaming = on;
+    if (lane.btn) {
+      lane.btn.textContent = on ? "停下" : "发送";
+      lane.btn.classList.toggle("stopping", on);
+      lane.btn.disabled = false;          // 别再变灰：变灰就等于没有出口
     }
-    $("clipBtn").disabled = on;
+    // 剪贴板那颗是全局的，任意一条在跑就先按住
+    $("clipBtn").disabled = readLane.streaming || chatLane.streaming;
   }
 
-  function stopChat() {
-    if (!chatAbort) return;
-    try { chatAbort.abort(); } catch { }
-    chatAbort = null;
+  function stopChat(lane) {
+    if (!lane || !lane.abort) return;
+    try { lane.abort.abort(); } catch { }
+    lane.abort = null;
   }
 
   // fromButton：只有真去点那颗键才算「停下」。
   // 回车不能算——用户边等边把下一句敲好、顺手一个回车，
   // 结果把正在写的东西提前杀了，那比没有停止键还糟。
   function send(from, fromButton) {
-    if (streaming) { if (fromButton) stopChat(); return; }
+    const lane = from === "main" ? chatLane : readLane;
+    if (lane.streaming) { if (fromButton) stopChat(lane); return; }
     // 两个输入框分属两个模式，各发各的，不再互相清空
     const box = from === "main" ? input2 : input;
     const text = box.value.trim();
@@ -1638,14 +1646,14 @@
 
   async function sendText(text, lane) {
     lane = lane || laneOf();
-    if (!text || streaming) return;
+    if (!text || lane.streaming) return;
     addMsg(lane, "user", text);
-    setBusy(true);
+    setBusy(lane, true);
 
     let bot = null, statusEl = null;
     const ensureBot = () => bot || (bot = addMsg(lane, "bot", ""));
     const ac = new AbortController();
-    chatAbort = ac;
+    lane.abort = ac;
 
     try {
       const resp = await fetch("/api/chat", {
@@ -1702,9 +1710,9 @@
         ? "已经停下了。刚写到一半的内容没有保存。"
         : "这句话没发出去，跟「群星回廊」断了联系。看看电脑上的启动窗口还开着没有，然后把刚才那句再发一次。");
     } finally {
-      chatAbort = null;
+      lane.abort = null;
       if (statusEl) dropMsg(lane, statusEl);
-      setBusy(false);
+      setBusy(lane, false);
       renderRich(lane, bot);
       // 没打开书的时候读书那条也是书架级的，跟对话那条同源——
       // 让另一条下次显示时重新拉一遍，不然两边各说各的
