@@ -127,6 +127,10 @@
   #composer textarea:focus { outline: 2px solid var(--accent-soft); }
   #sendBtn, #sendBtn2 { background: var(--accent); color: #fff; border-radius: 8px; padding: 0 1.1rem; font-size: .95rem; flex-shrink: 0; }
   #sendBtn:disabled, #sendBtn2:disabled { opacity: .5; cursor: default; }
+  /* 修工具时把命令原文摊在这里。等宽 + 可滚，别撑破卡片 */
+  .set-log { margin: .7rem 0 0; padding: .6rem .7rem; background: #efe7d8; border-radius: 6px;
+             font-family: ui-monospace, Consolas, monospace; font-size: .74rem; line-height: 1.6;
+             white-space: pre-wrap; word-break: break-all; max-height: 16rem; overflow: auto; color: var(--ink-soft); }
   /* 助手在写的时候这颗键是「停下」：换个颜色，免得跟平时的发送看混 */
   #sendBtn.stopping, #sendBtn2.stopping { background: #8a6f52; }
 
@@ -2938,6 +2942,50 @@
     }
   }
 
+  // 读书的工具（PDF、认字）到底在不在，以及「试着修一下」。
+  //
+  // 只在缺东西的时候把这张卡露出来：一切正常的人不需要知道底下还有 Python 这回事。
+  // 探测要真去跑几次 python，所以只在打开设置页时问一次、修完再问一次，
+  // 不跟着设置页那个定时刷新一起跑。
+  async function fillTools() {
+    const card = $("setToolsCard");
+    if (!card) return;
+    let s = null;
+    try { s = await fetch("/api/tools").then(r => r.json()); } catch { return; }
+    const missing = [];
+    if (!s.pdf) missing.push(["pdf", "读 PDF"]);
+    if (!s.ocr) missing.push(["ocr", "读扫描版（认字）"]);
+    if (!missing.length) { card.hidden = true; return; }
+    card.hidden = false;
+    $("setToolsState").textContent =
+      missing.map(m => m[1]).join("、") + "现在用不了"
+      + (s.python ? `（这台电脑上的 Python 是 ${s.version || "未知版本"}）` : "（这台电脑上没找到 Python）")
+      + "。点下面的按钮会把安装时那几条命令原样再跑一次——多半是当时网没通。";
+    $("setToolsBtns").innerHTML = missing
+      .map(m => `<button class="set-plain" data-fix="${m[0]}">试着修一下：${esc(m[1])}</button>`).join("");
+  }
+
+  $("setBody").addEventListener("click", async e => {
+    const btn = e.target.closest("[data-fix]");
+    if (!btn) return;
+    const what = btn.dataset.fix;
+    const log = $("setToolsLog");
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = "正在装…（要一两分钟）";
+    log.hidden = true;
+    try {
+      const r = await api("/api/tools/repair", { what });
+      $("setToolsState").textContent = r.hint || (r.ok ? "修好了。" : "还是没成。");
+      $("setToolsState").classList.toggle("err", !r.ok);
+      if (r.log) { log.textContent = r.log; log.hidden = false; }
+      if (r.ok) await fillTools();          // 修好了这张卡就该自己消失
+    } catch (err) {
+      $("setToolsState").textContent = err.message || "没修成，稍后再试。";
+      $("setToolsState").classList.add("err");
+    } finally { btn.disabled = false; btn.textContent = old; }
+  });
+
   function renderSettings() {
     $("setBody").innerHTML = `
       <div class="rite-card">
@@ -3053,6 +3101,12 @@
           <button id="setVisTest" class="set-plain">试一下</button>
         </div>
         <p class="set-note" id="setVisNote"></p>
+      </div>
+      <div class="rite-card" id="setToolsCard" hidden>
+        <h3>读书的工具</h3>
+        <p class="set-note" id="setToolsState" style="margin:0 0 .6rem"></p>
+        <div class="set-row" id="setToolsBtns"></div>
+        <pre class="set-log" id="setToolsLog" hidden></pre>
       </div>
       <div class="rite-card">
         <h3>书架上没有《怎么用群星回廊》？</h3>
@@ -3422,7 +3476,7 @@
   });
 
   async function loadSettings() {
-    if (!setReady) { renderSettings(); setReady = true; }
+    if (!setReady) { renderSettings(); setReady = true; fillTools(); }
     // 这个 catch 曾经是光秃秃的 {}，代价是：fillSettings 里一句 ReferenceError
     // 被它整个吞掉，设置页所有已存的值都不显示，而页面一声不吭，整整一版没人发现。
     // 现在至少往控制台留一行——排错的人打开 F12 就看得见。
