@@ -127,6 +127,9 @@
   #composer textarea:focus { outline: 2px solid var(--accent-soft); }
   #sendBtn, #sendBtn2 { background: var(--accent); color: #fff; border-radius: 8px; padding: 0 1.1rem; font-size: .95rem; flex-shrink: 0; }
   #sendBtn:disabled, #sendBtn2:disabled { opacity: .5; cursor: default; }
+  /* 图没找到时那行小字：说清楚是哪一张，但别打断阅读 */
+  .img-missing { display: inline-block; padding: .15rem .5rem; border: 1px dashed var(--line);
+                 border-radius: 6px; color: var(--ink-mute); font-size: .82rem; }
   /* 修工具时把命令原文摊在这里。等宽 + 可滚，别撑破卡片 */
   .set-log { margin: .7rem 0 0; padding: .6rem .7rem; background: #efe7d8; border-radius: 6px;
              font-family: ui-monospace, Consolas, monospace; font-size: .74rem; line-height: 1.6;
