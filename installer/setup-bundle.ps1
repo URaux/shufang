@@ -313,8 +313,17 @@ if ([version]$nodeVer -lt [version]"22.15.0") {
 # 用户装完才发现聊天用不了，而且报错是英文的 ERR_MODULE_NOT_FOUND，没人看得懂。
 $dshBoot = Join-Path $NodeDir "node_modules\@deepseek-ai\dsh\node_modules\@deepseek-ai\dsh-app-boot"
 $dshBin  = Join-Path $NodeDir "node_modules\@deepseek-ai\dsh\lib\bin.js"
-if (-not (Test-Path $dshBin)) { throw "助手没装全（缺 dsh 主程序）。把安装器放到路径短一点的地方（比如 D:\ 根目录）再装一次。" }
-if (-not (Test-Path $dshBoot)) { throw "助手没装全（缺 dsh 的依赖）。多半是路径太长拷贝中断了：把安装器放到路径短一点的地方（比如 D:\ 根目录）再装一次。" }
+# 缺文件不等于路径太长。有用户就装在 E:\ 根目录上，照样被告知
+# 「把安装器放到路径短一点的地方」——已经不能再短了，他只会觉得这程序在胡说。
+# 路径长不长自己量得出来，量完再决定该说哪句话。
+$deep = $NodeDir.Length -gt 120
+$fixHint = if ($deep) {
+  "安装的位置太深（$NodeDir），文件拷到一半就断了。换个路径短的地方（比如 D:\ 根目录）再装一次。"
+} else {
+  "路径不长，那多半是拷贝时被杀毒软件拦了，或者磁盘满了。把安装目录加进杀毒软件白名单、腾出点空间，再装一次。"
+}
+if (-not (Test-Path $dshBin))  { throw "助手没装全（缺 dsh 主程序）。$fixHint" }
+if (-not (Test-Path $dshBoot)) { throw "助手没装全（缺 dsh 的依赖）。$fixHint" }
 Ok "运行环境就绪（$NodeDir，Node $nodeVer）"
 
 Step "安放程序本体"
