@@ -310,7 +310,18 @@ Step "检查 PDF 支持"
 # 安装期口径得跟它一致，否则会出现「装的时候说没有、用的时候却有」。
 # 而且不能只看 Get-Command 找不找得到 —— Windows 应用商店在 WindowsApps 下面
 # 放了个同名的桩，跑起来只会弹商店。必须真问一次版本才算数。
+# 挑哪个 python：优先挑 3.12 及以下的那个。
+#
+# 为什么不是「随便一个 3.9+」：认字组件 rapidocr-onnxruntime 在自己的元数据里写死了
+# requires_python <3.13，pip 在 3.13/3.14 上根本装不上。有用户就栽在这儿——他有
+# 一台装了 3.14 的机器，安装时老老实实选了「要支持扫描版 PDF」，装不上（黄字一闪
+# 而过），然后传扫描书时程序还告诉他「重跑安装器选是就行」，他重跑了几遍都不行。
+# 机器上要是同时有 3.12 和 3.14，挑前者两件事都办得成；只有 3.14 就照旧用，
+# 普通 PDF 一点不受影响，只是下面那一步会直说装不了。
 $PyExe = ""
+$PyVer = $null
+$PyFallback = ""
+$PyFallbackVer = $null
 foreach ($cand in @("python", "python3", "py")) {
   $c = Get-Command $cand -ErrorAction SilentlyContinue
   if (-not $c) { continue }
@@ -323,9 +334,13 @@ foreach ($cand in @("python", "python3", "py")) {
   if (-not $m.Success) { continue }                      # 商店那个桩答不出版本
   $major = [int]$m.Groups[1].Value; $minor = [int]$m.Groups[2].Value
   if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 9)) { continue }   # pymupdf4llm 要 3.9+
-  $PyExe = $c.Source
-  break
+  if ($major -eq 3 -and $minor -le 12) {                                 # 认字组件也能装的那一档
+    $PyExe = $c.Source; $PyVer = @($major, $minor)
+    break
+  }
+  if (-not $PyFallback) { $PyFallback = $c.Source; $PyFallbackVer = @($major, $minor) }
 }
+if (-not $PyExe -and $PyFallback) { $PyExe = $PyFallback; $PyVer = $PyFallbackVer }
 
 if ($PyExe) {
   # 版本必须钉死。pymupdf4llm 从 1.27 起 import 时就硬 import onnxruntime（自带 OCR），
@@ -339,6 +354,37 @@ if ($PyExe) {
   $pdfOk = (Invoke-Native $PyExe @("-c", "import pymupdf4llm")) -eq 0
   if ($pdfOk) {
     Ok "PDF 支持就绪（用你电脑上的 Python）"
+
+    # ---- 扫描版 PDF（认字）----
+    # 这一段以前只在联网安装器里有，离线包里没有。可现在官网发的就是这个包，
+    # 结果是：从官网装的人永远读不了扫描件，而程序还会告诉他「重跑安装器、
+    # 那一步选是」——他重跑一百遍也看不到那一步。所以补上。
+    #
+    # 这一步要联网（约 100 MB），而这本来是个「零下载」的离线包——所以它是
+    # 问一句、默认不装、装不成也不影响任何其他东西。
+    $ocrTooNew = ($PyVer -and ($PyVer[0] -gt 3 -or ($PyVer[0] -eq 3 -and $PyVer[1] -ge 13)))
+    if ($ocrTooNew) {
+      Write-Host ""
+      Write-Host "   扫描版 PDF（认字）这一项装不了：你这台电脑上的 Python 是 $($PyVer[0]).$($PyVer[1])，" -ForegroundColor Yellow
+      Write-Host "   而认字组件目前最高只支持到 3.12。普通 PDF、epub、txt 都不受影响。" -ForegroundColor Yellow
+      Write-Host "   要读扫描件的话：去 python.org 另装一个 3.12（可以和现在这个共存），再重跑一次本安装器。" -ForegroundColor Yellow
+      Write-Host ""
+    } else {
+      $wantOcr = "" + (Read-Host "   要支持扫描版 PDF 吗？这一步要联网再下约 100 MB (y/N)")
+      if ($wantOcr -match "^[Yy]") {
+        Write-Host "   正在装认字组件（大约 100 MB，慢的话请耐心等）..." -ForegroundColor DarkGray
+        # 版本钉死，跟联网安装器里那条同一个理由：onnxruntime 新版在不少 Windows 机器上
+        # DLL load failed；1.4.4 拉下来的是 1.18.1，实测能起。
+        Invoke-Native $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "rapidocr-onnxruntime==1.4.4") | Out-Null
+        if ((Invoke-Native $PyExe @("-c", "import rapidocr_onnxruntime")) -eq 0) {
+          Ok "扫描版 PDF 也能读了"
+        } else {
+          Write-Host "   认字组件没装成（网络或者运行库的事），扫描件暂时读不了；普通 PDF 不受影响。" -ForegroundColor Yellow
+        }
+      } else {
+        Write-Host "   跳过了。以后想读扫描版的书，重跑一次本安装器，这一步选 y 就行。" -ForegroundColor DarkGray
+      }
+    }
   } else {
     Write-Host "   PDF 组件装上了但跑不起来，PDF 格式的书暂时读不了（epub/txt/docx 不受影响）。" -ForegroundColor Yellow
   }

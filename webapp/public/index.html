@@ -127,6 +127,8 @@
   #composer textarea:focus { outline: 2px solid var(--accent-soft); }
   #sendBtn, #sendBtn2 { background: var(--accent); color: #fff; border-radius: 8px; padding: 0 1.1rem; font-size: .95rem; flex-shrink: 0; }
   #sendBtn:disabled, #sendBtn2:disabled { opacity: .5; cursor: default; }
+  /* 助手在写的时候这颗键是「停下」：换个颜色，免得跟平时的发送看混 */
+  #sendBtn.stopping, #sendBtn2.stopping { background: #8a6f52; }
 
   /* 对话视图：居中单列（与读书的三栏区分靠布局，不靠配色） */
   #chatview { flex: 1; min-width: 0; flex-direction: row; background: var(--paper); }
@@ -1519,6 +1521,12 @@
   // 对话模式能像网页版聊天那样开好几段、各聊各的。读书模式不需要——
   // 那条永远绑在当前这本书上，一本书一段。
   let sessions = [], curSession = "";
+  // 每段会话各存一份没发出去的草稿。
+  // 原来所有会话共用 input2 这一个框：在 A 里敲了半句、切到 B，那半句跟着过去了，
+  // 看着就像两段对话串了线。切换的时候存旧的、取新的，各写各的。
+  const drafts = new Map();
+  function stashDraft(id) { if (id !== undefined) drafts.set(id || "", input2.value); }
+  function restoreDraft(id) { input2.value = drafts.get(id || "") || ""; }
 
   function renderSessions() {
     const host = $("sessionList");
@@ -1551,7 +1559,9 @@
   async function newSession() {
     let r = null;
     try { r = await api("/api/chat/session/new", {}); } catch (e) { alert(e.message); return; }
+    stashDraft(curSession);
     await loadSessions(r.id);
+    restoreDraft(r.id);            // 新会话是空的，顺手把上一段的半句话清掉
     chatLane.session = r.id;
     await loadLane(chatLane, null);
   }
@@ -1563,7 +1573,9 @@
     if (!el) return;
     if (el.dataset.open) {
       if (el.dataset.open === curSession) return;
+      stashDraft(curSession);
       curSession = el.dataset.open;
+      restoreDraft(curSession);
       chatLane.session = curSession;
       renderSessions();
       $("sessions").classList.remove("open");
@@ -1588,13 +1600,34 @@
   });
 
   let streaming = false;
+  let chatAbort = null;        // 正在跑的那一条，用来「停下」
+
+  // 助手在写的时候，发送键变成「停下」而不是变灰。
+  //
+  // 为什么必须有出口：有用户碰上过一条请求挂在那儿转了四分钟不动，而按钮是灰的、
+  // 回车也不响应——他没有任何办法，只能去关整个程序。服务端本来就认客户端断线
+  //（res 一 close 就把大脑子进程杀掉、把忙碌标记清掉），差的只是前端给个按钮。
   function setBusy(on) {
     streaming = on;
-    sendBtn.disabled = on; sendBtn2.disabled = on;
+    for (const b of [sendBtn, sendBtn2]) {
+      b.textContent = on ? "停下" : "发送";
+      b.classList.toggle("stopping", on);
+      b.disabled = false;                 // 别再变灰：变灰就等于没有出口
+    }
     $("clipBtn").disabled = on;
   }
 
-  function send(from) {
+  function stopChat() {
+    if (!chatAbort) return;
+    try { chatAbort.abort(); } catch { }
+    chatAbort = null;
+  }
+
+  // fromButton：只有真去点那颗键才算「停下」。
+  // 回车不能算——用户边等边把下一句敲好、顺手一个回车，
+  // 结果把正在写的东西提前杀了，那比没有停止键还糟。
+  function send(from, fromButton) {
+    if (streaming) { if (fromButton) stopChat(); return; }
     // 两个输入框分属两个模式，各发各的，不再互相清空
     const box = from === "main" ? input2 : input;
     const text = box.value.trim();
@@ -1611,10 +1644,13 @@
 
     let bot = null, statusEl = null;
     const ensureBot = () => bot || (bot = addMsg(lane, "bot", ""));
+    const ac = new AbortController();
+    chatAbort = ac;
 
     try {
       const resp = await fetch("/api/chat", {
         method: "POST",
+        signal: ac.signal,
         headers: { "Content-Type": "application/json" },
         // chapter 只在读书那条带上：对话模式是书架级的，没有"当前章节"这回事
         body: JSON.stringify({
@@ -1660,9 +1696,13 @@
           }
         }
       }
-    } catch {
-      addMsg(lane, "status", "这句话没发出去，跟「群星回廊」断了联系。看看电脑上的启动窗口还开着没有，然后把刚才那句再发一次。");
+    } catch (e) {
+      // 用户自己按的「停下」不是故障，别把它说成断线吓人一跳
+      addMsg(lane, "status", e && e.name === "AbortError"
+        ? "已经停下了。刚写到一半的内容没有保存。"
+        : "这句话没发出去，跟「群星回廊」断了联系。看看电脑上的启动窗口还开着没有，然后把刚才那句再发一次。");
     } finally {
+      chatAbort = null;
       if (statusEl) dropMsg(lane, statusEl);
       setBusy(false);
       renderRich(lane, bot);
@@ -1913,8 +1953,8 @@
 
   $("clipBtn").addEventListener("click", pickFile);
 
-  sendBtn.addEventListener("click", () => send("side"));
-  sendBtn2.addEventListener("click", () => send("main"));
+  sendBtn.addEventListener("click", () => send("side", true));
+  sendBtn2.addEventListener("click", () => send("main", true));
   const enterToSend = (from) => e => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(from); }
   };
