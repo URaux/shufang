@@ -2933,21 +2933,17 @@
     el.textContent = x; el.classList.toggle("err", !!err);
     if (sticky) el.dataset.sticky = "1";
   };
-  let visWanted = false;
   function fillVision(s) {
     if (!$("setVisBase")) return;
     if (document.activeElement !== $("setVisBase")) $("setVisBase").value = s.visionBase || "";
     if (document.activeElement !== $("setVisModel")) $("setVisModel").value = s.visionModel || "";
-    visWanted = !!s.visionWanted;
-    $("setVisToggle").textContent = visWanted ? "关掉读图" : "打开读图";
     // 用户刚点过保存/试一下的话，那句话比状态更该留在屏幕上
     if (!$("setVisNote").dataset.sticky) {
-      // 「开了」和「真的能用」得分开说。开着却没 key 的时候只写「开着」，
-      // 用户会盯着一个没反应的功能想不明白——而那句才是他真正需要的。
+      // 没 key 的时候得直说。只写一句「开着」，用户会盯着一个没反应的
+      // 功能想不明白——而那句才是他真正需要的。
       visNote(s.visionOn
-        ? (s.visionBorrowed ? "开着，用的是上面那把 key。从下一本传进来的书开始看图。" : "开着。")
-        : visWanted ? "开着，但上面还没填 key，所以暂时读不了图。"
-        : "关着。");
+        ? (s.visionBorrowed ? "开着，用的是上面那把 key。" : "开着。")
+        : "上面还没填 key，所以暂时读不了图。");
     }
   }
 
@@ -3157,10 +3153,9 @@
       </div>
       <div class="rite-card">
         <h3>读图</h3>
-        <p class="set-note" style="margin:0 0 .6rem">助手本身看不见图。书里的插图、表格、符印、手抄页，对它只是一行占位，正文说「如图三所示」它就只能干瞊眼。开了之后，传书时每张图会被看一遍，说明写在图旁边，翻译和聊书都用得上。用的就是上面那把 key，不用另外去找一个。默认关着——看图是另算钱的。</p>
+        <p class="set-note" style="margin:0 0 .6rem">助手本身看不见图。书里的插图、表格、符印、手抄页，对它只是一行占位，正文说「如图三所示」它就只能干瞊眼。现在默认开着：传书时每张图会被看一遍，说明写在图旁边，翻译和聊书都用得上。用的就是上面那把 key，不用另外去找一个。</p>
         <div class="set-row">
-          <button id="setVisToggle" class="rite-go">打开读图</button>
-          <button id="setVisTest" class="set-plain">试一下</button>
+          <button id="setVisTest" class="rite-go">试一下</button>
           <button id="setVisMore" class="set-plain">用别家的模型</button>
         </div>
         <div class="set-row" id="setVisAdv" hidden>
@@ -3441,24 +3436,6 @@
       } finally { $("setDiagDesk").disabled = false; }
     });
 
-    // 开关。点一下就生效，不用再去点一次保存——一个开关还要确认一遍是多余的。
-    $("setVisToggle").addEventListener("click", async () => {
-      const btn = $("setVisToggle");
-      btn.disabled = true;
-      visNote(visWanted ? "正在关…" : "正在开…", false, true);
-      try {
-        const r = await api("/api/settings", { visionOn: !visWanted });
-        if (r && r.error) visNote(r.hint || r.error, true, true);
-        else {
-          delete $("setVisNote").dataset.sticky;
-          fillVision(r);
-          visNote(r.visionOn
-            ? "开了。从下一本传进来的书开始看图；已经在书架上的书，到书里点「读一遍插图」。"
-            : r.visionWanted ? "开着，但上面还没填 key。" : "关了。", false, true);
-        }
-      } catch (e) { visNote(e.message || "没改成。", true, true); }
-      finally { btn.disabled = false; }
-    });
     // 那两个框只有用别家模型的人需要，默认收着：
     // 两个空框摆在那里，会让人以为自己还得填点什么才能用。
     $("setVisMore").addEventListener("click", () => {
