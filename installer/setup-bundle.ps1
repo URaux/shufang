@@ -125,7 +125,18 @@ function NormalizePath([string]$p) {
     } else { [void]$sb.Append($ch) }
   }
   # 「D: \文件」这种冒号后头多打了空格的，同样不算绝对路径
-  return ([regex]::Replace($sb.ToString(), '^([A-Za-z]):[\s]+\\', '$1:\')).Trim()
+  $out = ([regex]::Replace($sb.ToString(), '^([A-Za-z]):[\s]+\\', '$1:\')).Trim()
+
+  # 「D:」和「D:书房」都要补上那一道杠。
+  #
+  # 这一条是用户踩出来的：有人直接填了「D:」（很自然——「放 D 盘」），
+  # 而 New-Item 对「D:」报的是「路径的形式不合法」，整个安装当场断在那里。
+  # 而且 IsPathRooted("D:") 是 **true**，上面那道关拦不住它。
+  # 更阴的是它偶尔能「装成功」：Test-Path "D:" 为真就跳过建目录，
+  # 于是 vaultPath 存成了「D:」——那是「D 盘的当前目录」，书最后落到哪儿谁也说不准。
+  if ($out -match '^([A-Za-z]):$') { return ($out + '\') }
+  if ($out -match '^([A-Za-z]):([^\\/].*)$') { return ($Matches[1] + ':\' + $Matches[2]) }
+  return $out
 }
 
 function ReadPath([string]$prompt, [string]$fallback) {

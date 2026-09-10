@@ -3112,10 +3112,11 @@
         <h3>出问题了？</h3>
         <p>点一下，把程序版本、设置和最近的运行记录复制到剪贴板，然后粘贴给站长。</p>
         <div class="set-row">
+          <button id="setDiagDesk" class="rite-go">存到桌面</button>
           <button id="setDiag" class="set-plain">复制诊断日志</button>
           <a id="setDiagFile" class="set-plain" href="/api/diag/download" download>导出成文件</a>
         </div>
-        <p class="set-note" id="setDiagNote">复制出来的内容里不含密钥和口令，可以放心发。手机上用「导出成文件」更省事。</p>
+        <p class="set-note" id="setDiagNote">日志里不含密钥和口令，可以放心发。<b>要发给站长就点「存到桌面」</b>——日志有好几千字，粘进 QQ 会被嫌太长，当文件发才行。手机上用「导出成文件」。</p>
       </div>
       <div class="rite-card">
         <h3>接口和模型</h3>
@@ -3417,6 +3418,21 @@
       } catch (e) { visNote(e.message || "没测成。", true, true); }
       finally { $("setVisTest").disabled = false; }
     });
+    // 存到桌面：写成文件 + 打开文件夹选中它。用户下一步就是拖进 QQ。
+    $("setDiagDesk").addEventListener("click", async () => {
+      const note = $("setDiagNote");
+      $("setDiagDesk").disabled = true;
+      note.textContent = "正在写…";
+      try {
+        const r = await api("/api/diag/save", {});
+        note.textContent = r.hint || "存好了。";
+        note.classList.toggle("err", !r.ok);
+      } catch (e) {
+        note.textContent = e.message || "没存成，用旁边那个「导出成文件」试试。";
+        note.classList.add("err");
+      } finally { $("setDiagDesk").disabled = false; }
+    });
+
     $("setGuide").addEventListener("click", async () => {
       const note = $("setGuideNote");
       $("setGuide").disabled = true;

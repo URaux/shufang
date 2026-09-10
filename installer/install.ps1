@@ -248,6 +248,20 @@ ShowDrives $NEED_VAULT_MB
 Write-Host "直接回车用默认: $DefaultVault"
 $Vault = ("" + (Read-Host "书库位置")).Trim().Trim('"')
 if (-not $Vault) { $Vault = $DefaultVault }
+# 把用户手打的路径扯直。两条都是真有人踩过的：
+#   全角冒号「D：\u4e66库」——中文输入法下很容易打出来，不算绝对路径，
+#   一路装到一半才炸，报的还是一串没人看得懂的路径。
+#   光秃盘符「D:」——New-Item 对它报「路径的形式不合法」，安装当场断掉；
+#   偶尔还能「装成功」，那更糟：「D:」指的是 D 盘的**当前目录**，书落到哪儿谁也说不准。
+foreach ($pair in @(@([char]0xFF1A, ':'), @([char]0xFF3C, ''), @([char]0xFF0F, '/'), @([char]0x3000, ' '))) {
+  $Vault = $Vault.Replace($pair[0], $pair[1])
+}
+$Vault = ([regex]::Replace($Vault, '^([A-Za-z]):[\s]+\', '$1:')).Trim()
+if ($Vault -match '^([A-Za-z]):$') { $Vault = $Vault + '' }
+elseif ($Vault -match '^([A-Za-z]):([^\/].*)$') { $Vault = $Matches[1] + ':' + $Matches[2] }
+if (-not [System.IO.Path]::IsPathRooted($Vault)) {
+  throw "书库位置「$Vault」不是完整路径。请写成 D:\u4e66库 这样。"
+}
 
 EnsureSpace $AppDir $NEED_APP_MB "程序"
 EnsureSpace $Vault $NEED_VAULT_MB "书库"
