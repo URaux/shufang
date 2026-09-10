@@ -2989,6 +2989,64 @@
     } finally { btn.disabled = false; btn.textContent = old; }
   });
 
+  // QQ 机器人。密钥只写不读——服务端只回「填没填过」，不回明文。
+  const qqNote = (x, err, sticky) => {
+    const el = $("setQqNote"); if (!el) return;
+    el.textContent = x; el.classList.toggle("err", !!err);
+    if (sticky) el.dataset.sticky = "1";
+  };
+  function fillQq(s) {
+    if (!$("setQqId")) return;
+    if (document.activeElement !== $("setQqId")) $("setQqId").value = s.qqAppId || "";
+    if (s.qqSecretSet && document.activeElement !== $("setQqSecret")) {
+      $("setQqSecret").placeholder = "已经存过一把（要换就填新的）";
+    }
+    const q = s.qq || {};
+    $("setQqUnbind").hidden = !q.bound;
+    if ($("setQqNote").dataset.sticky) return;
+    // 状态直说，别让用户猜「保存了到底连上没有」
+    const words = {
+      off: s.qqAppId ? "还没保存密钥，填上再点保存。" : "没开。填 AppID 和密钥就开。",
+      connecting: "正在连…" + (q.detail ? "（" + q.detail + "）" : ""),
+      online: q.bound ? "连上了，也认过主人了。直接在 QQ 上给它发消息。"
+        : "连上了，还没认主人——去 QQ 上给它发一句话，第一个说话的人就是主人。",
+      error: "连不上：" + (q.detail || "不知道为什么"),
+    };
+    qqNote(words[q.phase] || "");
+  }
+  $("setQqSave").addEventListener("click", async () => {
+    $("setQqSave").disabled = true;
+    qqNote("正在保存…", false, true);
+    try {
+      const r = await api("/api/settings", { qqAppId: $("setQqId").value, qqSecret: $("setQqSecret").value });
+      if (r && r.error) qqNote(r.hint || r.error, true, true);
+      else {
+        $("setQqSecret").value = "";
+        $("setQqNote").dataset.sticky = "";
+        fillQq(r);
+        qqNote("存好了，正在连。连上之后去 QQ 上给你的机器人发一句话。", false, true);
+      }
+    } catch (e) { qqNote(e.message || "没保存成。", true, true); }
+    finally { $("setQqSave").disabled = false; }
+  });
+  $("setQqTest").addEventListener("click", async () => {
+    $("setQqTest").disabled = true;
+    qqNote("正在问开放平台…", false, true);
+    try {
+      const r = await api("/api/settings/test-qq", { qqAppId: $("setQqId").value, qqSecret: $("setQqSecret").value });
+      qqNote(r.hint || (r.ok ? "通了。" : "不通。"), !r.ok, true);
+    } catch (e) { qqNote(e.message || "没测成。", true, true); }
+    finally { $("setQqTest").disabled = false; }
+  });
+  $("setQqUnbind").addEventListener("click", async () => {
+    if (!confirm("解除绑定？\n\n下一个跟这个机器人说话的人会成为新的主人。")) return;
+    try {
+      const r = await api("/api/settings/qq-unbind", {});
+      qqNote(r.hint || "解开了。", false, true);
+      $("setQqUnbind").hidden = true;
+    } catch (e) { qqNote(e.message || "没解成。", true, true); }
+  });
+
   function renderSettings() {
     $("setBody").innerHTML = `
       <div class="rite-card">
@@ -3104,6 +3162,20 @@
           <button id="setVisTest" class="set-plain">试一下</button>
         </div>
         <p class="set-note" id="setVisNote"></p>
+      </div>
+      <div class="rite-card">
+        <h3>在 QQ 上跟书房说话</h3>
+        <p class="set-note" style="margin:0 0 .6rem">连上你自己的 QQ 机器人，在手机上随时问自己的书——不用同一个 Wi-Fi、不用装别的东西。去 QQ 开放平台建一个机器人，把 AppID 和密钥填在这里。不填就当没有这功能。</p>
+        <div class="set-row">
+          <input id="setQqId" class="rite-q" placeholder="AppID" />
+          <input id="setQqSecret" class="rite-q" type="password" placeholder="AppSecret（只写一次，不回显）" />
+        </div>
+        <div class="set-row">
+          <button id="setQqSave" class="rite-go">保存</button>
+          <button id="setQqTest" class="set-plain">试一下</button>
+          <button id="setQqUnbind" class="set-plain" hidden>解除绑定</button>
+        </div>
+        <p class="set-note" id="setQqNote"></p>
       </div>
       <div class="rite-card" id="setToolsCard" hidden>
         <h3>读书的工具</h3>
@@ -3394,6 +3466,7 @@
     if (![$("setBase"), $("setModel"), $("setFast")].includes(document.activeElement)) fillApi(s);
     if (document.activeElement !== $("setBrain")) fillBrain(s);
     fillVision(s);
+    fillQq(s);
     $("setRemote").checked = !!s.remoteAccess;
     $("setSpaces").checked = !!s.spacesEnabled;
     applyFlags(s);
