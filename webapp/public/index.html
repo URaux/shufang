@@ -771,6 +771,38 @@
     return /^[\x20-\x7E]+$/.test(c) ? "" : c;
   }
 
+  // GET 一段 JSON。
+  //
+  // 原来这些 GET 是 `fetch(u).then(r => r.json())` 直接用的，没有任何检查。
+  // 后果是：服务端一旦回的不是 JSON（500 的 HTML 错误页、被代理截胡、被杀毒插一脚），
+  // r.json() 当场抛，而调用它的 openBook 又没有 try——于是整个「打开这本书」
+  // 无声无息地死在半路，界面上什么都不发生。
+  // 用户看到的就是「点了没反应」，而且是**每一本书**都没反应，因为坏的是同一条路。
+  // 有用户就这么报上来的：翻完一章之后，书架上哪本都点不开。
+  //
+  // 现在把三种坏法分开说：连不上、服务端出错、回的东西不是 JSON。
+  async function getJson(url) {
+    let r;
+    try {
+      r = await fetch(url);
+    } catch {
+      throw new Error("跟「群星回廊」断了联系。看看电脑上的启动窗口还开着没有，然后刷新这个页面。");
+    }
+    const text = await r.text().catch(() => "");
+    if (!r.ok) {
+      // 服务端给了人话就用它的，没有就说个大概，并且**带上是哪一条路**，
+      // 用户截图给站长时那半行字就是线索。
+      let hint = "";
+      try { hint = (JSON.parse(text) || {}).hint || ""; } catch { }
+      throw new Error(hint || `服务端出错了（${r.status}）。把设置页里的日志存到桌面发给站长。`);
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error("服务端回的东西看不懂，多半是它自己出错了。把设置页里的日志存到桌面发给站长。");
+    }
+  }
+
   async function api(url, body) {
     let r;
     try {
@@ -818,7 +850,14 @@
     // 弹回本章开头。这里在重渲染之前先把当前读到的位置记下来，刷完再放回去。
     // 必须在任何 await 之前读：await 之后 DOM 可能已经不是原来那一屏了。
     const keepFrac = keep ? readFrac() : 0;
-    currentBook = await fetch("/api/book?name=" + encodeURIComponent(name)).then(r => r.json());
+    try {
+      currentBook = await getJson("/api/book?name=" + encodeURIComponent(name));
+    } catch (e) {
+      // 出错必须落在屏幕上。这一条以前是静默的，用户只知道「点了没反应」。
+      reader.innerHTML = `<div class="page"><p>《${esc(name)}》打不开。</p><p>${esc(e.message)}</p></div>`;
+      crumb.textContent = name;
+      return;
+    }
     if (!keep) { collabState = null; loadHistory(name); }
     refreshCollab(name);
     await loadMarks(name);
@@ -1052,7 +1091,14 @@
   // 书签指向的章节可能已经被重命名或删掉，那时得退回默认章节，
   // 不然读者点开一本书看到的是一片空白，还以为软件坏了。
   async function openFile(rel, label, frac) {
-    const r = await fetch("/api/file?path=" + encodeURIComponent(rel)).then(r => r.json());
+    let r;
+    try {
+      r = await getJson("/api/file?path=" + encodeURIComponent(rel));
+    } catch (e) {
+      // 跟 openBook 同一个道理：以前这儿抛出去就没人接，界面上一片安静。
+      reader.innerHTML = `<div class="page"><p>这一篇打不开。</p><p>${esc(e.message)}</p></div>`;
+      return false;
+    }
     if (r.error) return false;
     currentFile = rel;
     fileMd = r.md || "";
@@ -3016,38 +3062,6 @@
     };
     qqNote(words[q.phase] || "");
   }
-  $("setQqSave").addEventListener("click", async () => {
-    $("setQqSave").disabled = true;
-    qqNote("正在保存…", false, true);
-    try {
-      const r = await api("/api/settings", { qqAppId: $("setQqId").value, qqSecret: $("setQqSecret").value });
-      if (r && r.error) qqNote(r.hint || r.error, true, true);
-      else {
-        $("setQqSecret").value = "";
-        $("setQqNote").dataset.sticky = "";
-        fillQq(r);
-        qqNote("存好了，正在连。连上之后去 QQ 上给你的机器人发一句话。", false, true);
-      }
-    } catch (e) { qqNote(e.message || "没保存成。", true, true); }
-    finally { $("setQqSave").disabled = false; }
-  });
-  $("setQqTest").addEventListener("click", async () => {
-    $("setQqTest").disabled = true;
-    qqNote("正在问开放平台…", false, true);
-    try {
-      const r = await api("/api/settings/test-qq", { qqAppId: $("setQqId").value, qqSecret: $("setQqSecret").value });
-      qqNote(r.hint || (r.ok ? "通了。" : "不通。"), !r.ok, true);
-    } catch (e) { qqNote(e.message || "没测成。", true, true); }
-    finally { $("setQqTest").disabled = false; }
-  });
-  $("setQqUnbind").addEventListener("click", async () => {
-    if (!confirm("解除绑定？\n\n下一个跟这个机器人说话的人会成为新的主人。")) return;
-    try {
-      const r = await api("/api/settings/qq-unbind", {});
-      qqNote(r.hint || "解开了。", false, true);
-      $("setQqUnbind").hidden = true;
-    } catch (e) { qqNote(e.message || "没解成。", true, true); }
-  });
 
   function renderSettings() {
     $("setBody").innerHTML = `
@@ -3443,6 +3457,44 @@
       $("setVisAdv").hidden = !on;
       $("setVisAdv2").hidden = !on;
       $("setVisMore").textContent = on ? "收起来" : "用别家的模型";
+    });
+
+    // QQ 这三个按钮跟上面那些一样，是 renderSettings 画出来的，
+    // 所以事件必须在这里挂。挂在顶层的话，页面一加载 $("setQqSave") 还是 null，
+    // addEventListener 当场抛异常，**后面整段启动代码一句都不会再跑**——
+    // 包括加载书架。症状是界面打得开、书架空的、哪本书都点不开，
+    // 而控制台之外没有任何提示。真发出去过一版，用户报的就是这个。
+    $("setQqSave").addEventListener("click", async () => {
+      $("setQqSave").disabled = true;
+      qqNote("正在保存…", false, true);
+      try {
+        const r = await api("/api/settings", { qqAppId: $("setQqId").value, qqSecret: $("setQqSecret").value });
+        if (r && r.error) qqNote(r.hint || r.error, true, true);
+        else {
+          $("setQqSecret").value = "";
+          $("setQqNote").dataset.sticky = "";
+          fillQq(r);
+          qqNote("存好了，正在连。连上之后去 QQ 上给你的机器人发一句话。", false, true);
+        }
+      } catch (e) { qqNote(e.message || "没保存成。", true, true); }
+      finally { $("setQqSave").disabled = false; }
+    });
+    $("setQqTest").addEventListener("click", async () => {
+      $("setQqTest").disabled = true;
+      qqNote("正在问开放平台…", false, true);
+      try {
+        const r = await api("/api/settings/test-qq", { qqAppId: $("setQqId").value, qqSecret: $("setQqSecret").value });
+        qqNote(r.hint || (r.ok ? "通了。" : "不通。"), !r.ok, true);
+      } catch (e) { qqNote(e.message || "没测成。", true, true); }
+      finally { $("setQqTest").disabled = false; }
+    });
+    $("setQqUnbind").addEventListener("click", async () => {
+      if (!confirm("解除绑定？\n\n下一个跟这个机器人说话的人会成为新的主人。")) return;
+      try {
+        const r = await api("/api/settings/qq-unbind", {});
+        qqNote(r.hint || "解开了。", false, true);
+        $("setQqUnbind").hidden = true;
+      } catch (e) { qqNote(e.message || "没解成。", true, true); }
     });
 
     $("setGuide").addEventListener("click", async () => {
