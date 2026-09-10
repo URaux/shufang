@@ -139,6 +139,25 @@ function NormalizePath([string]$p) {
   return $out
 }
 
+# 盘根不是一个能装东西的地方。
+#
+# New-Item -ItemType Directory -Force "E:\" 抛的是「路径的形式不合法」，
+# 在真实存在的盘上也一样抛 —— 所以光把「D:」补成「D:\」不够，那只是把
+# 崩溃从一行挪到了另一行。
+#
+# 而填「D:」的人想说的从来不是「装进盘根」，是「放 D 盘」。替他补个文件夹名，
+# 比弹一句「这个位置不行」再让他重填一遍强。
+# 资源管理器里也选得出盘根，所以这一道跟手输那一道都得走。
+function RootToFolder([string]$p, [string]$leaf) {
+  if (-not $p) { return $p }
+  try {
+    $full = [System.IO.Path]::GetFullPath($p)
+    $root = [System.IO.Path]::GetPathRoot($full)
+    if ($full.TrimEnd([char]92) -eq $root.TrimEnd([char]92)) { return (Join-Path $root $leaf) }
+  } catch { }
+  return $p
+}
+
 function ReadPath([string]$prompt, [string]$fallback) {
   # 归一化之后还不是绝对路径就重问，不要带着一个坏路径往下走。
   for ($i = 1; $i -le 3; $i++) {
@@ -149,6 +168,218 @@ function ReadPath([string]$prompt, [string]$fallback) {
     Write-Host "   最常见的原因是冒号打成了全角「：」——请切到英文输入法，写成 D:\群星回廊 这样。" -ForegroundColor Yellow
   }
   throw "位置填了三次都不是完整路径。请切到英文输入法后重新运行安装器。"
+}
+
+# ---------------------------------------------------------------- 图形界面那一步
+#
+# 为什么要有它：这个安装器要问的几件事里，最容易出错的是「装到哪」。
+# 手打路径踩过的坑都不是笔误级别的：
+#   全角冒号「D：\书房」——中文输入法下顺手就打出来了，不算绝对路径，
+#   一路装到一半才炸，报的还是一串没人看得懂的路径；
+#   光秃盘符「D:」——New-Item 直接报「路径的形式不合法」，安装当场断；
+#   偶尔还能「装成功」，那更糟：「D:」是 D 盘的**当前目录**，书落到哪儿谁也说不准。
+# 这两个坑在资源管理器里选目录时根本不存在——选出来的一定是真实存在的绝对路径。
+#
+# 做成一个窗口而不是接连几个对话框：三件事一屏看完，改哪一项都不用从头再来。
+# 装完的过程还是照旧在黑窗口里滚日志——出了岔子那些字是唯一的线索，不能藏。
+#
+# 窗口起不来就退回命令行问（远程会话、精简版系统、WinForms 加载失败都可能）。
+# 这条退路必须留着：图形界面是为了少出错，不该变成多一处装不上的理由。
+function TryLoadForms() {
+  try {
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+    Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+    # 这两句必须赶在任何控件被 new 出来之前；重复调用会抛，所以各自吞掉。
+    try { [System.Windows.Forms.Application]::EnableVisualStyles() } catch {}
+    try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false) } catch {}
+    return $true
+  } catch { return $false }
+}
+
+# 选目录。用户填的那个可能还不存在（他就是想新建一个），
+# 那就沿着父目录往上找一个真实存在的当起点，别让对话框开在一个莫名其妙的地方。
+function PickFolder([string]$cur, [string]$desc) {
+  $start = ""
+  $p = ("" + $cur).Trim()
+  for ($i = 0; $i -lt 8 -and $p; $i++) {
+    if (Test-Path -LiteralPath $p) { $start = $p; break }
+    $parent = ""
+    try { $parent = [System.IO.Path]::GetDirectoryName($p) } catch {}
+    if (-not $parent -or $parent -eq $p) { break }
+    $p = $parent
+  }
+  $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+  $dlg.Description = $desc
+  $dlg.ShowNewFolderButton = $true
+  if ($start) { $dlg.SelectedPath = $start }
+  $r = $dlg.ShowDialog()
+  $out = ""
+  if ($r -eq [System.Windows.Forms.DialogResult]::OK) { $out = $dlg.SelectedPath }
+  $dlg.Dispose()
+  return $out
+}
+
+function Show-SetupForm([string]$defaultApp, [string]$defaultVault, [string]$oldBrain, [bool]$hasOldKey) {
+  if (-not (TryLoadForms)) { return $null }
+
+  $F = New-Object System.Drawing.Font("Microsoft YaHei UI", 9.5)
+  $mkLabel = {
+    param($text, $x, $y, $w, $gray)
+    $l = New-Object System.Windows.Forms.Label
+    $l.Text = $text; $l.AutoSize = $false
+    $l.Location = New-Object System.Drawing.Point($x, $y)
+    $l.Size = New-Object System.Drawing.Size($w, 20)
+    $l.Font = $F
+    if ($gray) { $l.ForeColor = [System.Drawing.Color]::Gray }
+    return $l
+  }
+
+  $form = New-Object System.Windows.Forms.Form
+  $form.Text = "群星回廊 · 安装"
+  $form.Font = $F
+  $form.ClientSize = New-Object System.Drawing.Size(600, 470)
+  $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+  $form.MaximizeBox = $false; $form.MinimizeBox = $false
+  $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+  $form.BackColor = [System.Drawing.Color]::White
+
+  $form.Controls.Add((& $mkLabel "选好位置就行，剩下的我来。装的过程会在黑窗口里滚字，那是正常的。" 24 18 560 $true))
+
+  # ---- 程序装到哪 ----
+  $form.Controls.Add((& $mkLabel "程序装到哪？（程序本体 + 运行环境）" 24 56 400 $false))
+  $tbApp = New-Object System.Windows.Forms.TextBox
+  $tbApp.Location = New-Object System.Drawing.Point(24, 80)
+  $tbApp.Size = New-Object System.Drawing.Size(450, 26)
+  $tbApp.Font = $F
+  $tbApp.Text = $defaultApp
+  $form.Controls.Add($tbApp)
+  $btApp = New-Object System.Windows.Forms.Button
+  $btApp.Text = "浏览…"
+  $btApp.Location = New-Object System.Drawing.Point(484, 79)
+  $btApp.Size = New-Object System.Drawing.Size(92, 28)
+  $btApp.Font = $F
+  $btApp.Add_Click({ $v = PickFolder $tbApp.Text "把群星回廊装到哪个文件夹"; if ($v) { $tbApp.Text = $v } }.GetNewClosure())
+  $form.Controls.Add($btApp)
+
+  # ---- 书库放到哪 ----
+  $form.Controls.Add((& $mkLabel "书库放到哪？（你的书、译文、笔记都在这，会越来越大）" 24 120 500 $false))
+  $tbVault = New-Object System.Windows.Forms.TextBox
+  $tbVault.Location = New-Object System.Drawing.Point(24, 144)
+  $tbVault.Size = New-Object System.Drawing.Size(450, 26)
+  $tbVault.Font = $F
+  $tbVault.Text = $defaultVault
+  $form.Controls.Add($tbVault)
+  $btVault = New-Object System.Windows.Forms.Button
+  $btVault.Text = "浏览…"
+  $btVault.Location = New-Object System.Drawing.Point(484, 143)
+  $btVault.Size = New-Object System.Drawing.Size(92, 28)
+  $btVault.Font = $F
+  $btVault.Add_Click({ $v = PickFolder $tbVault.Text "书库放在哪个文件夹"; if ($v) { $tbVault.Text = $v } }.GetNewClosure())
+  $form.Controls.Add($btVault)
+
+  # ---- 谁来当大脑 ----
+  $form.Controls.Add((& $mkLabel "谁来当大脑？" 24 190 300 $false))
+  $rbDsh = New-Object System.Windows.Forms.RadioButton
+  $rbDsh.Text = "用你们代管的（推荐）　填一个 DeepSeek key，装完就能用"
+  $rbDsh.Location = New-Object System.Drawing.Point(28, 216)
+  $rbDsh.Size = New-Object System.Drawing.Size(552, 24)
+  $rbDsh.Font = $F
+  $form.Controls.Add($rbDsh)
+  $rbCodex = New-Object System.Windows.Forms.RadioButton
+  $rbCodex.Text = "用我自己的 Codex 订阅　这台电脑上要先装好 Codex 并登录过"
+  $rbCodex.Location = New-Object System.Drawing.Point(28, 242)
+  $rbCodex.Size = New-Object System.Drawing.Size(552, 24)
+  $rbCodex.Font = $F
+  $form.Controls.Add($rbCodex)
+  $rbCc = New-Object System.Windows.Forms.RadioButton
+  $rbCc.Text = "用我自己的 Claude 订阅　这台电脑上要先装好 Claude Code 并登录过"
+  $rbCc.Location = New-Object System.Drawing.Point(28, 268)
+  $rbCc.Size = New-Object System.Drawing.Size(552, 24)
+  $rbCc.Font = $F
+  $form.Controls.Add($rbCc)
+  if ($oldBrain -eq "codex") { $rbCodex.Checked = $true }
+  elseif ($oldBrain -eq "cc") { $rbCc.Checked = $true }
+  else { $rbDsh.Checked = $true }
+
+  # ---- key ----
+  $lbKey = & $mkLabel "DeepSeek API key（在 platform.deepseek.com 创建，sk- 开头）" 24 306 520 $false
+  $form.Controls.Add($lbKey)
+  $tbKey = New-Object System.Windows.Forms.TextBox
+  $tbKey.Location = New-Object System.Drawing.Point(24, 330)
+  $tbKey.Size = New-Object System.Drawing.Size(552, 26)
+  $tbKey.Font = $F
+  # 不遮住：粘贴进没进去、粘全没粘全，用户得自己看得见。
+  # 这是有人反馈过的——隐藏输入框里粘贴只进去一个字符，屏幕上什么都不显示，
+  # 人根本看不出粘漏了，最后只能一个字一个字手打。
+  $form.Controls.Add($tbKey)
+  $lbKeyHint = & $mkLabel "" 24 358 552 $true
+  if ($hasOldKey) { $lbKeyHint.Text = "留空就沿用你上次填的那把。" }
+  else { $lbKeyHint.Text = "这把 key 只存在你自己电脑上，会加密，谁也看不到。" }
+  $form.Controls.Add($lbKeyHint)
+
+  # 选了自己的订阅就把 key 那一格灰掉——不是藏起来：
+  # 让人看见「这一步不用填了」，比让它凭空消失更让人放心。
+  $syncKey = {
+    $on = $rbDsh.Checked
+    $lbKey.Enabled = $on; $tbKey.Enabled = $on; $lbKeyHint.Enabled = $on
+  }.GetNewClosure()
+  $rbDsh.Add_CheckedChanged($syncKey)
+  $rbCodex.Add_CheckedChanged($syncKey)
+  $rbCc.Add_CheckedChanged($syncKey)
+  & $syncKey
+
+  # ---- 出错提示 ----
+  $lbErr = & $mkLabel "" 24 386 552 $false
+  $lbErr.ForeColor = [System.Drawing.Color]::Firebrick
+  $form.Controls.Add($lbErr)
+
+  # ---- 按钮 ----
+  $btGo = New-Object System.Windows.Forms.Button
+  $btGo.Text = "开始安装"
+  $btGo.Location = New-Object System.Drawing.Point(388, 418)
+  $btGo.Size = New-Object System.Drawing.Size(100, 32)
+  $btGo.Font = $F
+  $form.Controls.Add($btGo)
+  $btCancel = New-Object System.Windows.Forms.Button
+  $btCancel.Text = "取消"
+  $btCancel.Location = New-Object System.Drawing.Point(496, 418)
+  $btCancel.Size = New-Object System.Drawing.Size(80, 32)
+  $btCancel.Font = $F
+  $btCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+  $form.Controls.Add($btCancel)
+  $form.CancelButton = $btCancel
+
+  $script:__setupResult = $null
+  $btGo.Add_Click({
+    $lbErr.Text = ""
+    $a = NormalizePath $tbApp.Text
+    $v = NormalizePath $tbVault.Text
+    if (-not $a -or -not [System.IO.Path]::IsPathRooted($a)) {
+      $lbErr.Text = "程序位置不是一个完整路径。点「浏览…」选一个最稳妥。"; return
+    }
+    if (-not $v -or -not [System.IO.Path]::IsPathRooted($v)) {
+      $lbErr.Text = "书库位置不是一个完整路径。点「浏览…」选一个最稳妥。"; return
+    }
+    if ($a -eq $v) { $lbErr.Text = "程序和书库不能是同一个文件夹。"; return }
+    $b = "dsh"
+    if ($rbCodex.Checked) { $b = "codex" } elseif ($rbCc.Checked) { $b = "cc" }
+    $k = ("" + $tbKey.Text).Trim()
+    if ($b -eq "dsh") {
+      if (-not $k -and $hasOldKey) { $k = "" }          # 空着 = 沿用上次那把
+      elseif ($k -notmatch "^sk-") {
+        $lbErr.Text = if ($k) { "这串不是 sk- 开头的——是不是把 key 的名字复制过来了？" }
+                      else { "还没填 key。或者选下面两条，用你自己的订阅。" }
+        return
+      }
+    } else { $k = "" }
+    $script:__setupResult = @{ AppDir = $a; Vault = $v; Brain = $b; Key = $k }
+    $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $form.Close()
+  }.GetNewClosure())
+
+  [void]$form.ShowDialog()
+  $form.Dispose()
+  return $script:__setupResult
 }
 
 function RemoveWithRetry($path) {
@@ -215,30 +446,6 @@ function EnsureSpace($path, $needMB, $what) {
          "`n    换个空间大的盘重跑一次就行，比如 D:\群星回廊。")
 }
 
-# ---------------------------------------------------------------- 位置选择
-$DefaultApp = Join-Path $env:USERPROFILE ".shufang"
-if ($InstallDir) {
-  $AppDir = $InstallDir
-} else {
-  $DefaultApp = PickDefaultDir $DefaultApp $NEED_APP_MB "群星回廊"
-  Write-Host ""
-  Write-Host "程序装到哪？（程序本体 + 运行环境，约 700MB）"
-  ShowDrives $NEED_APP_MB
-  Write-Host "直接回车用默认: $DefaultApp"
-  $AppDir = ReadPath "安装位置" $DefaultApp
-}
-$AppDir = NormalizePath $AppDir
-if (-not [System.IO.Path]::IsPathRooted($AppDir)) {
-  throw "安装位置「$AppDir」不是完整路径（冒号是不是打成了全角「：」？）。请写成 D:\群星回廊 这样。"
-}
-if ($AppDir -match '[\u4e00-\u9fff]') {
-  # 中文路径本身没问题，但个别 npm 包对非 ASCII cwd 犯病，提示一句不拦着
-  Write-Host "   （路径带中文一般没事，万一之后出怪问题可以换成纯英文路径重装）" -ForegroundColor DarkGray
-}
-EnsureSpace $AppDir $NEED_APP_MB "程序"
-EnsureSpace $Vault $NEED_VAULT_MB "书库"
-New-Item -ItemType Directory -Force $AppDir | Out-Null
-
 # ---------------------------------------------------------------- 读老配置
 # 升级场景：key / token / 端口 / 书库位置都沿用，别让人重填一遍。
 # token 尤其重要——它变了的话，手机上存的那个带 ?t= 的链接就全失效了。
@@ -258,9 +465,54 @@ if ($OldCfg -and $OldCfg.env -and $OldCfg.env.DEEPSEEK_API_KEY) {
 $OldVault = ""
 if ($OldCfg -and $OldCfg.vaultPath -and (Test-Path $OldCfg.vaultPath)) { $OldVault = [string]$OldCfg.vaultPath }
 
+# ---------------------------------------------------------------- 位置选择
+$DefaultVaultForGui = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "书房"
+if ($OldVault) { $DefaultVaultForGui = $OldVault }
+
+# ---------------------------------------------------------------- 先试一次图形界面
+# 一个窗口把「装到哪、书库放哪、谁当大脑、key」一次问完。成了就把下面那几段
+# 命令行问答全跳过；窗口起不来、或者用户按了取消，就照旧一问一答。
+#
+# 最要紧的是那两个「浏览…」按钮：手打路径踩出来的坑（全角冒号「D：」、光秃盘符
+# 「D:」）在资源管理器里选目录时根本不会发生 —— 选出来的一定是真实存在的绝对路径。
+# 这两个坑都是用户实打实踩过的，一个装到一半才炸，一个装完书不知道去哪儿了。
+$GUI = $null
+if (-not $InstallDir -and -not $ApiKey) {
+  $__da = PickDefaultDir (Join-Path $env:USERPROFILE ".shufang") $NEED_APP_MB "群星回廊"
+  $__ob = ""
+  if ($OldCfg -and $OldCfg.brain) { $__ob = [string]$OldCfg.brain }
+  $GUI = Show-SetupForm $__da $DefaultVaultForGui $__ob ([bool]$OldKey)
+}
+
+$DefaultApp = Join-Path $env:USERPROFILE ".shufang"
+if ($InstallDir) {
+  $AppDir = $InstallDir
+} elseif ($GUI) {
+  $AppDir = $GUI.AppDir
+} else {
+  $DefaultApp = PickDefaultDir $DefaultApp $NEED_APP_MB "群星回廊"
+  Write-Host ""
+  Write-Host "程序装到哪？（程序本体 + 运行环境，约 700MB）"
+  ShowDrives $NEED_APP_MB
+  Write-Host "直接回车用默认: $DefaultApp"
+  $AppDir = ReadPath "安装位置" $DefaultApp
+}
+$AppDir = RootToFolder (NormalizePath $AppDir) "群星回廊"
+if (-not [System.IO.Path]::IsPathRooted($AppDir)) {
+  throw "安装位置「$AppDir」不是完整路径（冒号是不是打成了全角「：」？）。请写成 D:\群星回廊 这样。"
+}
+if ($AppDir -match '[\u4e00-\u9fff]') {
+  # 中文路径本身没问题，但个别 npm 包对非 ASCII cwd 犯病，提示一句不拦着
+  Write-Host "   （路径带中文一般没事，万一之后出怪问题可以换成纯英文路径重装）" -ForegroundColor DarkGray
+}
+EnsureSpace $AppDir $NEED_APP_MB "程序"
+New-Item -ItemType Directory -Force $AppDir | Out-Null
+
 $DefaultVault = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "书房"
 if ($VaultDir) {
   $Vault = $VaultDir
+} elseif ($GUI) {
+  $Vault = $GUI.Vault
 } else {
   Write-Host ""
   Write-Host "书库放到哪？（你的书、译文、笔记都在这，会越来越大）"
@@ -270,10 +522,15 @@ if ($VaultDir) {
   if ($OldVault) { $__vd = $OldVault }
   $Vault = ReadPath "书库位置" $__vd
 }
-$Vault = NormalizePath $Vault
+$Vault = RootToFolder (NormalizePath $Vault) "书房"
 if (-not [System.IO.Path]::IsPathRooted($Vault)) {
   throw "书库位置「$Vault」不是完整路径（冒号是不是打成了全角「：」？）。请写成 D:\书库 这样。"
 }
+
+# 书库的空间检查得等 $Vault 真的有值了再做。
+# 这一行以前在上面——那时候 $Vault 还是空的，DriveFreeMB 问不出来就返回 -1，
+# 于是这道关一直是空跑的：书库选到一个装不下的盘也不会被拦下来。
+EnsureSpace $Vault $NEED_VAULT_MB "书库"
 
 $NodeDir = Join-Path $AppDir "node"
 $BinDir  = Join-Path $AppDir "bin"
@@ -520,12 +777,59 @@ function Get-CleanKey([string]$s) {
   $s = $s -replace '[''"\u2019\u201D\u300D\u300F\u300B]+$', ''
   return $s
 }
+# ---------------------------------------------------------------- 谁来当大脑
+# 这一步必须排在问 key 前面。
+#
+# 以前这儿没有选择：不给一个 sk- 开头的 key 就出不去下面那个 while 循环，只能关窗口。
+# 于是「我有 Codex / Claude 订阅，不想再去办一个 DeepSeek」的人根本装不进来——
+# 而程序里 codex / 自带 Claude 账号那两条大脑，存在的全部意义就是给这种人用的。
+# 门口那道坎正好把它们要服务的人挡在外面。
+$brain = ""
+if ($OldCfg -and $OldCfg.brain) { $brain = [string]$OldCfg.brain }
+if ($GUI) { $brain = $GUI.Brain }        # 窗口里选过了，以它为准
+if ($ApiKey -match "^sk-") { $brain = "dsh" }    # 带 key 的静默安装：意图已经写在参数里了
+if (@("dsh","codex","cc") -notcontains $brain) {
+  Step "谁来当大脑"
+  Write-Host "   这个程序得有一个「大脑」替你干活。选一个："
+  Write-Host "     1) 用我们代管的（推荐）     填一个 DeepSeek key，装完就能用"
+  Write-Host "     2) 用我自己的 Codex 订阅    这台电脑上要先装好 Codex 并登录过"
+  Write-Host "     3) 用我自己的 Claude 订阅   这台电脑上要先装好 Claude Code 并登录过"
+  $pick = ""
+  while (@("1","2","3") -notcontains $pick) {
+    $pick = ("" + (Read-Host "   输 1 / 2 / 3（直接回车就是 1）")).Trim()
+    if (-not $pick) { $pick = "1" }
+    if (@("1","2","3") -notcontains $pick) { Write-Host "   只认 1、2、3 这三个数。" -ForegroundColor Yellow }
+  }
+  if ($pick -eq "2") { $brain = "codex" } elseif ($pick -eq "3") { $brain = "cc" } else { $brain = "dsh" }
+}
+if ($brain -ne "dsh") {
+  # 只是提醒，不拦着装：命令没装好是几分钟就能补的事，
+  # 为它把整个安装挡回去（用户还得从头再来一遍）不划算。
+  $__need = "claude"; if ($brain -eq "codex") { $__need = "codex" }
+  $__found = $null
+  try { $__found = Get-Command $__need -ErrorAction SilentlyContinue } catch {}
+  if ($__found) { Ok "找到 $__need 了，装完就用你自己的账号" }
+  else {
+    Write-Host "   这台电脑上还没有 $__need 命令。" -ForegroundColor Yellow
+    Write-Host "   装完之后先把它装好并登录，回廊才有得用；也可以到设置页改回「内置助手」（那条要填 key）。" -ForegroundColor Yellow
+  }
+}
+
 # ---------------------------------------------------------------- API key
 try { Stop-Transcript | Out-Null } catch {}
 Step "配置 DeepSeek"
 # 次序：命令行显式传的 > 上次存的 > 问用户。
 # 反过来的话，用户想换 key 而特地带 -ApiKey 重装，会被老 key 默默盖掉。
-if ($ApiKey -match "^sk-") {
+if ($brain -ne "dsh") {
+  # 用自己订阅的人不经过我们代管的 key。老 key 有就留着——他哪天在设置页
+  # 换回「内置助手」时还用得上，这会儿抹掉只会让那一步凭空多一道坎。
+  $key = $OldKey
+  Ok "用你自己的账号，装的时候不用填 DeepSeek key"
+} elseif ($GUI) {
+  # 窗口里已经填过了（留空就是「沿用上次那把」），不再问第二遍
+  $key = $GUI.Key
+  if (-not $key) { $key = $OldKey }
+} elseif ($ApiKey -match "^sk-") {
   $key = $ApiKey
 } elseif ($OldKey) {
   $key = $OldKey
@@ -578,11 +882,11 @@ $config = [ordered]@{}
 if ($OldCfg) { foreach ($__p in $OldCfg.PSObject.Properties) { $config[$__p.Name] = $__p.Value } }
 $__env = [ordered]@{}
 if ($OldCfg -and $OldCfg.env) { foreach ($__p in $OldCfg.env.PSObject.Properties) { $__env[$__p.Name] = $__p.Value } }
-$__env["DEEPSEEK_API_KEY"] = $key
+if ($key) { $__env["DEEPSEEK_API_KEY"] = $key }
 $config["vaultPath"] = $Vault
 if (-not $config["port"]) { $config["port"] = 7787 }
 $config["token"] = $token
-$config["brain"] = "dsh"
+$config["brain"] = $brain
 $config["env"]   = $__env
 # 无 BOM UTF-8：server.js 的 JSON.parse 见到 BOM 会当首次运行，key 就"丢"了
 [System.IO.File]::WriteAllText($ConfigPath, ($config | ConvertTo-Json -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
