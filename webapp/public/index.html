@@ -2943,6 +2943,21 @@
     $("setBase").value = s.baseUrl || "";  $("setBase").placeholder = "接口地址，留空＝" + (d.baseUrl || "官方");
     $("setModel").value = s.model || "";   $("setModel").placeholder = "主模型，留空＝" + (d.model || "默认");
     $("setFast").value = s.fastModel || ""; $("setFast").placeholder = "快模型，留空＝" + (d.fastModel || "默认");
+    if ($("setReasoning")) $("setReasoning").value = s.reasoning || "";
+  }
+
+  // 模型候选。不做成只能选的下拉：接口回的那张表是「它愿意公开的」，不是「能用的全集」，
+  // 中转站更是想列什么列什么、甚至不开这个接口。所以用 datalist——
+  // 点一下有得挑，想打字照样打，查不到也只是没有候选，不挡着人填。
+  let modelListTried = false;
+  async function loadModelList(quiet) {
+    const dl = $("setModelList"); if (!dl) return;
+    if (!quiet) apiNote("正在问这个接口有哪些模型…");
+    try {
+      const r = await api("/api/settings/models", { baseUrl: $("setBase").value });
+      dl.innerHTML = (r.models || []).map(m => `<option value="${esc(m)}"></option>`).join("");
+      if (!quiet) apiNote(r.hint || "", false);
+    } catch (e) { if (!quiet) apiNote(e.message || "没问成，名字自己打就行。", true); }
   }
 
   // 谁来当大脑。选项列表由后端给（server.js 里 BRAINS 那张表），前端只管画——
@@ -3141,12 +3156,23 @@
           <input id="setBase" class="rite-q" placeholder="接口地址，如 https://xxx.com/v1" />
         </div>
         <div class="set-row">
-          <input id="setModel" class="rite-q" placeholder="主模型名（翻译、梗概用）" />
-          <input id="setFast" class="rite-q" placeholder="快模型名（章节摘要用）" />
+          <input id="setModel" class="rite-q" list="setModelList" placeholder="主模型名（翻译、梗概用）" />
+          <input id="setFast" class="rite-q" list="setModelList" placeholder="快模型名（章节摘要用）" />
+          <datalist id="setModelList"></datalist>
+        </div>
+        <div class="set-row">
+          <select id="setReasoning" class="rite-q">
+            <option value="">深度思考：跟随默认</option>
+            <option value="off">深度思考：关（最快最省）</option>
+            <option value="low">深度思考：低</option>
+            <option value="high">深度思考：高</option>
+            <option value="max">深度思考：最高（最慢最贵）</option>
+          </select>
         </div>
         <div class="set-row">
           <button id="setApiSave" class="rite-go">保存</button>
           <button id="setApiTest" class="set-plain">测一下</button>
+          <button id="setApiList" class="set-plain">看有哪些模型</button>
         </div>
         <p class="set-note" id="setApiNote">改完立刻生效；聊天那条要关掉重开才换过来。</p>
       </div>
@@ -3372,11 +3398,17 @@
       try {
         const r = await api("/api/settings", {
           baseUrl: $("setBase").value, model: $("setModel").value, fastModel: $("setFast").value,
+          reasoning: $("setReasoning") ? $("setReasoning").value : undefined,
         });
         if (r && r.error) { apiNote(r.hint || r.error, true); }
         else { fillApi(r); apiNote("保存好了。整理书、写摘要立刻用新的；聊天那条要关掉重开才换过来。"); }
       } catch (e) { apiNote(e.message || "没保存成。", true); }
       finally { $("setApiSave").disabled = false; }
+    });
+    $("setApiList").addEventListener("click", async () => {
+      $("setApiList").disabled = true;
+      try { await loadModelList(false); }
+      finally { $("setApiList").disabled = false; }
     });
     $("setApiTest").addEventListener("click", async () => {
       $("setApiTest").disabled = true;
@@ -3543,7 +3575,10 @@
       $("setPortNote").textContent = `配置的端口 ${s.port} 被别的程序占了，现在实际用的是 ${s.actualPort}。`;
     }
     // 三个框正在被人编辑的时候别覆盖掉（设置页会定时刷新）
-    if (![$("setBase"), $("setModel"), $("setFast")].includes(document.activeElement)) fillApi(s);
+    if (![$("setBase"), $("setModel"), $("setFast"), $("setReasoning")].includes(document.activeElement)) fillApi(s);
+    // 候选模型只在第一次打开设置页时悄悄取一次：这个面板会定时刷新，
+    // 每次刷新都去打人家的接口既慢又没礼貌。取不到就当没有候选，不打扰用户。
+    if (!modelListTried) { modelListTried = true; loadModelList(true); }
     if (document.activeElement !== $("setBrain")) fillBrain(s);
     fillVision(s);
     fillQq(s);
