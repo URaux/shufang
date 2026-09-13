@@ -497,6 +497,64 @@
   .side-item .sug-meta { color: var(--ink-mute); font-size: .75rem; display: block; }
   .side-item.sug-done { opacity: .55; }
 
+  /* ---- 划线 ---- */
+  /* 颜色压得很淡：划线是压在正文底下的，不是盖在正文上面的。
+     饱和一点的黄在长段落里读十分钟就开始晃眼。 */
+  mark.hl { background: #FDF0B8; color: inherit; border-radius: 2px; padding: 0 1px; cursor: pointer; }
+  mark.hl.green { background: #D9F0D3; }
+  mark.hl.blue  { background: #D6E9F8; }
+  mark.hl.pink  { background: #F8DDE6; }
+  /* 带评论的多一条下边线 —— 光靠颜色分不出「划了一道」和「写了话」，
+     而用户想找的往往是后者。 */
+  mark.hl.has-note { border-bottom: 2px solid rgba(0,0,0,.28); }
+
+  /* 侧边栏里那一列划线前面的小色块 */
+  .hl-chip { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: .38rem; background: #FDF0B8; vertical-align: middle; }
+  .hl-chip.green { background: #D9F0D3; }
+  .hl-chip.blue  { background: #D6E9F8; }
+  .hl-chip.pink  { background: #F8DDE6; }
+
+  /* 选中文字之后冒出来的小工具条 */
+  #hlBar {
+    position: fixed; z-index: 40; display: none;
+    background: #2B2722; border-radius: 8px; padding: .34rem .4rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,.28);
+    display: none; align-items: center; gap: .3rem;
+  }
+  #hlBar.on { display: flex; }
+  #hlBar .dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); cursor: pointer; }
+  #hlBar .dot[data-c=yellow] { background: #FDF0B8; }
+  #hlBar .dot[data-c=green]  { background: #D9F0D3; }
+  #hlBar .dot[data-c=blue]   { background: #D6E9F8; }
+  #hlBar .dot[data-c=pink]   { background: #F8DDE6; }
+  #hlBar .say {
+    background: none; border: 0; color: #F3EEE4; font: inherit; font-size: .82rem;
+    cursor: pointer; padding: .1rem .4rem; border-left: 1px solid rgba(255,255,255,.2); margin-left: .15rem;
+  }
+
+  /* ---- 中英对照 ---- */
+  .cmp-note { color: var(--ink-soft); font-size: .84rem; margin: 0 0 .8rem; }
+  .cmp-row { display: flex; gap: 1.6rem; align-items: flex-start; }
+  .cmp-row + .cmp-row { margin-top: .2rem; }
+  .cmp-a, .cmp-b { flex: 1 1 0; min-width: 0; }
+  /* 原文压淡一档。两栏一样重的时候眼睛不知道该跟哪一边走，
+     而看对照的人十有八九是以译文为主、原文为校。 */
+  .cmp-a { color: var(--ink-soft); }
+  .cmp-row > div > :first-child { margin-top: 0; }
+  .cmp-row:hover { background: rgba(0,0,0,.02); }
+  /* 对不上号那种：两栏各自滚，滚动条联动 */
+  .cmp-split { display: flex; gap: 1.6rem; height: calc(100vh - 190px); }
+  .cmp-split > div { flex: 1 1 0; min-width: 0; overflow-y: auto; padding-right: .4rem; }
+  .cmp-split .cmp-a { border-right: 1px solid var(--line, #DED5C1); }
+  @media (max-width: 760px) {
+    /* 手机上并排放不下，改成一段原文一段译文交替 */
+    .cmp-row { flex-direction: column; gap: .2rem; }
+    .cmp-a { font-size: .92em; padding-bottom: .3rem; border-bottom: 1px dashed var(--line, #DED5C1); }
+    .cmp-split { flex-direction: column; height: auto; }
+    .cmp-split > div { overflow: visible; height: auto; }
+    .cmp-split .cmp-a { border-right: 0; border-bottom: 1px solid var(--line, #DED5C1); padding-bottom: .8rem; }
+  }
+
   #suggestBtn {
     position: fixed; z-index: 40; background: var(--accent); color: #fff;
     border-radius: 999px; padding: .35rem .9rem; font-size: .85rem;
@@ -655,6 +713,13 @@
   </main>
 
   <button id="suggestBtn">✏️ 提个建议</button>
+  <div id="hlBar">
+    <div class="dot" data-c="yellow" title="划黄线"></div>
+    <div class="dot" data-c="green" title="划绿线"></div>
+    <div class="dot" data-c="blue" title="划蓝线"></div>
+    <div class="dot" data-c="pink" title="划粉线"></div>
+    <button class="say" data-note="1">写句话</button>
+  </div>
   <input type="file" id="fileInput" accept=".epub,.txt,.docx,.pdf,.md" style="display:none" />
   <div id="modalHost"></div>
 
@@ -960,6 +1025,20 @@
         + `<button class="mark-x" data-unmark="${esc(m.id)}" title="删掉这条书签">×</button></div>`);
     }
 
+    // ---- 划线 ----
+    // 划了线的人回头要找的是「我标过的那几句」，而不是「我读到哪一页」，
+    // 所以跟书签分开列，并且把原话摆出来 —— 只写章节名等于让人一条条点开找。
+    if (hls.length) {
+      parts.push(`<div class="side-h">划线 (${hls.length})</div>`);
+      for (const h of hls.slice(0, 60)) {
+        const head = esc((h.anchor || "").slice(0, 16));
+        const sub = esc(h.note || docLabel(h.path));
+        parts.push(`<div class="mark-row"><button class="side-item mark" data-hl-jump="${esc(h.id)}">`
+          + `<span class="hl-chip ${esc(h.color || "yellow")}"></span>${head}…<small>${sub}</small></button>`
+          + `<button class="mark-x" data-hl-del="${esc(h.id)}" title="删掉这道划线">×</button></div>`);
+      }
+    }
+
     // ---- 校对协作区 ----
     const cs = collabState;
     if (cs) {
@@ -1018,12 +1097,13 @@
   const docLabel = rel => (rel || "").split("/").pop().replace(/\.md$/, "");
 
   async function loadMarks(book) {
-    if (!book) { marks = []; autoPos = null; return; }
+    if (!book) { marks = []; autoPos = null; hls = []; return; }
     try {
       const r = await fetch("/api/bookmarks?book=" + encodeURIComponent(book)).then(r => r.json());
       marks = r.marks || [];
       autoPos = r.auto || null;
-    } catch { marks = []; autoPos = null; }
+      hls = r.hl || [];
+    } catch { marks = []; autoPos = null; hls = []; }
   }
 
   // 滚动就存会把磁盘打满，停下来才存。读者翻页翻得再快，
@@ -1087,6 +1167,316 @@
     else applyFrac(frac);
   }
 
+  // ------------------------------------------------------------------ 划线
+  //
+  // 锚点是「那段文字 + 它在这一章里是第几次出现」，不是字符偏移 —— 理由写在
+  // 服务端 /api/highlights/add 那一段上面。这里只讲前端这一侧的一个坑：
+  //
+  // **存锚点和找锚点必须用同一个坐标系。** 直觉的写法是存的时候用
+  // selection.toString()、找的时候把文字节点拼起来搜 —— 两者对空白的处理不一样
+  // （toString 会在块元素之间塞换行，拼接不会），于是存下去的锚点回头自己找不到
+  // 自己。所以两边都走 flatten()：把 reader 里所有文字节点原样拼成一条字符串，
+  // 存和找都在这条字符串上量。
+  let hls = [];
+
+  function flatten(root) {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [], starts = [];
+    let full = "", n;
+    while ((n = w.nextNode())) {
+      if (!n.nodeValue) continue;
+      starts.push(full.length); nodes.push(n); full += n.nodeValue;
+    }
+    return { full, nodes, starts };
+  }
+
+  // 摊平坐标 → 具体哪个文字节点的第几个字
+  function locate(flat, pos) {
+    let lo = 0, hi = flat.nodes.length - 1, best = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (flat.starts[mid] <= pos) { best = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    if (best < 0) return null;
+    return [flat.nodes[best], pos - flat.starts[best]];
+  }
+
+  // 选区的两头不一定落在文字节点上（三击选一整段就会给元素节点），往里走一步
+  function toTextPos(node, offset, isStart) {
+    if (node.nodeType === 3) return [node, offset];
+    const kid = node.childNodes[isStart ? offset : offset - 1];
+    const scope = kid || node;
+    if (scope.nodeType === 3) return [scope, isStart ? 0 : scope.nodeValue.length];
+    const w = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+    let first = null, last = null, n;
+    while ((n = w.nextNode())) { if (!first) first = n; last = n; }
+    if (!first) return null;
+    return isStart ? [first, 0] : [last, last.nodeValue.length];
+  }
+
+  function selectionAnchor() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+    const rg = sel.getRangeAt(0);
+    if (!reader.contains(rg.commonAncestorContainer)) return null;
+    const flat = flatten(reader);
+    const a = toTextPos(rg.startContainer, rg.startOffset, true);
+    const b = toTextPos(rg.endContainer, rg.endOffset, false);
+    if (!a || !b) return null;
+    const ia = flat.nodes.indexOf(a[0]), ib = flat.nodes.indexOf(b[0]);
+    if (ia < 0 || ib < 0) return null;
+    let p1 = flat.starts[ia] + a[1];
+    const p2 = flat.starts[ib] + b[1];
+    if (p2 <= p1) return null;
+    let text = flat.full.slice(p1, p2);
+    // 两头的空白削掉，起点跟着挪 —— 锚点带着空白，回头就找不着了
+    p1 += text.length - text.replace(/^\s+/, "").length;
+    text = text.trim();
+    if (text.length < 2 || text.length > 300) return null;
+    let occ = 0, i = -1;
+    while ((i = flat.full.indexOf(text, i + 1)) >= 0 && i < p1) occ++;
+    return { text, occ };
+  }
+
+  // 把这一章的划线贴回正文。
+  // **从后往前贴**：贴一条就会把文字节点切开，前面的位置不受影响、后面的全变。
+  // 每贴一条重新摊平一次，位置表才不会是旧的。一章几千字，这点开销看不出来。
+  // 把正文里已有的 <mark> 拆掉，还原成干净的文字。
+  // normalize() 不能省：surroundContents 会把文字节点切成好几段，不接回去的话
+  // 下一轮 flatten 出来的还是碎的，锚点数出来的位置就不对了。
+  function stripHighlights(page) {
+    for (const mk of [...page.querySelectorAll("mark.hl")]) {
+      const p = mk.parentNode;
+      if (!p) continue;
+      while (mk.firstChild) p.insertBefore(mk.firstChild, mk);
+      p.removeChild(mk);
+    }
+    page.normalize();
+  }
+
+  // **这个函数必须是幂等的**：同一份 hls 跑一次和跑十次，正文得一模一样。
+  // 每存一条划线就会调它一次，不先拆干净的话，前面那几条会被一层层重复包起来
+  // —— 连划十二条之后正文里是 364 个 mark 而不是 12 个，每个拿到的都是半截话。
+  function applyHighlights() {
+    if (editing || cmpMode || !currentFile) return;
+    const page = reader.querySelector(".page");
+    if (!page) return;
+    stripHighlights(page);
+    const mine = hls.filter(h => h.path === currentFile);
+    if (!mine.length) return;
+    const flat0 = flatten(page);
+    const findAt = (flat, h) => {
+      let i = -1;
+      for (let k = 0; k <= (h.anchorIndex || 0); k++) {
+        i = flat.full.indexOf(h.anchor, i + 1);
+        if (i < 0) return -1;
+      }
+      return i;
+    };
+    const ordered = mine.map(h => ({ h, at: findAt(flat0, h) }))
+      .filter(x => x.at >= 0).sort((a, b) => b.at - a.at);
+    for (const { h } of ordered) {
+      const flat = flatten(page);
+      const at = findAt(flat, h);
+      if (at < 0) continue;                       // 这段话被改掉了，划线自然消失
+      const a = locate(flat, at), b = locate(flat, at + h.anchor.length);
+      if (!a || !b) continue;
+      // 已经贴在别的划线里面了就跳过。
+      // 同一句话被划两次是会发生的（划过了自己忘了，又划一次），那时两条的锚点
+      // 完全相同，第二条会把第一条整个包进去 —— 一层套一层，点开拿到的是半截话。
+      // 这一条只认「这一趟贴上去的」：正文本来就有的 <mark> 在上面已经拆干净了。
+      if (a[0].parentNode && a[0].parentNode.closest && a[0].parentNode.closest("mark.hl")) continue;
+      const rg = document.createRange();
+      try { rg.setStart(a[0], a[1]); rg.setEnd(b[0], b[1]); } catch { continue; }
+      const mk = document.createElement("mark");
+      mk.className = "hl " + (h.color || "yellow") + (h.note ? " has-note" : "");
+      mk.dataset.hl = h.id;
+      if (h.note) mk.title = h.note;
+      // surroundContents 碰到跨元素的选区会抛，退回「掏出来再包回去」
+      try { rg.surroundContents(mk); }
+      catch { try { mk.appendChild(rg.extractContents()); rg.insertNode(mk); } catch { } }
+    }
+  }
+
+  const hlBar = $("hlBar");
+  let pendingSel = null;
+
+  function maybeShowHlBar() {
+    hlBar.classList.remove("on");
+    if (view !== "read" || editing || cmpMode || !currentBook || !currentFile) return;
+    const a = selectionAnchor();
+    if (!a) return;
+    pendingSel = a;
+    const r = window.getSelection().getRangeAt(0).getBoundingClientRect();
+    hlBar.style.left = Math.max(8, Math.min(window.innerWidth - 200, r.left + r.width / 2 - 95)) + "px";
+    // 摆在选区**上方**：提建议那颗按钮在下方，两个一起冒出来时不打架
+    hlBar.style.top = Math.max(8, r.top - 46) + "px";
+    hlBar.classList.add("on");
+  }
+  reader.addEventListener("mouseup", () => setTimeout(maybeShowHlBar, 10));
+  reader.addEventListener("touchend", () => setTimeout(maybeShowHlBar, 10));
+  document.addEventListener("selectionchange", () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) hlBar.classList.remove("on");
+  });
+
+  async function saveHl(color, note) {
+    if (!pendingSel || !currentBook || !currentFile) return;
+    try {
+      const r = await fetch("/api/highlights/add", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          book: currentBook.name, path: currentFile,
+          anchor: pendingSel.text, anchorIndex: pendingSel.occ,
+          color, note: note || "",
+        }),
+      }).then(r => r.json());
+      if (r.error) { toast(r.hint || "这条划线没存上，再划一次。"); return; }
+      hls.unshift(r.mark);
+      try { window.getSelection().removeAllRanges(); } catch { }
+      applyHighlights();
+      if (currentBook) renderBookMenu();
+    } catch { toast("没存上，跟「群星回廊」断了联系。看看启动窗口还开着没有。"); }
+  }
+
+  hlBar.addEventListener("click", e => {
+    const dot = e.target.closest(".dot");
+    hlBar.classList.remove("on");
+    if (dot) return saveHl(dot.dataset.c, "");
+    if (e.target.closest("[data-note]")) {
+      const note = prompt("想说点什么（留空也行，就是划一道）", "");
+      if (note === null) return;
+      return saveHl("yellow", note);
+    }
+  });
+
+  // 点已有的划线 → 改评论、换颜色、删掉
+  reader.addEventListener("click", e => {
+    const mk = e.target.closest("mark.hl");
+    if (!mk) return;
+    const h = hls.find(x => x.id === mk.dataset.hl);
+    if (!h) return;
+    const m = modal(`
+      <h3>这道划线</h3>
+      <div class="quote">${esc(h.anchor)}</div>
+      <label>你的话</label>
+      <textarea id="mNote" rows="3"></textarea>
+      <div class="row">
+        <button class="plain" id="mDel">删掉</button>
+        <button class="plain" id="mCancel">算了</button>
+        <button class="primary" id="mOk">存下</button>
+      </div>`);
+    m.querySelector("#mNote").value = h.note || "";
+    m.querySelector("#mCancel").addEventListener("click", closeModal);
+    m.querySelector("#mDel").addEventListener("click", async () => {
+      closeModal();
+      hls = hls.filter(x => x.id !== h.id);
+      applyHighlights();                 // 幂等，直接整篇重贴，不手工拆这一个
+      if (currentBook) renderBookMenu();
+      try {
+        await fetch("/api/highlights/remove", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: h.id }),
+        });
+      } catch { }
+    });
+    m.querySelector("#mOk").addEventListener("click", async () => {
+      const note = m.querySelector("#mNote").value.trim();
+      closeModal();
+      h.note = note;
+      mk.classList.toggle("has-note", !!note);
+      mk.title = note;
+      if (currentBook) renderBookMenu();
+      try {
+        await fetch("/api/highlights/note", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: h.id, note }),
+        });
+      } catch { toast("评论没存上，再点一次。"); }
+    });
+  });
+
+  // 侧边栏那个叉。只从 hls 里删掉、不重贴的话，这一页上那道线要等翻页回来才消失。
+  async function removeHl(id) {
+    hls = hls.filter(x => x.id !== id);
+    applyHighlights();                   // 同上：改数据 + 重贴，不单独拆某一个
+    if (currentBook) renderBookMenu();
+    try {
+      await fetch("/api/highlights/remove", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch { }
+  }
+
+  // 从侧边栏跳到某一道划线
+  async function jumpToHl(id) {
+    const h = hls.find(x => x.id === id);
+    if (!h) return;
+    if (h.path !== currentFile) { cmpMode = false; await openFile(h.path); }
+    const mk = reader.querySelector(`mark.hl[data-hl="${h.id}"]`);
+    if (mk) {
+      mk.scrollIntoView({ block: "center", behavior: "smooth" });
+      mk.style.outline = "2px solid rgba(0,0,0,.35)";
+      setTimeout(() => { mk.style.outline = ""; }, 1400);
+    } else {
+      toast("这段话在正文里找不着了 —— 多半是这一章后来改过。");
+    }
+  }
+
+  // ------------------------------------------------------------------ 中英对照
+  //
+  // 数据全在服务端配好（/api/pair），这边只管画。两种画法：
+  //   段数对得上 —— 逐段并排，电脑左右两栏、手机一段原文一段译文交替；
+  //   对不上     —— 两栏各自滚动、滚动条联动，并且把「为什么没并排」写在上面。
+  // 不硬配的理由写在服务端那一段上。
+  let cmpMode = false;
+  const isChapter = rel => /\/(00-原书|译文)\//.test(rel || "");
+
+  function linkScroll(root) {
+    const cols = root.querySelectorAll(".cmp-split > div");
+    if (cols.length !== 2) return;
+    let lock = false;
+    cols.forEach((from, i) => {
+      from.addEventListener("scroll", () => {
+        if (lock) return;
+        lock = true;
+        const to = cols[1 - i];
+        const fm = from.scrollHeight - from.clientHeight;
+        const tm = to.scrollHeight - to.clientHeight;
+        to.scrollTop = fm > 0 ? (from.scrollTop / fm) * tm : 0;
+        // 下一帧再解锁：同一轮里对面那次 scroll 事件不该反弹回来
+        requestAnimationFrame(() => { lock = false; });
+      }, { passive: true });
+    });
+  }
+
+  async function toggleCompare() {
+    if (!currentFile) return;
+    if (cmpMode) { cmpMode = false; await openFile(currentFile); return; }
+    let r;
+    try { r = await getJson("/api/pair?path=" + encodeURIComponent(currentFile)); }
+    catch (e) { toast("对照打不开：" + e.message); return; }
+    if (!r || !r.ok) { toast((r && r.reason) || "这一章没法对照。"); return; }
+    cmpMode = true;
+    const nav = chapterNav(currentFile);
+    if (r.aligned) {
+      const rows = r.src.blocks.map((b, i) =>
+        `<div class="cmp-row"><div class="cmp-a">${b}</div><div class="cmp-b">${r.zh.blocks[i] || ""}</div></div>`).join("");
+      reader.innerHTML = `<div class="page">${editBar()}`
+        + `<p class="cmp-note">左边原文，右边译文，逐段对齐。手机上是一段原文、一段译文交替。</p>`
+        + rows + nav + `</div>`;
+    } else {
+      reader.innerHTML = `<div class="page">${editBar()}`
+        + `<p class="cmp-note">${esc(r.why || "")}</p>`
+        + `<div class="cmp-split"><div class="cmp-a">${r.src.html}</div><div class="cmp-b">${r.zh.html}</div></div>`
+        + `</div>`;
+      linkScroll(reader);
+    }
+    reader.scrollTop = 0;
+    bindPager();
+  }
+
   // 返回是否真的打开了。调用方要能分辨「文件没了」——
   // 书签指向的章节可能已经被重命名或删掉，那时得退回默认章节，
   // 不然读者点开一本书看到的是一片空白，还以为软件坏了。
@@ -1100,6 +1490,7 @@
       return false;
     }
     if (r.error) return false;
+    cmpMode = false;                 // 换一章就退回单栏，不然按钮写着「回到单栏」而正文早就是单栏了
     currentFile = rel;
     fileMd = r.md || "";
     fileMtime = r.mtime || 0;
@@ -1107,6 +1498,7 @@
     crumb.textContent = (currentBook ? currentBook.name + " · " : "") + (label || rel.split("/").pop());
     const nav = chapterNav(rel);
     reader.innerHTML = `<div class="page">${editBar()}${r.html}${nav}</div>`;
+    applyHighlights();
     reader.scrollTop = 0;
     if (frac) applyFrac(frac);
     if (currentBook) renderBookMenu();
@@ -1139,6 +1531,8 @@
     const href = obsidianHref(currentFile);
     return `<div class="editbar"><button data-edit="1">✏️ 改一改</button>`
       + (currentBook ? `<button data-mark="1">🔖 加书签</button>` : "")
+      // 只有书里的章节才有「另一半」，梗概摘要笔记没有，给了也是点了报错
+      + (isChapter(currentFile) ? `<button data-pair="1">${cmpMode ? "↩ 回到单栏" : "⇄ 中英对照"}</button>` : "")
       // Obsidian 只认它自己「打开过」的库。第一次点没反应不是坏了，
       // 是那边还不知道有这么个库——把这句写在悬停提示里，省一次求助。
       + (href ? `<a class="obs" href="${href}" title="第一次用要先在 Obsidian 里「打开文件夹作为库」选中你的书库">在 Obsidian 里打开</a>` : "")
@@ -1186,15 +1580,20 @@
     editing = false;
     const page = reader.querySelector(".page");
     if (page) page.innerHTML = editBar() + r.html + chapterNav(currentFile);
+    // 存完是整段重画的，划线跟着没了 —— 而这一页说的是「只要那句话还在，划线就还在」。
+    // 改一个错别字回来发现五条划线全不见了，用户只会当成丢数据。
+    // 锚点认的是文字不是位置，所以重贴就能原样回来（改掉的那一句除外，那本该消失）。
+    applyHighlights();
     bindPager();
   }
 
   reader.addEventListener("click", e => {
-    const el = e.target.closest("[data-edit],[data-save],[data-cancel],[data-mark]");
+    const el = e.target.closest("[data-edit],[data-save],[data-cancel],[data-mark],[data-pair]");
     if (!el) return;
     if (el.dataset.edit) return enterEdit();
     if (el.dataset.save) return saveEdit();
     if (el.dataset.mark) return addMark();
+    if (el.dataset.pair) return toggleCompare();
     if (el.dataset.cancel) { editing = false; openFile(currentFile); }
   });
 
@@ -1217,10 +1616,12 @@
   }
 
   sidebar.addEventListener("click", e => {
-    const el = e.target.closest("[data-book],[data-file],[data-sug],[data-jump],[data-unmark],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook,#delBook,#capBook");
+    const el = e.target.closest("[data-book],[data-file],[data-sug],[data-jump],[data-unmark],[data-hl-jump],[data-hl-del],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook,#delBook,#capBook");
     if (!el) return;
     // 删按钮压在跳转按钮上面，先判它，否则点叉会顺带跳过去
     if (el.dataset.unmark) { removeMark(el.dataset.unmark); return; }
+    if (el.dataset.hlDel) { removeHl(el.dataset.hlDel); return; }
+    if (el.dataset.hlJump) { jumpToHl(el.dataset.hlJump); return; }
     if (el.dataset.jump) { jumpTo(decodeURIComponent(el.dataset.jump), Number(el.dataset.frac) || 0); return; }
     if (el.id === "uploadBook") { pickFile(); return; }
     if (el.id === "backShelf") { currentBook = null; currentFile = null; collabState = null; loadHistory(null); loadShelf(); return; }
@@ -3010,22 +3411,45 @@
 
   // 读书的工具（PDF、认字）到底在不在，以及「试着修一下」。
   //
-  // 只在缺东西的时候把这张卡露出来：一切正常的人不需要知道底下还有 Python 这回事。
+  // **这张卡一直在，不再「修好了就整张消失」。**
+  // 原来是缺东西才露面，想法是「一切正常的人不用知道底下还有 Python 这回事」。
+  // 结果是反的：有人一路修到好，眼看着那个按钮凭空不见了，以为是自己把界面弄坏了
+  // ——而那一刻恰恰是修成功的信号。两个人先后这么问过。
+  // 修好之后该给的是一句「都好了」，不是把证据收走。
+  //
   // 探测要真去跑几次 python，所以只在打开设置页时问一次、修完再问一次，
   // 不跟着设置页那个定时刷新一起跑。
   async function fillTools() {
     const card = $("setToolsCard");
     if (!card) return;
+    // 先写一句占位再露脸。原来是先 hidden=false 再去问，问得慢或者问不到的时候
+    // 用户看到的是一张只有标题、底下空着的卡片 —— 那比不显示更让人发慌。
+    if (!$("setToolsState").textContent.trim()) $("setToolsState").textContent = "正在看读书的工具装好了没…";
+    card.hidden = false;
     let s = null;
-    try { s = await fetch("/api/tools").then(r => r.json()); } catch { return; }
+    // 问不到就说问不到。原来这儿是 return，卡留在上一次的样子——
+    // 探测本身卡住的时候，用户看到的是一张过期的卡，还以为是当前状态。
+    try { s = await fetch("/api/tools").then(r => r.json()); }
+    catch {
+      $("setToolsState").textContent = "这会儿问不出工具的状态（服务没回话）。过一会儿再打开这一页看看。";
+      $("setToolsBtns").innerHTML = "";
+      return;
+    }
     const missing = [];
     if (!s.pdf) missing.push(["pdf", "读 PDF"]);
     if (!s.ocr) missing.push(["ocr", "读扫描版（认字）"]);
-    if (!missing.length) { card.hidden = true; return; }
-    card.hidden = false;
+    const who = s.python
+      ? `用的是 ${s.python}${s.version ? "（" + s.version + "）" : "（版本问不出来）"}`
+      : "这台电脑上没找到 Python";
+    if (!missing.length) {
+      $("setToolsState").textContent = `读 PDF、读扫描版都正常，${who}。这一格没事就不用管。`;
+      $("setToolsState").classList.remove("err");
+      $("setToolsBtns").innerHTML = "";
+      $("setToolsLog").hidden = true;
+      return;
+    }
     $("setToolsState").textContent =
-      missing.map(m => m[1]).join("、") + "现在用不了"
-      + (s.python ? `（这台电脑上的 Python 是 ${s.version || "未知版本"}）` : "（这台电脑上没找到 Python）")
+      missing.map(m => m[1]).join("、") + "现在用不了（" + who + "）"
       + "。点下面的按钮会把安装时那几条命令原样再跑一次——多半是当时网没通。";
     $("setToolsBtns").innerHTML = missing
       .map(m => `<button class="set-plain" data-fix="${m[0]}">试着修一下：${esc(m[1])}</button>`).join("");
@@ -3045,7 +3469,7 @@
       $("setToolsState").textContent = r.hint || (r.ok ? "修好了。" : "还是没成。");
       $("setToolsState").classList.toggle("err", !r.ok);
       if (r.log) { log.textContent = r.log; log.hidden = false; }
-      if (r.ok) await fillTools();          // 修好了这张卡就该自己消失
+      if (r.ok) await fillTools();          // 修好了就把卡刷成「都好了」，不是让它消失
     } catch (err) {
       $("setToolsState").textContent = err.message || "没修成，稍后再试。";
       $("setToolsState").classList.add("err");
