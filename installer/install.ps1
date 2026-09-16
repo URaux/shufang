@@ -846,7 +846,7 @@ if ($PyExe) {
       # 1.4.4 拉下来的是 onnxruntime 1.18.1，项目机上实测能起
       # （引擎 0.7s，一页 1.4s，中英文都认得出）。不钉的话今天装能跑、
       # 过几个月新装的人拉到坏的那版，症状跟当年一模一样。
-      Invoke-Native $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "rapidocr-onnxruntime==1.4.4") | Out-Null
+      Invoke-Native $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "rapidocr-onnxruntime==1.4.4", "onnxruntime>=1.18.1,<1.22", "opencv-python<5") | Out-Null
       $ocrProbe = Invoke-NativeSay $PyExe @("-c", "import rapidocr_onnxruntime; print('ok')")
       if ($ocrProbe.Code -eq 0) {
         Ok "扫描版 PDF 也能读了"

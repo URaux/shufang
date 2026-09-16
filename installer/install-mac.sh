@@ -186,7 +186,7 @@ if command -v python3 >/dev/null 2>&1; then
         # 版本钉死，理由见 install.ps1 里同一处：它依赖 onnxruntime，
         # 而这个项目被 onnxruntime 的 DLL load failed 坑过。不钉的话
         # 今天装能跑、过几个月新装的人可能拉到起不来的那一版。
-        if python3 -m pip install --quiet --user "rapidocr-onnxruntime==1.4.4" 2>/dev/null \
+        if python3 -m pip install --quiet --user "rapidocr-onnxruntime==1.4.4" "onnxruntime>=1.18.1,<1.22" "opencv-python<5" 2>/dev/null \
            && python3 -c "import rapidocr_onnxruntime" 2>/dev/null; then
           ok "扫描版 PDF 也能读了"
         else

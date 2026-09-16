@@ -679,7 +679,7 @@ if ($PyExe) {
         Write-Host "   正在装认字组件（大约 100 MB，慢的话请耐心等）..." -ForegroundColor DarkGray
         # 版本钉死，跟联网安装器里那条同一个理由：onnxruntime 新版在不少 Windows 机器上
         # DLL load failed；1.4.4 拉下来的是 1.18.1，实测能起。
-        Invoke-Native $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "rapidocr-onnxruntime==1.4.4") | Out-Null
+        Invoke-Native $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "rapidocr-onnxruntime==1.4.4", "onnxruntime>=1.18.1,<1.22", "opencv-python<5") | Out-Null
         $ocrProbe = Invoke-NativeSay $PyExe @("-c", "import rapidocr_onnxruntime; print('ok')")
         if ($ocrProbe.Code -eq 0) {
           Ok "扫描版 PDF 也能读了"
