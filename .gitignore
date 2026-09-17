@@ -8,6 +8,7 @@ Thumbs.db
 dist-build/
 .dist-worktree/
 .smoke-test/
+tmp/
 
 
 # 打 exe 的中间产物与产物（bundle.zip 150MB、exe 140MB），不进仓
