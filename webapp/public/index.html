@@ -180,7 +180,7 @@
   .msg.md th, .msg.md td { border: 1px solid var(--line); padding: .35em .6em; font-size: .92em; }
   .msg.md hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
   #chatComposer { border-top: 1px solid var(--line); background: var(--card); padding: .9rem 0 1.1rem; flex-shrink: 0; }
-  #chatComposer .col { display: flex; gap: .6rem; align-items: flex-end; }
+  #chatComposer .col { display: flex; gap: .6rem; align-items: flex-end; flex-wrap: wrap; }
   #chatComposer textarea {
     flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px;
     padding: .7rem .9rem; font-family: inherit; font-size: 1rem; line-height: 1.7;
@@ -623,6 +623,11 @@
   }
   #clipBtn:hover { border-color: var(--accent-soft); color: var(--accent); }
   #clipBtn:disabled { opacity: .5; cursor: default; }
+  #imageTray { display: none; flex: 0 0 100%; gap: .45rem; padding: 0 0 .1rem 3rem; flex-wrap: wrap; }
+  #imageTray.on { display: flex; }
+  .chat-image { position: relative; width: 4rem; height: 4rem; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--card); }
+  .chat-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .chat-image button { position: absolute; right: 2px; top: 2px; width: 1.25rem; height: 1.25rem; border: 0; border-radius: 50%; background: rgba(20,18,14,.78); color: #fff; line-height: 1; }
 </style>
 </head>
 <body class="view-read">
@@ -660,7 +665,8 @@
         <div id="chatScroll"><div id="chatBody" class="col"></div></div>
         <div id="chatComposer">
           <div class="col">
-            <button id="clipBtn" title="传一本书">📎</button>
+            <div id="imageTray"></div>
+            <button id="clipBtn" title="传书或附上图片">📎</button>
             <textarea id="input2" rows="3" placeholder="把书的文件拖进来，或者说「翻第 3 章」（回车发送，Shift+回车换行）"></textarea>
             <button id="sendBtn2">发送</button>
           </div>
@@ -720,7 +726,7 @@
     <div class="dot" data-c="pink" title="划粉线"></div>
     <button class="say" data-note="1">写句话</button>
   </div>
-  <input type="file" id="fileInput" accept=".epub,.txt,.docx,.pdf,.md" style="display:none" />
+  <input type="file" id="fileInput" accept=".epub,.txt,.docx,.pdf,.md,image/png,image/jpeg,image/webp,image/gif" multiple style="display:none" />
   <div id="modalHost"></div>
 
 <script>
@@ -2093,15 +2099,19 @@
     // 两个输入框分属两个模式，各发各的，不再互相清空
     const box = from === "main" ? input2 : input;
     const text = box.value.trim();
-    if (!text) return;
+    const images = from === "main" ? pendingImages.slice() : [];
+    if (!text && !images.length) return;
     box.value = "";
-    return sendText(text, from === "main" ? chatLane : readLane);
+    if (images.length) clearPendingImages();
+    return sendText(text, from === "main" ? chatLane : readLane, images);
   }
 
-  async function sendText(text, lane) {
+  async function sendText(text, lane, images) {
     lane = lane || laneOf();
-    if (!text || lane.streaming) return;
-    addMsg(lane, "user", text);
+    images = Array.isArray(images) ? images : [];
+    if ((!text && !images.length) || lane.streaming) return;
+    const shown = [text, ...images.map(x => `📷 ${x.name}`)].filter(Boolean).join("\n");
+    addMsg(lane, "user", shown);
     setBusy(lane, true);
 
     let bot = null, statusEl = null;
@@ -2117,6 +2127,7 @@
         // chapter 只在读书那条带上：对话模式是书架级的，没有"当前章节"这回事
         body: JSON.stringify({
           message: text,
+          images: images.map(x => x.id),
           book: lane.scope || "",
           session: lane.scope ? "" : (lane.session || ""),
           chapter: (lane === readLane && lane.scope && currentFile)
@@ -2338,13 +2349,70 @@
   // 传完自动起一个后台整理作业，聊天不受影响。
   const fileInput = $("fileInput");
   const OK_EXT = ["epub", "txt", "docx", "pdf", "md"];
+  const IMAGE_EXT = ["png", "jpg", "jpeg", "webp", "gif"];
   const MAX_MB = 200;
+  let pendingImages = [];
 
   function pickFile() { fileInput.value = ""; fileInput.click(); }
 
   fileInput.addEventListener("change", () => {
-    const f = fileInput.files && fileInput.files[0];
-    if (f) uploadBook(f);
+    const files = [...(fileInput.files || [])];
+    for (const f of files) {
+      const ext = (f.name.split(".").pop() || "").toLowerCase();
+      if (IMAGE_EXT.includes(ext) || String(f.type || "").startsWith("image/")) uploadChatImage(f);
+      else { uploadBook(f); break; }
+    }
+  });
+
+  function renderPendingImages() {
+    const tray = $("imageTray");
+    tray.classList.toggle("on", pendingImages.length > 0);
+    tray.innerHTML = pendingImages.map((x, i) => `<span class="chat-image" title="${esc(x.name)}"><img src="${x.url}" alt=""><button data-rm-image="${i}" title="移除">×</button></span>`).join("");
+  }
+
+  function clearPendingImages() {
+    for (const x of pendingImages) URL.revokeObjectURL(x.url);
+    pendingImages = [];
+    renderPendingImages();
+  }
+
+  async function uploadChatImage(file) {
+    if (file.size > 20 * 1024 * 1024) return toast("这张图片超过 20MB，压小一点再传。");
+    if (pendingImages.length >= 4) return toast("一条消息最多附 4 张图片。");
+    const fd = new FormData();
+    fd.append("file", file, file.name || "image.png");
+    try {
+      const resp = await fetch("/api/chat/image", { method: "POST", body: fd });
+      const r = await resp.json();
+      if (!resp.ok || !r.ok) throw new Error(r.hint || "图片没传上去。");
+      pendingImages.push({ id: r.id, name: r.name || file.name || "图片", url: URL.createObjectURL(file) });
+      renderPendingImages();
+      input2.focus();
+    } catch (e) { toast(e.message || "图片没传上去，请再试一次。"); }
+  }
+
+  $("imageTray").addEventListener("click", e => {
+    const b = e.target.closest("[data-rm-image]");
+    if (!b) return;
+    const i = Number(b.dataset.rmImage);
+    if (pendingImages[i]) URL.revokeObjectURL(pendingImages[i].url);
+    pendingImages.splice(i, 1);
+    renderPendingImages();
+  });
+
+  input2.addEventListener("paste", e => {
+    const files = [...(e.clipboardData && e.clipboardData.files || [])].filter(f => String(f.type || "").startsWith("image/"));
+    if (!files.length) return;
+    e.preventDefault();
+    files.forEach(uploadChatImage);
+  });
+  input2.addEventListener("dragover", e => e.preventDefault());
+  input2.addEventListener("drop", e => {
+    const files = [...(e.dataTransfer && e.dataTransfer.files || [])];
+    const pictures = files.filter(f => String(f.type || "").startsWith("image/"));
+    if (!pictures.length) return;
+    e.preventDefault();
+    pictures.forEach(uploadChatImage);
   });
 
   function uploadBook(file) {
