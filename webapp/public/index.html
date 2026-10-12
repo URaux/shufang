@@ -14,6 +14,8 @@
     --ink-mute: #8a8170; --line: #e5dfd0; --accent: #8c6a2d; --accent-soft: #c89a4a;
     --chat-bg: #f3efe5; --user-bubble: #e9e0c8; --bot-bubble: #ffffff;
     --bubble-shadow: 0 1px 2px rgba(90,70,30,.08);
+    /* 下面几个原来是写死的浅色，夜间要跟着换（见「夜间」那一段） */
+    --code-bg: #f0ead9; --hit-bg: #FDF0B8; --link: #8c6a2d; --img-tile: transparent; --img-pad: 0px;
   }
   /* 全站一套配色。切视图只换布局（三栏 ↔ 居中单列），不换颜色——
      换主题看着像跳到了另一个软件里。 */
@@ -34,6 +36,11 @@
   header h1 { font-size: 1.05rem; font-weight: 600; letter-spacing: .1em; }
   header .crumb { color: var(--ink-mute); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   header .spacer { flex: 1; }
+  /* 奠城颂的印（丙式·星斗），挨着名字。站上丙式是挂在页脚右角的，这软件没有页脚，
+     侧栏又是 innerHTML 整块重画的（挂进去下一次渲染就没了）、切到别的视图还藏起来——
+     四个视图里一直在、又不挡操作的只有顶栏名字旁边这一处。
+     不用甲式（钉右下角）：那里是对话页的「发送」键。 */
+  header .gx-seal--c.gx-hd { width: 22px; height: 22px; margin: 0 0 0 -.2rem; flex-shrink: 0; opacity: .55; }
   .tabs { display: flex; gap: .3rem; flex-shrink: 0; }
   .tabs button { padding: .3rem .8rem; border-radius: 999px; font-size: .85rem; color: var(--ink-mute); white-space: nowrap; }
   .tabs button.on { background: var(--accent); color: #fff; }
@@ -77,6 +84,9 @@
   /* 原书里抽出来的插图。老书的图常常只有两三百像素宽，放大了糊，所以不强行撑满，
      只封一个上限；比正文窄的就按原大小居中。手机上按屏宽收。 */
   #reader .page img { display: block; max-width: 100%; height: auto; margin: 1.2em auto; border-radius: 4px; }
+  /* 夜间：原书插图多是白底黑线（印记、符号、字母表），直接放在深底上黑线就看不见了；
+     也不能反色（反了颜色，彩图和照片就全错了）。垫一块米纸色的底，跟日间看到的是同一张图 */
+  #reader .page img { background: var(--img-tile); padding: var(--img-pad); box-sizing: content-box; max-width: calc(100% - 2 * var(--img-pad)); }
   #reader .page img[alt]:not([alt=""]) { margin-bottom: .4em; }
   #reader .page p > img + em { display: block; text-align: center; color: var(--ink-mute); font-size: .86rem; }
   .msg.md img { max-width: 100%; height: auto; border-radius: 4px; }
@@ -100,7 +110,7 @@
   #reader p { line-height: 2; margin: .9em 0; font-size: 1.02rem; }
   #reader blockquote { border-left: 3px solid var(--accent-soft); padding-left: 1em; color: var(--ink-soft); margin: 1em 0; }
   #reader li { line-height: 1.9; margin: .3em 0 .3em 1.4em; }
-  #reader code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: #f0ead9; padding: .1em .3em; border-radius: 3px; }
+  #reader code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: var(--code-bg); padding: .1em .3em; border-radius: 3px; }
   #reader table { border-collapse: collapse; margin: 1em 0; width: 100%; }
   #reader th, #reader td { border: 1px solid var(--line); padding: .4em .7em; font-size: .92rem; }
   .pager { display: flex; justify-content: space-between; margin-top: 3rem; gap: 1rem; }
@@ -131,7 +141,7 @@
   .img-missing { display: inline-block; padding: .15rem .5rem; border: 1px dashed var(--line);
                  border-radius: 6px; color: var(--ink-mute); font-size: .82rem; }
   /* 修工具时把命令原文摊在这里。等宽 + 可滚，别撑破卡片 */
-  .set-log { margin: .7rem 0 0; padding: .6rem .7rem; background: #efe7d8; border-radius: 6px;
+  .set-log { margin: .7rem 0 0; padding: .6rem .7rem; background: var(--code-bg); border-radius: 6px;
              font-family: ui-monospace, Consolas, monospace; font-size: .74rem; line-height: 1.6;
              white-space: pre-wrap; word-break: break-all; max-height: 16rem; overflow: auto; color: var(--ink-soft); }
   /* 助手在写的时候这颗键是「停下」：换个颜色，免得跟平时的发送看混 */
@@ -171,8 +181,8 @@
   .msg.md h1, .msg.md h2, .msg.md h3 { font-size: 1.08rem; margin: 1.1em 0 .5em; font-weight: 600; }
   .msg.md ul, .msg.md ol { margin: .6em 0 .6em 1.3em; }
   .msg.md li { margin: .25em 0; }
-  .msg.md code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: #f0ead9; border: 1px solid var(--line); padding: .08em .35em; border-radius: 4px; }
-  .msg.md pre { background: #f6f1e4; border: 1px solid var(--line); border-radius: 8px; padding: .7rem .85rem; overflow-x: auto; margin: .8em 0; }
+  .msg.md code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: var(--code-bg); border: 1px solid var(--line); padding: .08em .35em; border-radius: 4px; }
+  .msg.md pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: .7rem .85rem; overflow-x: auto; margin: .8em 0; }
   .msg.md pre code { background: none; border: 0; padding: 0; font-size: .85em; line-height: 1.7; }
   .msg.md blockquote { border-left: 3px solid var(--accent-soft); padding-left: .9em; color: var(--ink-soft); margin: .8em 0; }
   .msg.md a { color: var(--accent); }
@@ -456,6 +466,26 @@
   .set-note.err { color: #a3453a; }
   .ts-prog { height: 9px; background: var(--line); border-radius: 999px; overflow: hidden; margin: .5rem 0; }
   .ts-prog i { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
+  /* 在外面也能用：二维码、已配对的手机。二维码永远白底黑码——深色底上很多手机扫不出来 */
+  .relay-pair { display: flex; gap: 1.2rem; align-items: center; flex-wrap: wrap; margin: .2rem 0 .4rem; }
+  .relay-qr { width: 200px; height: 200px; flex-shrink: 0; background: #fff; border-radius: .5rem; padding: 6px;
+              border: 1px solid var(--line); }
+  .relay-qr svg { display: block; width: 100%; height: 100%; }
+  .relay-pair .relay-how { flex: 1; min-width: 12rem; }
+  .relay-pair .relay-how p { margin: 0 0 .5rem; }
+  .relay-fp { font-family: ui-monospace, Consolas, monospace; letter-spacing: .06em; color: var(--ink-soft); }
+  .rite-card .relay-h { font-size: .88rem; color: var(--ink-soft); margin: 1.1rem 0 .4rem; }
+  .relay-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .relay-list li { display: flex; align-items: center; gap: .8rem; padding: .6rem 0; border-bottom: 1px solid var(--line); }
+  .relay-list .who { flex: 1; min-width: 0; }
+  .relay-list .who b { font-weight: 600; font-size: .93rem; }
+  .relay-list .who small { display: block; font-size: .78rem; color: var(--ink-mute); margin-top: .15rem; }
+  .relay-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--line); margin-right: .35rem; vertical-align: middle; }
+  .relay-dot.on { background: #5a9a5e; }
+  .relay-ok { color: #4f8a52; }
+  .relay-adv { margin-top: 1.2rem; }
+  .relay-adv summary { cursor: pointer; font-size: .85rem; color: var(--ink-mute); }
+  .relay-adv[open] summary { margin-bottom: .6rem; }
   .set-switch { display: flex; align-items: center; gap: .55rem; font-size: .93rem; cursor: pointer; color: var(--ink); }
   .set-switch input { accent-color: var(--accent); transform: scale(1.15); }
 
@@ -464,12 +494,17 @@
      原来它在后面，等于把手机里的 display:block 又盖回 none，☰ 一直点不动。 */
   #menuBtn { display: none; font-size: 1.2rem; padding: .2rem .4rem; }
   @media (max-width: 860px) {
-    #sidebar { position: fixed; inset: 49px 0 0 0; width: 100%; z-index: 20; display: none; }
+    /* 盖层钉在 main 里而不是按顶栏高度写死 top：顶栏按钮加高到 44px 以后顶栏变高了，
+       写死的 49px 会让书架顶端被顶栏压住一截 */
+    main { position: relative; }
+    #sidebar { position: absolute; inset: 0; width: 100%; z-index: 20; display: none; }
     body.view-read #sidebar.open { display: block; }
     #chat { display: none; }
     #reader .page { padding: 1.4rem 1.1rem 4rem; }
     #menuBtn { display: block; }
     header h1 { display: none; }
+    /* 手机上顶栏连标签都放不下，印跟名字一起让位 */
+    header .gx-seal--c.gx-hd { display: none; }
     /* 390 宽的手机上实测：四个标签加⚙加☰放不下，「工坊」被挤出屏外、「工作台」切掉一半。
        标签条自己可以横向滚（不显示滚动条），面包屑让位——它是说明，标签是出口。 */
     header { gap: .4rem; padding: .5rem .6rem; }
@@ -482,12 +517,29 @@
     #chatBody .msg { max-width: 94%; }
     .col { padding: 0 .9rem; }
     /* 窄屏放不下并排两栏：会话列表变成盖上来的一层，点顶栏的☰开关 */
-    #sessions { position: fixed; inset: 49px 0 0 0; width: 100%; z-index: 20;
+    #sessions { position: absolute; inset: 0; width: 100%; z-index: 20;
       display: none; background: var(--paper); }
     body.view-chat #sessions.open { display: flex; }
     body.view-chat #menuBtn { display: block; }
     /* 触屏没有 hover，删书签的叉常驻显示，否则手机上根本删不掉 */
     .mark-x { opacity: .6; }
+
+    /* 手机上手指点的东西都不低于 44px（390 宽实测原来只有 29–34px，点「对话」常点到「工作台」） */
+    #menuBtn, .tabs button { min-height: 44px; }
+    /* 标签点得到的范围是 44px，看上去的胶囊还是原来那么扁：上下各垫 7px 透明边框，
+       底色只铺到边框里面。直接撑高的话「读书」那颗胶囊会鼓成一个圆 */
+    .tabs button { border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+    /* 选中那颗的底色是 background 简写给的，简写会把 clip 重置回 border-box，所以要单独再写一遍 */
+    .tabs button, .tabs button.on { background-clip: padding-box; }
+    .side-item, .editbar button, .editbar a.obs, .pager button { min-height: 44px; }
+    .editbar a.obs { display: inline-flex; align-items: center; }
+    .book-search input { min-height: 44px; font-size: 1rem; }
+    .mark-x { width: 44px; height: 44px; }
+    /* 正文里的长网址、宽表格、代码块原来把阅读区撑出一截，整页能左右晃。
+       网址就地折行；表格和代码块自己横向滚，不连累正文 */
+    #reader .page { overflow-wrap: anywhere; }
+    #reader table { display: block; overflow-x: auto; }
+    #reader pre { overflow-x: auto; }
   }
 
   /* 校对协作 */
@@ -507,6 +559,30 @@
   /* 带评论的多一条下边线 —— 光靠颜色分不出「划了一道」和「写了话」，
      而用户想找的往往是后者。 */
   mark.hl.has-note { border-bottom: 2px solid rgba(0,0,0,.28); }
+
+  /* ---- 全书搜索 / 跳回原文 ---- */
+  .book-search { margin: .1rem .2rem .4rem; }
+  .book-search input {
+    width: 100%; box-sizing: border-box; padding: .38rem .55rem; font-size: .88rem;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink);
+  }
+  .search-hits { list-style: none; padding: 0; margin: 0; }
+  .search-hits button {
+    display: block; width: 100%; text-align: left; padding: .6rem .7rem; margin: 0 0 .35rem;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink-soft); line-height: 1.6;
+  }
+  .search-hits button:hover { border-color: var(--accent-soft); }
+  .search-hits .hit-ch { display: block; font-size: .76rem; color: var(--ink-mute); margin-bottom: .15rem; }
+  .search-hits mark { background: var(--hit-bg); color: inherit; border-radius: 2px; }
+  .search-note { color: var(--ink-mute); font-size: .85rem; }
+  /* 跳过来的那一段：底色慢慢退掉。一直亮着的话，读者往下读时它就成了噪音 */
+  .passage-hit { background: var(--hit-bg); border-radius: 4px; box-shadow: 0 0 0 4px var(--hit-bg); transition: background 2.4s ease, box-shadow 2.4s ease; }
+  .passage-hit.fade { background: transparent; box-shadow: 0 0 0 4px transparent; }
+  .passage-zh {
+    margin: .5rem 0 1rem; padding: .5rem .75rem; border-left: 3px solid var(--accent-soft);
+    background: var(--paper); color: var(--ink-soft); font-size: .92rem;
+  }
+  .passage-zh small { display: block; color: var(--ink-mute); font-size: .75rem; margin-bottom: .2rem; }
 
   /* 侧边栏里那一列划线前面的小色块 */
   .hl-chip { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: .38rem; background: #FDF0B8; vertical-align: middle; }
@@ -532,27 +608,53 @@
     cursor: pointer; padding: .1rem .4rem; border-left: 1px solid rgba(255,255,255,.2); margin-left: .15rem;
   }
 
-  /* ---- 中英对照 ---- */
-  .cmp-note { color: var(--ink-soft); font-size: .84rem; margin: 0 0 .8rem; }
-  .cmp-row { display: flex; gap: 1.6rem; align-items: flex-start; }
-  .cmp-row + .cmp-row { margin-top: .2rem; }
-  .cmp-a, .cmp-b { flex: 1 1 0; min-width: 0; }
+  /* ---- 章首：显示方式 + 翻译本章 + 进度 ---- */
+  .ch-head { margin: -1rem 0 1.3rem; padding: .7rem .85rem; border: 1px solid var(--line);
+    border-radius: 12px; background: var(--card); font-size: .85rem; }
+  .ch-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .ch-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .ch-seg button { font: inherit; font-size: .82rem; padding: .28rem .75rem; border: 0; background: transparent;
+    color: var(--ink-soft); cursor: pointer; }
+  .ch-seg button + button { border-left: 1px solid var(--line); }
+  .ch-seg button.on { background: var(--accent); color: #fff; }
+  .ch-act { display: flex; gap: .45rem; margin-left: auto; flex-wrap: wrap; }
+  .ch-act button, .ch-st button { font: inherit; font-size: .82rem; padding: .28rem .8rem; border-radius: 999px;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
+  .ch-act button:hover, .ch-st button:hover { color: var(--ink); border-color: var(--accent-soft); }
+  .ch-act button.primary, .ch-st button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .ch-act button[disabled], .ch-st button[disabled] { opacity: .5; cursor: default; }
+  .ch-st { margin-top: .65rem; color: var(--ink-soft); line-height: 1.7; }
+  .ch-st:empty { display: none; }
+  .ch-st .prog { margin: .2rem 0 .35rem; }
+  .ch-st .prog.wait i { width: 30% !important; animation: chWait 1.4s ease-in-out infinite alternate; }
+  @keyframes chWait { from { margin-left: 0; } to { margin-left: 70%; } }
+  @media (prefers-reduced-motion: reduce) { .ch-st .prog.wait i { animation: none; } }
+  .ch-st .line { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .ch-st .line span { flex: 1; min-width: 10rem; }
+  .ch-st.bad { color: #a3453a; }
+  .ch-st .mute { color: var(--ink-mute); }
+
+  /* ---- 双列对照 ---- */
+  #reader .page.wide { max-width: 80rem; }
   /* 原文压淡一档。两栏一样重的时候眼睛不知道该跟哪一边走，
      而看对照的人十有八九是以译文为主、原文为校。 */
   .cmp-a { color: var(--ink-soft); }
-  .cmp-row > div > :first-child { margin-top: 0; }
-  .cmp-row:hover { background: rgba(0,0,0,.02); }
-  /* 对不上号那种：两栏各自滚，滚动条联动 */
-  .cmp-split { display: flex; gap: 1.6rem; height: calc(100vh - 190px); }
-  .cmp-split > div { flex: 1 1 0; min-width: 0; overflow-y: auto; padding-right: .4rem; }
-  .cmp-split .cmp-a { border-right: 1px solid var(--line, #DED5C1); }
-  @media (max-width: 760px) {
-    /* 手机上并排放不下，改成一段原文一段译文交替 */
-    .cmp-row { flex-direction: column; gap: .2rem; }
-    .cmp-a { font-size: .92em; padding-bottom: .3rem; border-bottom: 1px dashed var(--line, #DED5C1); }
-    .cmp-split { flex-direction: column; height: auto; }
-    .cmp-split > div { overflow: visible; height: auto; }
-    .cmp-split .cmp-a { border-right: 0; border-bottom: 1px solid var(--line, #DED5C1); padding-bottom: .8rem; }
+  .cmp-g > :first-child, .cmp-row > div > :first-child { margin-top: 0; }
+  /* 电脑：两栏各自滚，按对齐的段联动（见 linkGroups） */
+  .cmp-split { display: flex; gap: 1.6rem; height: calc(100vh - 230px); min-height: 18rem; }
+  .cmp-split > div { position: relative; flex: 1 1 0; min-width: 0; overflow-y: auto; padding-right: .5rem; }
+  .cmp-split .cmp-a { border-right: 1px solid var(--line); }
+  .cmp-g { padding: .05rem .4rem; margin: 0 -.4rem; border-radius: 6px; }
+  .cmp-g.hot { background: var(--accent-soft-bg, rgba(200,154,74,.12)); }
+  /* 手机：一组原文、一组译文交替排，整页一起滚 */
+  .cmp-stack .cmp-row { padding: .3rem 0 .5rem; border-bottom: 1px dashed var(--line); }
+  .cmp-stack .cmp-a { font-size: .92em; padding-bottom: .35rem; }
+  .cmp-stack .cmp-a:empty, .cmp-stack .cmp-b:empty { display: none; }
+  @media (max-width: 860px) {
+    .ch-head { margin: -.6rem 0 1.1rem; padding: .6rem .65rem; }
+    .ch-seg { width: 100%; }
+    .ch-seg button { flex: 1; padding: .34rem .3rem; }
+    .ch-act { margin-left: 0; }
   }
 
   #suggestBtn {
@@ -608,6 +710,75 @@
     border-radius: 50%; animation: jspin .9s linear infinite;
   }
   @keyframes jspin { to { transform: rotate(360deg); } }
+  /* ---- 夜间 ----
+     跟着系统走：手机夜里调成深色，米纸白一开就刺眼。颜色还是那一套（米、墨、赭），
+     只是反过来，切过去不像换了个软件。
+     data-theme 那一份是给截图和以后的手动开关用的：浏览器里没法临时假装系统是深色。
+     两处的变量表必须一致；各组件只认变量，这里改一处就全站跟着变。 */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #1b1814; --card: #24201b; --ink: #e9e1d0; --ink-soft: #c9bea8;
+      --ink-mute: #958a77; --line: #3b352c; --accent: #b3843d; --accent-soft: #9a7a44;
+      --chat-bg: #1f1c18; --user-bubble: #3a3226; --bot-bubble: #24201b;
+      --bubble-shadow: 0 1px 2px rgba(0,0,0,.3);
+      --code-bg: #2e2922; --hit-bg: #4a3d1f; --link: #dcae62; --img-tile: #f3ecdc; --img-pad: 10px;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #1b1814; --card: #24201b; --ink: #e9e1d0; --ink-soft: #c9bea8;
+    --ink-mute: #958a77; --line: #3b352c; --accent: #b3843d; --accent-soft: #9a7a44;
+    --chat-bg: #1f1c18; --user-bubble: #3a3226; --bot-bubble: #24201b;
+    --bubble-shadow: 0 1px 2px rgba(0,0,0,.3);
+    --code-bg: #2e2922; --hit-bg: #4a3d1f; --link: #dcae62; --img-tile: #f3ecdc; --img-pad: 10px;
+  }
+
+  /* ---- 课程 ----
+     主要是在手机上读的（站主要把课发给朋友远程看），所以按手机先写：
+     能点的东西高度都不低于 44px，出处小按钮本身做小、点击范围用 ::after 撑到 44px，
+     不然一行一个大按钮会把正文拆得读不下去。 */
+  .course .c-top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: .6rem;
+    margin: -2.2rem -1.4rem 1rem; padding: .3rem 1rem; background: var(--paper); border-bottom: 1px solid var(--line); }
+  .course .c-top button { min-height: 44px; padding: 0 .6rem; color: var(--link); font-size: .95rem; }
+  .course .c-top .c-where { margin-left: auto; color: var(--ink-mute); font-size: .8rem; white-space: nowrap; }
+  #reader .course h1 { margin-top: .6em; }
+  .course .c-sub { color: var(--ink-mute); font-size: .9rem; line-height: 1.8; }
+  .course .c-unitname { color: var(--ink-mute); font-size: .82rem; letter-spacing: .08em; margin: 0; }
+  .course .c-unit h2 { display: flex; align-items: baseline; gap: .6rem; }
+  .course .c-unit h2 small { font-size: .78rem; font-weight: 400; color: var(--ink-mute); white-space: nowrap; }
+  .course .c-lessons { list-style: none; padding: 0; margin: 0; }
+  #reader .course .c-lessons li { margin: 0 0 .5rem; }
+  .course .c-lesson { display: flex; gap: .8rem; width: 100%; min-height: 44px; text-align: left; align-items: flex-start;
+    padding: .7rem .8rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); line-height: 1.55; }
+  .course .c-lesson:active { border-color: var(--accent-soft); }
+  .course .c-lesson .c-ln { flex: none; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: var(--user-bubble);
+    color: var(--ink-soft); font-size: .82rem; display: flex; align-items: center; justify-content: center; margin-top: .05rem; }
+  .course .c-lesson b { display: block; font-weight: 600; font-size: 1rem; }
+  .course .c-lesson small { display: block; color: var(--ink-mute); font-size: .84rem; margin-top: .15rem; }
+  .course .c-link { color: var(--link); text-decoration: underline; text-decoration-color: var(--accent-soft);
+    text-underline-offset: .2em; cursor: pointer; overflow-wrap: anywhere; }
+  .course .c-cite { position: relative; display: inline-block; margin: 0 .15rem; padding: 0 .45rem; border-radius: 999px;
+    font-size: .74rem; line-height: 1.55; vertical-align: .12em; color: var(--link); border: 1px solid var(--accent-soft); }
+  .course .c-cite::after { content: ""; position: absolute; inset: -13px -8px; }
+  .course .c-unv { font-size: .72rem; color: var(--ink-mute); border: 1px dashed var(--line); border-radius: 999px;
+    padding: 0 .4rem; margin: 0 .15rem; white-space: nowrap; }
+  .course .c-pager { display: flex; flex-direction: column; gap: .5rem; margin-top: 2.6rem; }
+  .course .c-pager button { min-height: 44px; padding: .55rem .8rem; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--card); color: var(--link); text-align: left; line-height: 1.5; }
+  .course .c-pager button.next { text-align: right; }
+  .course .c-pager small { display: block; color: var(--ink-mute); font-size: .75rem; }
+  /* 从课里跳到原文那一章时钉在顶上的返回条：读完那一段要能一下回到课文原处 */
+  .c-back { position: sticky; top: 0; z-index: 5; display: block; width: calc(100% + 2.8rem); min-height: 44px;
+    margin: -2.2rem -1.4rem 1rem; padding: 0 1rem; text-align: left; background: var(--card);
+    border-bottom: 1px solid var(--line); color: var(--link); font-size: .95rem; }
+  .side-item.course-entry { color: var(--ink); font-weight: 600; }
+  /* 手机上正文左右边距是 1.1rem（见上面的窄屏分支），顶条要贴边就得跟着改；
+     写在这里而不是那个分支里：那一段在前面，会被上面同权重的规则盖掉 */
+  @media (max-width: 860px) {
+    .course .c-top { margin: -1.4rem -1.1rem 1rem; }
+    .c-back { margin: -1.4rem -1.1rem 1rem; width: calc(100% + 2.2rem); }
+  }
   @media (prefers-reduced-motion: reduce) { .job-card .jicon.spin { animation-duration: 3s; } }
   .job-card .jmain { min-width: 0; flex: 1; }
   .job-card .jt { font-size: .93rem; line-height: 1.65; word-break: break-word; }
@@ -631,9 +802,12 @@
 </style>
 </head>
 <body class="view-read">
+<!-- 开场与印：下面这段由 installer/build-consecrate.js 生成，别手改。必须紧跟 <body>：幕要先于页面内容画出来 -->
+<!--gx:head--><style id="gx-css">#gx-veil{display:none}html.gx-v #gx-veil{display:block;position:fixed;z-index:2147483600;opacity:1;-webkit-transition:opacity .6s ease,background-color .35s ease;transition:opacity .6s ease,background-color .35s ease;-webkit-animation:gx-out .6s ease-in 8000ms forwards;animation:gx-out .6s ease-in 8000ms forwards}html.gx-end #gx-veil{opacity:0;pointer-events:none}html.gx-full #gx-veil{top:0;right:0;bottom:0;left:0;background:#0a0908;cursor:pointer;-webkit-tap-highlight-color:transparent}html.gx-full.gx-day #gx-veil{background:#FAF6EC}#gx-veil canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block}html.gx-float #gx-veil canvas,html.gx-rm #gx-veil canvas{display:none}#gx-veil .gx-logo{position:absolute;left:50%;top:50%;width:76px;height:76px;margin:-38px 0 0 -38px;color:#e8c877;-webkit-filter:drop-shadow(0 0 14px rgba(232,200,119,.45));filter:drop-shadow(0 0 14px rgba(232,200,119,.45));-webkit-animation:gx-in .9s ease-out both;animation:gx-in .9s ease-out both}html.gx-day #gx-veil .gx-logo{color:#8C6A2D;-webkit-filter:drop-shadow(0 0 12px rgba(214,168,86,.45));filter:drop-shadow(0 0 12px rgba(214,168,86,.45))}@media (max-width:600px){html.gx-full #gx-veil .gx-logo{width:64px;height:64px;margin:-32px 0 0 -32px}}#gx-veil .gx-ring{display:none;position:absolute;top:0;left:0;width:100%;height:100%;color:#e8c877;overflow:visible}html.gx-day #gx-veil .gx-ring{color:#9A7433}html.gx-float #gx-veil{top:50%;left:50%;width:76px;height:76px;margin:-38px 0 0 -38px;background:none;pointer-events:none;-webkit-animation:gx-pop .3s ease-out,gx-out .6s ease-in 8000ms forwards;animation:gx-pop .3s ease-out,gx-out .6s ease-in 8000ms forwards}html.gx-float #gx-veil .gx-ring{display:block}html.gx-float #gx-veil .gx-ring>circle:first-child{display:none}html.gx-float.gx-night #gx-veil .gx-ring{-webkit-filter:drop-shadow(0 0 1.5px rgba(10,9,8,.95)) drop-shadow(0 0 4px rgba(232,200,119,.4));filter:drop-shadow(0 0 1.5px rgba(10,9,8,.95)) drop-shadow(0 0 4px rgba(232,200,119,.4))}html.gx-float.gx-day #gx-veil .gx-ring{-webkit-filter:drop-shadow(0 0 1.5px rgba(255,252,244,1)) drop-shadow(0 0 4px rgba(255,246,222,.95));filter:drop-shadow(0 0 1.5px rgba(255,252,244,1)) drop-shadow(0 0 4px rgba(255,246,222,.95))}html.gx-float #gx-veil .gx-logo{width:34px;height:34px;margin:-17px 0 0 -17px;-webkit-filter:drop-shadow(0 0 1.5px rgba(10,9,8,.95)) drop-shadow(0 0 3px rgba(10,9,8,.8)) drop-shadow(0 0 7px rgba(232,200,119,.45));filter:drop-shadow(0 0 1.5px rgba(10,9,8,.95)) drop-shadow(0 0 3px rgba(10,9,8,.8)) drop-shadow(0 0 7px rgba(232,200,119,.45));-webkit-animation:none;animation:none}html.gx-float.gx-day #gx-veil .gx-logo{-webkit-filter:drop-shadow(0 0 1.5px rgba(255,252,244,1)) drop-shadow(0 0 3px rgba(255,250,238,1)) drop-shadow(0 0 7px rgba(255,244,216,.9));filter:drop-shadow(0 0 1.5px rgba(255,252,244,1)) drop-shadow(0 0 3px rgba(255,250,238,1)) drop-shadow(0 0 7px rgba(255,244,216,.9))}html.gx-rm #gx-veil .gx-logo{-webkit-animation:none;animation:none}@-webkit-keyframes gx-out{to{opacity:0;visibility:hidden}}@keyframes gx-out{to{opacity:0;visibility:hidden}}@-webkit-keyframes gx-in{from{opacity:0;-webkit-transform:scale(.94)}to{opacity:1;-webkit-transform:none}}@keyframes gx-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}@-webkit-keyframes gx-pop{from{opacity:0;-webkit-transform:scale(.9)}to{opacity:1;-webkit-transform:none}}@keyframes gx-pop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}.gx-seal{pointer-events:none;-webkit-user-select:none;user-select:none;line-height:0;color:#8C6A2D;-webkit-transition:opacity 1.4s ease;transition:opacity 1.4s ease}.gx-seal:not(.gx-on){opacity:0!important}.gx-seal[data-plan]:not(.gx-seal--a):not(.gx-seal--c){display:none}.gx-seal.gx-dark{color:#D4A050}.gx-seal svg{display:block;width:100%;height:100%;overflow:visible}.gx-seal--a{position:fixed;right:10px;bottom:10px;right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));width:32px;height:32px;margin:0;opacity:.42;z-index:40}.gx-seal--a.gx-left{right:auto;left:10px;left:calc(10px + env(safe-area-inset-left,0px))}.gx-seal--b{display:block;width:280px;max-width:74vw;height:20px;margin:34px auto 26px;opacity:.5}.gx-seal--b.gx-div{max-width:100%;opacity:.72}.gx-seal--c{display:block;width:34px;height:34px;margin:28px 18px 18px auto;margin-right:calc(18px + env(safe-area-inset-right,0px));margin-bottom:calc(18px + env(safe-area-inset-bottom,0px));opacity:.5}@media print{#gx-veil,.gx-seal{display:none!important}}</style><script>(function(){try{var d=document.documentElement,w=window,b=document.body,t0=Date.now(),seen=0,rm=0,m,done=0,night;try{var s=w.sessionStorage;seen=!!s.getItem("gx-veil");s.setItem("gx-veil","1")}catch(e){seen=1}try{rm=!!(w.matchMedia&&w.matchMedia("(prefers-reduced-motion: reduce)").matches)}catch(e){}m=seen?"float":"full";if(m==="off")return;function L(el){if(!el)return -1;var c=getComputedStyle(el).backgroundColor,x=c&&c.match(/[\d.]+/g);if(!x||x.length<3||(x.length>3&&+x[3]<.5))return -1;return .2126*x[0]+.7152*x[1]+.0722*x[2]}function tone(){var l=L(b),k,i;if(l<0)l=L(d);if(l<0&&b){k=b.children;for(i=0;i<k.length&&l<0;i++)if(k[i].id!=="gx-veil"&&k[i].offsetHeight>innerHeight*.5)l=L(k[i])}if(l>=0)return l<128;try{return w.matchMedia("(prefers-color-scheme: dark)").matches&&/dark/.test(getComputedStyle(d).colorScheme||"")}catch(e){return false}}night=tone();d.className+=" gx-v gx-"+m+(night?" gx-night":" gx-day")+(rm?" gx-rm":"");function end(now){if(done)return;done=1;setTimeout(function(){d.className+=" gx-end";setTimeout(function(){d.className=d.className.replace(/ gx-(v|full|float|day|night|rm|end)(?!\S)/g,"");var v=document.getElementById("gx-veil");if(v&&v.parentNode)v.parentNode.removeChild(v)},650)},now?0:Math.max(0,300-(Date.now()-t0)))}w.addEventListener("load",function(){end()});document.addEventListener("DOMContentLoaded",function(){var n=tone();if(n!==night&&!done){night=n;d.className=d.className.replace(/ gx-(day|night)(?!\S)/," gx-"+(n?"night":"day"))}setTimeout(function(){end()},1200)});if(m==="full"){document.addEventListener("click",function(e){for(var n=e.target;n;n=n.parentNode)if(n.id==="gx-veil"){e.preventDefault();e.stopPropagation();end(1);return}},true);w.addEventListener("keydown",function(e){if(e.key==="Escape"||e.keyCode===27)end(1)})}w.GXV={mode:m,rm:rm,t0:t0,end:end}}catch(e){}})();</script><div id="gx-veil" aria-hidden="true"><canvas></canvas><svg class="gx-ring" viewBox="0 0 40 40" focusable="false"><circle cx="20" cy="20" r="16.2" fill="none" stroke="currentColor" stroke-width=".4" opacity=".3"/></svg><svg class="gx-logo" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g transform="scale(.09375)"><defs><clipPath id="gx-app-clip"><path d="M0 0H256V166H200C172 162 144 166 128 176C112 166 84 162 56 166H0Z"/></clipPath></defs><g fill="currentColor"><path d="M128 34L134.5 56L157 62L134.5 68L128 90L121.5 68L99 62L121.5 56Z"/><circle cx="58" cy="46" r="4"/><circle cx="202" cy="38" r="5.5"/><circle cx="220" cy="70" r="3"/><circle cx="40" cy="76" r="2.8"/><path opacity=".8" d="M123 92C102 82 78 79 60 85C76 95 102 100 123 99Z"/><path opacity=".8" d="M133 92C154 82 178 79 196 85C180 95 154 100 133 99Z"/></g><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M128 88V176" stroke-width="9"/><g clip-path="url(#gx-app-clip)" stroke-width="7.5"><path d="M106 180C106 158 152 152 152 130C152 108 106 104 106 94"/><path d="M150 180C150 158 104 152 104 130C104 108 150 104 150 94"/></g><path stroke-width="9" d="M128 176C112 166 84 162 56 166V208C84 204 112 208 128 220ZM128 176C144 166 172 162 200 166V208C172 204 144 208 128 220Z"/></g><g fill="currentColor"><circle cx="106" cy="94" r="5.5"/><circle cx="150" cy="94" r="5.5"/></g></g></svg></div><script src="/consecrate.js?v=a9262ed1" async></script><!--/gx:head-->
   <header>
     <button id="menuBtn" title="书架">☰</button>
     <h1>群星回廊</h1>
+    <span class="gx-seal gx-seal--c gx-hd" aria-hidden="true"></span>
     <span class="crumb" id="crumb"></span>
     <span class="spacer"></span>
     <nav class="tabs">
@@ -983,6 +1157,15 @@
       `<button class="side-item" id="backShelf">← 书架</button>`,
       `<div class="side-h">${esc(b.name)}</div>`,
     ];
+    // 全书搜索只搜原文：规格定的「原文是唯一真相」，而且没翻完的书译文是残缺的。
+    // 没有原文章节的（纯笔记本之类）不给框，给了也搜不出东西。
+    if (b.original.length) {
+      parts.push(`<form class="book-search" id="bookSearch"><input type="search" id="bookQ" placeholder="🔍 在原文里搜…" `
+        + `value="${esc(lastQuery)}" enterkeyhint="search" autocomplete="off"></form>`);
+    }
+    // 课程放在最上面：编过课的书，照着课学是主路，梗概和章节是查的时候才翻
+    if (b.course) parts.push(`<button class="side-item course-entry${coursePage !== null ? " on" : ""}" data-course="1">📚 课程`
+      + `<small>按课学这本书，引的原文都能点回去</small></button>`);
     if (b.outline) parts.push(item(`Library/${b.name}/01-全书梗概.md`, "📖 全书梗概"));
     if (b.summary) parts.push(item(`Library/${b.name}/02-逐章摘要.md`, "🗂 逐章摘要"));
     if (b.translated.length) {
@@ -1430,63 +1613,388 @@
     }
   }
 
-  // ------------------------------------------------------------------ 中英对照
+  // ------------------------------------------------------------------ 全书搜索 / 跳回原文
   //
-  // 数据全在服务端配好（/api/pair），这边只管画。两种画法：
-  //   段数对得上 —— 逐段并排，电脑左右两栏、手机一段原文一段译文交替；
-  //   对不上     —— 两栏各自滚动、滚动条联动，并且把「为什么没并排」写在上面。
-  // 不硬配的理由写在服务端那一段上。
-  let cmpMode = false;
-  const isChapter = rel => /\/(00-原书|译文)\//.test(rel || "");
+  // 搜的是服务端的全文索引（每本书一个，原文改了会自己重建）。结果点进去，
+  // 落到阅读器里那一章、那一段，高亮一下，并把对齐好的译文摆在它下面。
+  // 以后课程里的出处、笔记里引的原文，都走 jumpToPassage 这同一条路。
+  let lastQuery = "";
 
-  function linkScroll(root) {
-    const cols = root.querySelectorAll(".cmp-split > div");
+  async function searchBook(q) {
+    q = String(q || "").trim();
+    lastQuery = q;
+    if (!currentBook || !q) return;
+    const name = currentBook.name;
+    let r;
+    try {
+      r = await getJson(`/api/book/search?name=${encodeURIComponent(name)}&q=${encodeURIComponent(q)}`);
+    } catch (e) {
+      toast(e.message);
+      return;
+    }
+    coursePage = null;
+    currentFile = null;              // 搜索页不是书里的文件：书签、划线、改一改都不该挂在它上面
+    crumb.textContent = `${name} · 搜「${q}」`;
+    // 先转义再标黄：原文可能是别人共享过来的，不能让里面的尖括号变成标签
+    const re = new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    const items = r.hits.map(h => `<li><button data-pid="${esc(h.id)}">`
+      + `<span class="hit-ch">${esc(h.chapter_file.replace(/\.md$/, ""))} · 第 ${h.order} 段</span>`
+      + esc(h.snippet).replace(re, m => `<mark>${m}</mark>`) + `</button></li>`).join("");
+    const note = !r.hits.length ? "原文里没搜到。换个说法，或者少打几个字试试。"
+      : `找到 ${r.hits.length}${r.more ? "+" : ""} 处${r.more ? "，只列出前 " + r.hits.length + " 处，换个更具体的词能缩小范围" : ""}。点一下跳到原文那一段。`;
+    reader.innerHTML = `<div class="page"><h2>搜「${esc(q)}」</h2><p class="search-note">${esc(note)}</p>`
+      + `<ol class="search-hits">${items}</ol></div>`;
+    reader.scrollTop = 0;
+    sidebar.classList.remove("open");
+  }
+
+  // 按段落 ID 跳到原文。段落里写的是 markdown，页面上是渲染过的 html，两边不能直接比；
+  // 都只留字母和数字再比开头一截——星号、井号、标点、空格这些渲染时会变的东西全不看。
+  const passageKey = s => String(s || "").normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, "");
+
+  async function jumpToPassage(book, id) {
+    if (!book || !id) return;
+    let r;
+    try {
+      r = await getJson(`/api/passage?book=${encodeURIComponent(book)}&id=${encodeURIComponent(id)}`);
+    } catch (e) {
+      toast(e.message);
+      return;
+    }
+    if (r.path !== currentFile && !(await openFile(r.path))) {
+      toast("这一章打不开了，刷新一下页面再试。");
+      return;
+    }
+    const probe = passageKey(r.text).slice(0, 24);
+    // 从细到粗找：先段落、标题、列表项，最后才是引用块整块
+    const blocks = reader.querySelectorAll(".page p, .page h1, .page h2, .page h3, .page h4, .page h5, .page h6, .page li, .page pre, .page blockquote");
+    const el = probe && [...blocks].find(b => passageKey(b.textContent).includes(probe));
+    if (!el) {
+      toast("这一段在正文里没找着——可能这一章刚被改过。");
+      return;
+    }
+    el.dataset.pid = r.id;
+    reader.querySelectorAll(".passage-hit").forEach(x => x.classList.remove("passage-hit", "fade"));
+    reader.querySelectorAll(".passage-zh").forEach(x => x.remove());
+    el.classList.add("passage-hit");
+    // 规格第 3 节：证据段落要原文和译文一起看。没翻的章也说一声，不然读者以为是漏了。
+    // 原书本来就是中文的，没有译文可言，什么都不摆（服务端按整章汉字比例判的）。
+    if (r.zh || r.needsTranslation !== false) {
+      const zh = document.createElement("div");
+      zh.className = "passage-zh";
+      zh.innerHTML = r.zh
+        ? `<small>对应的译文</small>${esc(r.zh)}`
+        : `<small>这一章还没翻译，只有原文。</small>`;
+      el.after(zh);
+    }
+    el.scrollIntoView({ block: "center" });
+    setTimeout(() => el.classList.add("fade"), 1800);
+    if (r.moved) toast("这段原文后来改过，已经跳到改过之后的那一段。");
+  }
+  window.jumpToPassage = jumpToPassage;   // 给以后的课程页、笔记里的出处链接用
+
+  // ------------------------------------------------------------------ 课程
+  //
+  // 课程编纂器编好的课：目录 → 一课 → 知识卡，点「原文」跳回书里那一段。
+  // 就画在阅读区里，不另开视图：课文跟原文来回跳是常事，同一个滚动区里切最不容易迷路。
+  // 「返回」自己记一条栈，不走浏览器历史——这个页面别处都没用 history，
+  // 只在课程里接管后退键，用户退出课程时反而会被困在里面。
+  let coursePage = null;        // 正在看的课程页（"" = 目录）；不在课程里是 null
+  let courseStack = [];
+
+  const courseBar = (back, where) => `<nav class="c-top"><button ${back}>← ${back === "data-course" ? "课程目录" : "返回"}</button>`
+    + (where ? `<span class="c-where">${esc(where)}</span>` : "") + `</nav>`;
+
+  async function openCourse() {
+    if (!currentBook) return;
+    let r;
+    try { r = await getJson("/api/course/outline?book=" + encodeURIComponent(currentBook.name)); }
+    catch (e) { toast(e.message); return; }
+    const n = r.units.reduce((k, u) => k + u.lessons.length, 0);
+    let no = 0;
+    const units = r.units.map((u, ui) => `<section class="c-unit"><h2>${esc(u.title)}<small>第 ${ui + 1} 单元</small></h2><ol class="c-lessons">`
+      + u.lessons.map(l => `<li><button class="c-lesson" data-cpage="${esc(l.file)}"><span class="c-ln">${++no}</span>`
+        + `<span><b>${esc(l.title)}</b><small>${esc(l.goal || "")}</small></span></button></li>`).join("")
+      + `</ol></section>`).join("");
+    showCourse("", `<h1>课程</h1><p class="c-sub">${r.units.length} 个单元、${n} 课，${r.cards} 张知识卡。`
+      + `课里引的每一句原文都核对过出处，点句子后面的「原文」能跳回书里那一段。</p>${units}`, "课程");
+    courseStack = [];
+  }
+
+  async function openCoursePage(rel, back) {
+    if (!currentBook) return;
+    let r;
+    try { r = await getJson(`/api/course/page?book=${encodeURIComponent(currentBook.name)}&path=${encodeURIComponent(rel)}`); }
+    catch (e) { toast(e.message); return; }
+    if (!back && coursePage !== null && coursePage !== rel) courseStack.push(coursePage);
+    const nav = r.kind !== "lesson" ? "" : `<nav class="c-pager">`
+      + (r.prev ? `<button data-cpage="${esc(r.prev.file)}"><small>上一课</small>← ${esc(r.prev.title)}</button>` : "")
+      + (r.next ? `<button class="next" data-cpage="${esc(r.next.file)}"><small>下一课</small>${esc(r.next.title)} →</button>` : "")
+      + `</nav>`;
+    // 课文一律给「课程目录」：从目录点进来、或者上一课下一课翻过来，想回的都是目录；
+    // 卡片是从课里点进来的，「返回」回到刚才那一课
+    const top = r.kind === "lesson" ? courseBar("data-course", `第 ${r.no} / ${r.total} 课`)
+      : courseBar(courseStack.length ? "data-cup" : "data-course", r.kind === "card" ? "知识卡" : "");
+    showCourse(rel, top + (r.kind === "lesson" ? `<p class="c-unitname">${esc(r.unit)}</p>` : "") + r.html + nav, r.title);
+    if (r.kind === "lesson") courseStack = [];
+  }
+
+  function showCourse(rel, html, label) {
+    reader.innerHTML = `<div class="page course">${html}</div>`;
+    currentFile = null;              // 课程页不是书里的一章：书签、划线、改一改都不挂在它上面
+    coursePage = rel;
+    crumb.textContent = `${currentBook.name} · ${label}`;
+    reader.scrollTop = 0;
+    sidebar.classList.remove("open");
+    renderBookMenu();
+  }
+
+  // 从课里点「原文」：先记下课文读到哪儿，跳过去之后在原文页顶上钉一条「回到这一课」
+  async function jumpFromCourse(pid) {
+    const from = { rel: coursePage, top: reader.scrollTop, stack: courseStack.slice() };
+    await jumpToPassage(currentBook.name, pid);
+    if (!reader.querySelector(".passage-hit")) return;     // 没跳成，页面还是原来那一课
+    const page = reader.querySelector(".page");
+    const bar = document.createElement("button");
+    bar.className = "c-back";
+    bar.textContent = "← 回到课文";
+    bar.addEventListener("click", async () => {
+      await (from.rel ? openCoursePage(from.rel, true) : openCourse());
+      courseStack = from.stack;
+      reader.scrollTop = from.top;
+    });
+    page.prepend(bar);
+  }
+
+  // ------------------------------------------------------------------ 显示方式
+  //
+  // 三档：单栏（点哪篇看哪篇，一直以来的样子，也是默认）、双列对照、只看译文。
+  // 记在这台设备的浏览器里：手机上爱看译文、电脑上爱看对照的人不少，
+  // 记到服务端反而会让两边互相改来改去。
+  //
+  // 双列对照的数据全在服务端配好（/api/pair，按长度的 DP 对齐，见那一段），
+  // 这边只管画：电脑左右两栏各自滚、按对齐的段联动；手机（≤860）并排放不下，
+  // 改成一组原文、一组译文交替，整页一起滚 —— 联动在手机上没意义，两栏各占 180 像素宽读不了。
+  const READ_MODES = { single: "单栏", pair: "双列对照", zh: "只看译文" };
+  let readMode = (() => { try { const m = localStorage.getItem("shufang.readMode"); return READ_MODES[m] ? m : "single"; } catch { return "single"; } })();
+  let cmpMode = false;                 // 现在页面上画的是不是双列
+  let pairData = null;                 // 上一次 /api/pair 的结果，转屏跨过 860 时重画用
+  const isChapter = rel => /\/(00-原书|译文)\//.test(rel || "");
+  const chNo = f => (String(f || "").match(/^(\d+)/) || [])[1] || "";
+  const narrow = window.matchMedia("(max-width: 860px)");
+
+  // 这一页是第几章、原文译文各在哪。不是书里的章就返回 null（梗概、笔记之类）。
+  function chapterOf(rel) {
+    if (!currentBook || !isChapter(rel)) return null;
+    const no = chNo(rel.split("/").pop());
+    if (!no) return null;
+    const src = currentBook.original.find(f => chNo(f) === no) || null;
+    const zh = currentBook.translated.find(f => chNo(f) === no) || null;
+    return {
+      no: Number(no), src, zh,
+      srcRel: src ? `Library/${currentBook.name}/00-原书/${src}` : null,
+      zhRel: zh ? `Library/${currentBook.name}/译文/${zh}` : null,
+      onZh: rel.includes("/译文/"),
+    };
+  }
+
+  // 「只看译文」：点了原文那一章，有译文就换成译文打开
+  function preferredRel(rel) {
+    if (readMode !== "zh") return rel;
+    const c = chapterOf(rel);
+    return c && !c.onZh && c.zhRel ? c.zhRel : rel;
+  }
+
+  function setReadMode(m) {
+    if (!READ_MODES[m] || m === readMode) return;
+    readMode = m;
+    try { localStorage.setItem("shufang.readMode", m); } catch { }
+    if (!currentFile) return;
+    // 从「只看译文」切回来，回到原来点的那一篇说不清是哪篇 —— 就停在现在这篇
+    openFile(currentFile);
+  }
+
+  // 两栏按对齐的组联动：左边第 k 组读到三分之一，右边就停在第 k 组的三分之一处。
+  // 不按整栏的滚动比例：译文比原文短三成，长短段一多，比例联动几屏之后就差出好几段。
+  function linkGroups(root) {
+    const cols = [...root.querySelectorAll(".cmp-split > div")];
     if (cols.length !== 2) return;
-    let lock = false;
+    const gs = cols.map(c => [...c.querySelectorAll(":scope > .cmp-g")]);
+    // 程序替对面设的那一次 scroll 事件不能再反推回来，否则两栏会互相拉扯着抖
+    const skip = [false, false];
     cols.forEach((from, i) => {
+      const to = cols[1 - i];
       from.addEventListener("scroll", () => {
-        if (lock) return;
-        lock = true;
-        const to = cols[1 - i];
-        const fm = from.scrollHeight - from.clientHeight;
-        const tm = to.scrollHeight - to.clientHeight;
-        to.scrollTop = fm > 0 ? (from.scrollTop / fm) * tm : 0;
-        // 下一帧再解锁：同一轮里对面那次 scroll 事件不该反弹回来
-        requestAnimationFrame(() => { lock = false; });
+        if (skip[i]) { skip[i] = false; return; }
+        const y = from.scrollTop;
+        let target;
+        if (y >= from.scrollHeight - from.clientHeight - 2) target = to.scrollHeight;   // 到底了，对面也到底
+        else {
+          const a = gs[i], b = gs[1 - i];
+          let k = 0;
+          for (let n = 0; n < a.length; n++) { if (a[n].offsetTop <= y + 1) k = n; else break; }
+          const frac = a[k] ? Math.min(1, (y - a[k].offsetTop) / Math.max(1, a[k].offsetHeight)) : 0;
+          target = b[k] ? b[k].offsetTop + frac * b[k].offsetHeight : 0;
+        }
+        target = Math.max(0, Math.min(Math.round(target), to.scrollHeight - to.clientHeight));
+        if (Math.abs(to.scrollTop - target) < 1) return;   // 不动就不会有事件，别留着 skip 吞掉用户下一次滚动
+        skip[1 - i] = true;
+        to.scrollTop = target;
       }, { passive: true });
+    });
+    // 指到哪一组，对面那组也亮一下：眼睛找「这句对应哪儿」最快的办法
+    root.addEventListener("mouseover", e => {
+      const g = e.target.closest(".cmp-g");
+      root.querySelectorAll(".cmp-g.hot").forEach(x => x.classList.remove("hot"));
+      if (!g) return;
+      root.querySelectorAll(`.cmp-g[data-g="${g.dataset.g}"]`).forEach(x => x.classList.add("hot"));
     });
   }
 
-  async function toggleCompare() {
-    if (!currentFile) return;
-    if (cmpMode) { cmpMode = false; await openFile(currentFile); return; }
-    let r;
-    try { r = await getJson("/api/pair?path=" + encodeURIComponent(currentFile)); }
-    catch (e) { toast("对照打不开：" + e.message); return; }
-    if (!r || !r.ok) { toast((r && r.reason) || "这一章没法对照。"); return; }
-    cmpMode = true;
+  function renderPair(r) {
+    const page = reader.querySelector(".page");
+    if (!page || !r) return;
     const nav = chapterNav(currentFile);
-    if (r.aligned) {
-      const rows = r.src.blocks.map((b, i) =>
-        `<div class="cmp-row"><div class="cmp-a">${b}</div><div class="cmp-b">${r.zh.blocks[i] || ""}</div></div>`).join("");
-      reader.innerHTML = `<div class="page">${editBar()}`
-        + `<p class="cmp-note">左边原文，右边译文，逐段对齐。手机上是一段原文、一段译文交替。</p>`
-        + rows + nav + `</div>`;
+    const join = a => a.join("");
+    let body;
+    if (narrow.matches) {
+      body = `<div class="cmp-stack">` + r.groups.map(g =>
+        `<div class="cmp-row"><div class="cmp-a">${join(g.s)}</div><div class="cmp-b">${join(g.z)}</div></div>`).join("") + `</div>`;
     } else {
-      reader.innerHTML = `<div class="page">${editBar()}`
-        + `<p class="cmp-note">${esc(r.why || "")}</p>`
-        + `<div class="cmp-split"><div class="cmp-a">${r.src.html}</div><div class="cmp-b">${r.zh.html}</div></div>`
-        + `</div>`;
-      linkScroll(reader);
+      body = `<div class="cmp-split"><div class="cmp-a">`
+        + r.groups.map((g, k) => `<div class="cmp-g" data-g="${k}">${join(g.s)}</div>`).join("")
+        + `</div><div class="cmp-b">`
+        + r.groups.map((g, k) => `<div class="cmp-g" data-g="${k}">${join(g.z)}</div>`).join("")
+        + `</div></div>`;
     }
-    reader.scrollTop = 0;
+    page.classList.add("wide");
+    page.innerHTML = chapterHead() + editBar() + body + nav;
+    if (!narrow.matches) linkGroups(page);
     bindPager();
   }
+  narrow.addEventListener("change", () => { if (cmpMode && pairData) renderPair(pairData); });
+
+  async function showPair() {
+    const at = currentFile;
+    let r;
+    try { r = await getJson("/api/pair?path=" + encodeURIComponent(at)); }
+    catch (e) { toast("对照打不开：" + e.message); return false; }
+    if (currentFile !== at || editing) return false;    // 等对齐的工夫里读者已经翻到别处、或者开始改了
+    if (!r || !r.ok) { toast((r && r.reason) || "这一章没法对照。"); return false; }
+    cmpMode = true;
+    pairData = r;
+    renderPair(r);
+    reader.scrollTop = 0;
+    return true;
+  }
+
+  // ------------------------------------------------------------------ 翻译本章
+  //
+  // 章首那一块：显示方式三档 + 「翻译本章」/「重新翻译」+ 进度。
+  // 翻译是服务端的后台作业（kind=translate，底下就是对话里「翻第 N 章」那条 translate.js），
+  // 进度从 /api/jobs 来 —— 所以刷新页面、换台设备打开，进度条都还在。
+  function chapterJob(no) {
+    if (!currentBook) return null;
+    return jobList.find(j => j.kind === "translate" && j.book === currentBook.name && j.chapter === no) || null;
+  }
+
+  function chapterHead() {
+    const c = chapterOf(currentFile);
+    if (!c) return "";
+    return `<div class="ch-head" data-chhead="1">${chapterHeadInner(c)}</div>`;
+  }
+
+  function chapterHeadInner(c) {
+    const seg = `<div class="ch-seg" role="group" aria-label="显示方式">` + Object.entries(READ_MODES).map(([k, t]) =>
+      `<button data-rmode="${k}" class="${k === readMode ? "on" : ""}" aria-pressed="${k === readMode}">${t}</button>`).join("") + `</div>`;
+    const j = chapterJob(c.no);
+    const busy = j && (j.state === "running" || j.state === "queued");
+    // 失败的那条下面已经有「再试一次」了，上面再摆一颗「翻译本章」是两颗按钮干一件事
+    const failedHere = j && j.state === "failed" && !j.dismissedLocal;
+    const acts = [];
+    if (c.src && !busy && !failedHere) {
+      if (c.zh) {
+        if (!c.onZh && readMode === "single") acts.push(`<button data-tr="show">看译文</button>`);
+        acts.push(`<button data-tr="redo">重新翻译</button>`);
+      } else acts.push(`<button class="primary" data-tr="go">翻译本章</button>`);
+    }
+    let st = "", bad = false;
+    if (j && j.state === "queued") {
+      st = `<div class="line"><span>排着队${j.ahead ? `，前面还有 ${j.ahead} 件` : "，马上开始"}</span><button data-tr="stop" data-id="${esc(j.id)}">停下</button></div>`;
+    } else if (j && j.state === "running") {
+      const p = j.progress || {};
+      const pct = p.totalChars ? Math.floor(p.doneChars * 100 / p.totalChars) : 0;
+      const started = p.total > 0;
+      const text = j.cancelling ? "正在停下…"
+        : !started ? "正在准备…"
+        : `正在翻译第 ${c.no} 章 · 已译 ${p.done}/${p.total} 段 · ${pct}%`;
+      st = `<div class="prog${started ? "" : " wait"}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>`
+        + `<div class="line"><span>${text}<span class="mute">　翻完之前，原来的${c.zh ? "译文" : "页面"}一个字都不动</span></span>`
+        + (j.cancelling ? "" : `<button data-tr="stop" data-id="${esc(j.id)}">停下</button>`) + `</div>`;
+    } else if (j && j.state === "failed" && !j.dismissedLocal) {
+      bad = true;
+      st = `<div class="line"><span>⚠️ 第 ${c.no} 章没翻成：${esc(j.error || "中途出岔子了。")}</span>`
+        + `<button class="primary" data-tr="retry">再试一次</button><button data-tr="dismiss" data-id="${esc(j.id)}">知道了</button></div>`;
+    } else if (j && j.state === "done" && !j.dismissedLocal && c.zh && Date.now() - (j.endedAt || 0) < 10 * 60000) {
+      st = `<div class="line"><span>✓ 第 ${c.no} 章翻好了${j.newTerms ? `，新收了 ${j.newTerms} 个专名进译名表` : ""}。</span>`
+        + (!c.onZh && readMode === "single" ? `<button class="primary" data-tr="show">看译文</button>` : "")
+        + `<button data-tr="dismiss" data-id="${esc(j.id)}">知道了</button></div>`;
+    } else if (!c.zh && readMode !== "single") {
+      st = `<span class="mute">这一章还没有译文，先给你看原文。</span>`;
+    }
+    return `<div class="ch-row">${seg}<div class="ch-act">${acts.join("")}</div></div>`
+      + `<div class="ch-st${bad ? " bad" : ""}">${st}</div>`;
+  }
+
+  // 轮询回来只换章首那一块，不重画正文：重画会把读者的滚动位置和划线都弄丢
+  function refreshChapterHead() {
+    const box = reader.querySelector("[data-chhead]");
+    const c = box && chapterOf(currentFile);
+    if (c) box.innerHTML = chapterHeadInner(c);
+  }
+
+  async function startTranslate(force) {
+    const c = chapterOf(currentFile);
+    if (!c || !currentBook) return;
+    if (force && !confirm(`重新翻译第 ${c.no} 章？\n\n现在的译文会被新译文整个换掉，你在网页里改过的地方也会跟着没了。\n翻译会调用模型，花一点钱。`)) return;
+    try {
+      const r = await api("/api/job", { kind: "translate", book: currentBook.name, chapter: c.no, force: !!force });
+      // 先把这一条塞进列表，章首立刻变成进度条；不然要等下一轮轮询才有反应，像没点上
+      if (r && r.job) { jobList = [r.job, ...jobList.filter(x => x.id !== r.job.id)]; refreshChapterHead(); renderJobs(); }
+    } catch (e) { toast(e.message); }
+    pollJobs();
+  }
+
+  reader.addEventListener("click", async e => {
+    const m = e.target.closest("[data-rmode]");
+    if (m) { setReadMode(m.dataset.rmode); return; }
+    const t = e.target.closest("[data-tr]");
+    if (!t) return;
+    const c = chapterOf(currentFile);
+    const act = t.dataset.tr;
+    if (act === "go") return startTranslate(false);
+    if (act === "redo") return startTranslate(true);
+    if (act === "retry") return startTranslate(!!(c && c.zh));
+    if (act === "show") { if (c && c.zhRel) openFile(c.zhRel); return; }
+    t.disabled = true;
+    try {
+      if (act === "stop") await api("/api/job/cancel", { id: t.dataset.id });
+      if (act === "dismiss") {
+        const j = jobList.find(x => x.id === t.dataset.id);
+        if (j) j.dismissedLocal = true;
+        refreshChapterHead();
+        await api("/api/job/dismiss", { id: t.dataset.id });
+      }
+    } catch (err) { toast(err.message); }
+    pollJobs();
+  });
 
   // 返回是否真的打开了。调用方要能分辨「文件没了」——
   // 书签指向的章节可能已经被重命名或删掉，那时得退回默认章节，
   // 不然读者点开一本书看到的是一片空白，还以为软件坏了。
   async function openFile(rel, label, frac) {
+    const want = preferredRel(rel);
+    if (want !== rel) { rel = want; label = null; }   // 换成了译文，原来那个标签说的是原文
     let r;
     try {
       r = await getJson("/api/file?path=" + encodeURIComponent(rel));
@@ -1496,20 +2004,27 @@
       return false;
     }
     if (r.error) return false;
-    cmpMode = false;                 // 换一章就退回单栏，不然按钮写着「回到单栏」而正文早就是单栏了
+    coursePage = null;
+    cmpMode = false;
+    pairData = null;
     currentFile = rel;
     fileMd = r.md || "";
     fileMtime = r.mtime || 0;
     editing = false;
-    crumb.textContent = (currentBook ? currentBook.name + " · " : "") + (label || rel.split("/").pop());
+    crumb.textContent = (currentBook ? currentBook.name + " · " : "") + (label || rel.split("/").pop().replace(/\.md$/, ""));
     const nav = chapterNav(rel);
-    reader.innerHTML = `<div class="page">${editBar()}${r.html}${nav}</div>`;
+    reader.innerHTML = `<div class="page">${chapterHead()}${editBar()}${r.html}${nav}</div>`;
     applyHighlights();
     reader.scrollTop = 0;
-    if (frac) applyFrac(frac);
     if (currentBook) renderBookMenu();
     sidebar.classList.remove("open");
     bindPager();
+    // 双列对照：单栏先画出来（对齐要服务端算一下，别让人对着空白等），配好了再换成两栏。
+    // 没有译文的章就停在单栏原文上，章首会说一句「还没有译文」。
+    const c = readMode === "pair" ? chapterOf(rel) : null;
+    // 要两边都有：说明书那种只有译文、没有原书的，一打开就弹「没法对照」只会烦人
+    if (c && c.src && c.zh && await showPair()) return true;
+    if (frac) applyFrac(frac);
     return true;
   }
 
@@ -1537,8 +2052,7 @@
     const href = obsidianHref(currentFile);
     return `<div class="editbar"><button data-edit="1">✏️ 改一改</button>`
       + (currentBook ? `<button data-mark="1">🔖 加书签</button>` : "")
-      // 只有书里的章节才有「另一半」，梗概摘要笔记没有，给了也是点了报错
-      + (isChapter(currentFile) ? `<button data-pair="1">${cmpMode ? "↩ 回到单栏" : "⇄ 中英对照"}</button>` : "")
+      // 原来这里有一颗「⇄ 中英对照」，现在并进了章首的显示方式（单栏 / 双列对照 / 只看译文）
       // Obsidian 只认它自己「打开过」的库。第一次点没反应不是坏了，
       // 是那边还不知道有这么个库——把这句写在悬停提示里，省一次求助。
       + (href ? `<a class="obs" href="${href}" title="第一次用要先在 Obsidian 里「打开文件夹作为库」选中你的书库">在 Obsidian 里打开</a>` : "")
@@ -1585,7 +2099,9 @@
     fileMtime = r.mtime || 0;
     editing = false;
     const page = reader.querySelector(".page");
-    if (page) page.innerHTML = editBar() + r.html + chapterNav(currentFile);
+    // 双列里点「改一改」改的是点进来的那一篇；存完回到双列，两边都是新的
+    if (cmpMode) { await showPair(); return; }
+    if (page) page.innerHTML = chapterHead() + editBar() + r.html + chapterNav(currentFile);
     // 存完是整段重画的，划线跟着没了 —— 而这一页说的是「只要那句话还在，划线就还在」。
     // 改一个错别字回来发现五条划线全不见了，用户只会当成丢数据。
     // 锚点认的是文字不是位置，所以重贴就能原样回来（改掉的那一句除外，那本该消失）。
@@ -1594,12 +2110,19 @@
   }
 
   reader.addEventListener("click", e => {
-    const el = e.target.closest("[data-edit],[data-save],[data-cancel],[data-mark],[data-pair]");
+    const el = e.target.closest("[data-edit],[data-save],[data-cancel],[data-mark],[data-pid],[data-cpage],[data-course],[data-cup]");
     if (!el) return;
+    if (el.dataset.cpage) return openCoursePage(el.dataset.cpage);
+    if (el.hasAttribute("data-course")) return openCourse();
+    if (el.hasAttribute("data-cup")) {
+      const prev = courseStack.pop();
+      return prev ? openCoursePage(prev, true) : openCourse();
+    }
+    if (el.dataset.pid && coursePage !== null) return jumpFromCourse(el.dataset.pid);
+    if (el.dataset.pid) return jumpToPassage(currentBook && currentBook.name, el.dataset.pid);
     if (el.dataset.edit) return enterEdit();
     if (el.dataset.save) return saveEdit();
     if (el.dataset.mark) return addMark();
-    if (el.dataset.pair) return toggleCompare();
     if (el.dataset.cancel) { editing = false; openFile(currentFile); }
   });
 
@@ -1621,8 +2144,14 @@
       b.addEventListener("click", () => openFile(decodeURIComponent(b.dataset.nav))));
   }
 
+  sidebar.addEventListener("submit", e => {
+    if (e.target.id !== "bookSearch") return;
+    e.preventDefault();
+    searchBook(($("bookQ") || {}).value || "");
+  });
+
   sidebar.addEventListener("click", e => {
-    const el = e.target.closest("[data-book],[data-file],[data-sug],[data-jump],[data-unmark],[data-hl-jump],[data-hl-del],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook,#delBook,#capBook");
+    const el = e.target.closest("[data-book],[data-file],[data-course],[data-sug],[data-jump],[data-unmark],[data-hl-jump],[data-hl-del],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook,#delBook,#capBook");
     if (!el) return;
     // 删按钮压在跳转按钮上面，先判它，否则点叉会顺带跳过去
     if (el.dataset.unmark) { removeMark(el.dataset.unmark); return; }
@@ -1637,6 +2166,7 @@
     if (el.id === "shareBook") { shareWizard(); return; }
     if (el.id === "showInvite") { showInvite(); return; }
     if (el.id === "syncNow") { syncNow(); return; }
+    if (el.dataset.course) { openCourse(); return; }
     if (el.dataset.sug) { openSuggestionCard(decodeURIComponent(el.dataset.sug)); return; }
     if (el.dataset.book) openBook(decodeURIComponent(el.dataset.book));
     else openFile(decodeURIComponent(el.dataset.file));
@@ -2236,6 +2766,18 @@
     const stop = j.cancelling
       ? `<button disabled>正在停…</button>`
       : `<button data-job="cancel" data-id="${id}">停下</button>`;
+    // 章首翻译：主进度条在那一章的章首，这张卡只是让人在对话里也看得见它在跑
+    if (j.kind === "translate") {
+      const where = `《${name}》第 ${esc(j.chapter)} 章`;
+      const p = j.progress || {};
+      const pct = p.totalChars ? Math.floor(p.doneChars * 100 / p.totalChars) : 0;
+      const go = `<button class="primary" data-job="open" data-id="${id}">去看看</button>`;
+      if (j.state === "queued") return jobCardHtml("spin", `${where}排着队`, "", stop);
+      if (j.state === "running") return jobCardHtml("spin", `正在翻译${where}`, p.total ? `${pct}%` : "正在准备…", stop);
+      if (j.state === "done") return jobCardHtml("✓", `${where}翻好了`, "", go + dismiss);
+      return jobCardHtml("⚠️", `${where}没翻成`, esc(j.error || "中途出岔子了。"),
+        `<button class="primary" data-job="retry" data-id="${id}">再试一次</button>${dismiss}`);
+    }
     if (j.state === "queued") {
       return jobCardHtml("spin", `《${name}》排着队`,
         j.ahead ? `前面还有 ${j.ahead} 本，弄完就轮到它` : "马上开始", stop);
@@ -2277,6 +2819,7 @@
       d.style.display = html ? "flex" : "none";
       lane.host.appendChild(d);            // 永远排在消息流最后
     }
+    refreshChapterHead();
   }
 
   function showJobInfo(j) {
@@ -2300,17 +2843,22 @@
     if (!r) { scheduleJobPoll(20000); return; }
     const wasActive = jobList.some(jobActive);
     const wasReadable = new Set(jobList.filter(j => j.readable).map(j => j.id));
+    const wasTr = new Set(jobList.filter(j => j.kind === "translate" && jobActive(j)).map(j => j.id));
     jobList = r.jobs || [];
     for (const j of jobList) showJobInfo(j);
     renderJobs();
     // 刚切完章的书这会儿才出现在书架上，不刷一下「去看看」会点进空列表
     if (jobList.some(j => j.readable && !wasReadable.has(j.id))) loadShelf();
     const active = jobList.some(jobActive);
-    if (wasActive && !active) {            // 刚有作业做完，书架上多了一本
+    // 一章刚翻完：目录里多了一篇译文，开着的这一页也该换上（双列 / 只看译文）
+    const trDone = jobList.some(j => wasTr.has(j.id) && j.state === "done");
+    if ((wasActive && !active) || trDone) {  // 刚有作业做完，书架上多了一本 / 多了一章译文
       loadShelf();
       if (currentBook) openBook(currentBook.name, { keepChat: true }).catch(() => { });
     }
-    scheduleJobPoll(active ? 4000 : 20000);
+    // 翻一章只要几十秒，四秒一刷进度条是一格一格跳的；有翻译在跑就刷勤一点
+    const trActive = jobList.some(j => j.kind === "translate" && jobActive(j));
+    scheduleJobPoll(trActive ? 1500 : active ? 4000 : 20000);
   }
 
   for (const host of [msgs, chatBody]) {
@@ -2324,6 +2872,13 @@
         if (!j.book) return;
         setView("read");
         await loadShelf();
+        if (j.kind === "translate") {
+          // 直接翻到那一章（按当前显示方式：单栏打开译文，双列就是双列）
+          if (!currentBook || currentBook.name !== j.book) await openBook(j.book);
+          const f = currentBook && currentBook.translated.find(x => chNo(x) === String(j.chapter));
+          if (f) openFile(`Library/${j.book}/译文/${f}`);
+          return;
+        }
         openBook(j.book);
         return;
       }
@@ -2331,6 +2886,8 @@
       try {
         if (el.dataset.job === "dismiss") await api("/api/job/dismiss", { id });
         else if (el.dataset.job === "cancel") await api("/api/job/cancel", { id });
+        // 翻译失败的重来：失败时译文一个字都没动，有旧译文就得带 force 才能盖
+        else if (j.kind === "translate") await api("/api/job", { kind: "translate", book: j.book, chapter: j.chapter, force: true });
         // 重试要把语言一起带上，不然选过的语言在「再试一次」这里悄悄丢掉
         else await api("/api/job", { kind: "ingest", file: j.file, lang: j.lang || "" });
       } catch (err) { toast(err.message); }
@@ -3595,9 +4152,14 @@
       </div>
       <div class="rite-card">
         <h3>在外面也能用</h3>
-        <p>在公司、在路上、用手机流量的时候，也想连回家里这台电脑看书——装一个 Tailscale 就行。
-          它走的是两台设备之间的直连加密通道，书和译文不经过任何第三方服务器，也不用在路由器上开端口。</p>
-        <div id="tsWizard"><p class="set-note">正在看这台电脑装没装 Tailscale…</p></div>
+        <p>在公司、在路上、用手机流量的时候，也能连回家里这台电脑看书。手机扫一下码就行，
+          不用装 App，不用注册账号，也不用在路由器上开端口。</p>
+        <div id="relayBox"><p class="set-note">…</p></div>
+        <details class="relay-adv">
+          <summary>高级：用 Tailscale 直连（需要能登录 Google 等账号）</summary>
+          <p class="set-note">两台设备之间直连、不经过我们的中转。国内登录它的账号常常要梯子，手机上也要另装它的 App。</p>
+          <div id="tsWizard"><p class="set-note">正在看这台电脑装没装 Tailscale…</p></div>
+        </details>
       </div>
       <div class="rite-card">
         <h3>端口</h3>
@@ -3616,6 +4178,11 @@
         <h3>实验功能</h3>
         <label class="set-switch"><input type="checkbox" id="setSpaces" /> 在工作台里显示「门枢」（把站上的几个页面嵌进来看）</label>
         <p class="set-note">还在试的东西，默认关着。开关只管这台电脑的界面，不动书库。</p>
+      </div>
+      <div class="rite-card">
+        <h3>匿名统计</h3>
+        <label class="set-switch"><input type="checkbox" id="setTelemetry" /> 只告诉站长「有一台回廊在用」和版本号，不含任何书的信息</label>
+        <p class="set-note" id="setTelemetryNote">开着的时候，每次启动和每天各报一声。不发书名、不发文件位置、不发你的名字和密钥。关掉之后什么都不发。</p>
       </div>
       <div class="rite-card">
         <h3>书库位置</h3>
@@ -3855,6 +4422,13 @@
       }).catch(() => { });
     });
 
+    $("setTelemetry").addEventListener("change", () => {
+      fetch("/api/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telemetry: $("setTelemetry").checked }),
+      }).catch(() => { });
+    });
+
     $("setRemote").addEventListener("change", () => {
       fetch("/api/settings", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -4060,7 +4634,8 @@
     $("setKeyState").innerHTML = s.keyMasked
       ? `现在用的是 <b>${esc(s.keyMasked)}</b>，要换就贴一个新的：`
       : `<b>还没配 key</b>——聊天和翻译都靠它，配一个吧：`;
-    $("setLan").textContent = s.lanUrl || "没找到局域网地址（电脑可能没连网）";
+    $("setLan").textContent = s.lanUrl || (s.viaRelay ? "这条链接只在家里那台电脑上显示。" : "没找到局域网地址（电脑可能没连网）");
+    renderRelay();
     renderTs();
     if (document.activeElement !== $("setPort")) $("setPort").value = s.port;
     if (s.actualPort && s.actualPort !== s.port) {
@@ -4076,9 +4651,95 @@
     fillQq(s);
     $("setRemote").checked = !!s.remoteAccess;
     $("setSpaces").checked = !!s.spacesEnabled;
+    $("setTelemetry").checked = !!s.telemetry;
+    // 被环境变量关死的时候开关点了也没用，干脆灰掉并说一声，免得以为设置坏了
+    $("setTelemetry").disabled = !!s.telemetryLocked;
+    if (s.telemetryLocked) $("setTelemetryNote").textContent = "这台电脑的启动方式里已经把它关掉了，这里改不了，也什么都不会发。";
     applyFlags(s);
     $("setVault").textContent = s.vaultPath || "—";
   }
+
+  // 「在外面也能用」：扫码配手机（自家中转，见 relay.js）。状态全从 /api/relay 来。
+  // 二维码只在点了「用手机扫码」的这一页上显示；配上以后接口里的 pending 会消失、
+  // 列表多一部手机，这一页隔两秒问一次，自己换成「配好了」——扫码的人手里拿着手机，
+  // 不会回来点刷新。二维码里带着钥匙，只有这台电脑自己能要到（手机上看设置页只有列表）。
+  let relayTimer = 0, relayQr = null, relayDone = "";
+  const relayAgo = t => {
+    const m = Math.round((Date.now() - t) / 60000);
+    return m < 1 ? "刚刚" : m < 60 ? `${m} 分钟前` : m < 1440 ? `${Math.round(m / 60)} 小时前` : `${Math.round(m / 1440)} 天前`;
+  };
+  const relayDay = t => { const d = new Date(t); return `${d.getMonth() + 1} 月 ${d.getDate()} 日`; };
+  async function renderRelay() {
+    const box = $("relayBox");
+    if (!box) return;
+    let s;
+    try { s = await fetch("/api/relay").then(r => r.json()); }
+    catch { box.innerHTML = `<p class="set-note">现在读不到状态，过一会儿再打开这一页。</p>`; return; }
+    // 正在扫的那一张已经被用掉（配上了）或者过期了
+    if (relayQr && (!s.pending || s.pending.id !== relayQr.id)) {
+      const got = s.phones.find(p => p.id === relayQr.id);
+      relayDone = got ? `配好了：${got.name} ✓ 以后在手机上点主屏幕的图标就能进来。` : "";
+      relayQr = null;
+    }
+    let html = "";
+    if (!s.available) {
+      html = `<p class="set-note err">这台电脑上的程序版本太旧，用不了。重跑一次安装器会装上合适的版本。</p>`;
+    } else if (relayQr) {
+      const left = Math.max(0, Math.ceil((relayQr.expiresAt - Date.now()) / 60000));
+      html = `<div class="relay-pair">
+          <div class="relay-qr">${relayQr.svg}</div>
+          <div class="relay-how">
+            <p>用手机的相机或者微信扫一下。</p>
+            <p class="set-note">扫完手机上直接打开的就是群星回廊。这张码 ${left} 分钟内有效，只能配一部手机。
+              在微信里扫的，要点右上角「···」→「在浏览器打开」。</p>
+            <p class="set-note">手机上会显示一个安全码，应该是 <span class="relay-fp">${esc(relayQr.fp)}</span>。</p>
+            <div class="set-row"><button class="set-plain" data-relay="cancel">不扫了</button></div>
+          </div>
+        </div>`;
+    } else if (!s.local) {
+      html = `<p class="set-note">配新手机、解除手机，都要在家里那台电脑上点。</p>`;
+    } else if (s.phones.length >= s.max) {
+      html = `<p class="set-note">已经配了 ${s.max} 部手机，满了。要配新的，先在下面解除一部不用的。</p>`;
+    } else {
+      html = `<div class="set-row"><button class="rite-go" data-relay="pair">用手机扫码</button></div>`;
+    }
+    if (relayDone && !relayQr) html = `<p class="relay-ok">${esc(relayDone)}</p>` + html;
+    if (s.phones.length) {
+      const net = { online: "", connecting: "正在连中转…", retry: "现在连不上中转，过一会儿会自己再试（这台电脑能上网吗？）", off: "" }[s.state] || "";
+      html += `<p class="relay-h">已配对的手机（${s.phones.length}/${s.max}）</p><ul class="relay-list">`
+        + s.phones.map(p => `<li>
+            <div class="who"><b><span class="relay-dot${p.online ? " on" : ""}"></span>${esc(p.name)}</b>
+              <small>${p.online ? "正连着" : `上次用：${relayAgo(p.lastSeen)}`} · 配对于 ${relayDay(p.pairedAt)} · 安全码 <span class="relay-fp">${esc(p.fp)}</span></small></div>
+            ${s.local ? `<button class="set-plain danger" data-relay="unpair" data-id="${esc(p.id)}" data-name="${esc(p.name)}">解除</button>` : ""}
+          </li>`).join("") + `</ul>`
+        + (net ? `<p class="set-note">${net}</p>` : "")
+        + `<p class="set-note">手机丢了、或者不想让它再连进来，点「解除」，那部手机就再也连不上了。</p>`;
+    }
+    box.innerHTML = html;
+    clearTimeout(relayTimer);
+    if (view === "settings") relayTimer = setTimeout(renderRelay, relayQr ? 2000 : 6000);
+  }
+  $("setBody").addEventListener("click", async e => {
+    const b = e.target.closest("button[data-relay]");
+    if (!b) return;
+    const kind = b.dataset.relay;
+    if (kind === "unpair" && !confirm(`解除「${b.dataset.name}」？\n\n解除后这部手机就再也连不上了，要再用得重新扫码。`)) return;
+    b.disabled = true;
+    try {
+      if (kind === "pair") {
+        const r = await fetch("/api/relay/pair", { method: "POST" }).then(r => r.json());
+        if (r.svg) { relayQr = r; relayDone = ""; }
+        else $("relayBox").insertAdjacentHTML("beforeend", `<p class="set-note err">${esc(r.hint || "没出得来二维码，过一会儿再点一次。")}</p>`);
+      } else if (kind === "cancel") {
+        relayQr = null;
+        await fetch("/api/relay/cancel", { method: "POST" });
+      } else if (kind === "unpair") {
+        relayDone = "";
+        await fetch("/api/relay/unpair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: b.dataset.id }) });
+      }
+    } catch { }
+    if (kind !== "pair" || relayQr) renderRelay();
+  });
 
   // 「在外面也能用」向导。状态全从 /api/tailscale 来，前端只按状态画卡，不自己判断：
   //   没装        → 一键装：服务端下官方安装包并拉起（带进度），失败给官网链接兜底
@@ -4097,7 +4758,9 @@
     const busy = inst.phase === "downloading" || inst.phase === "launching";
     const ok = s.installed && s.state === "running" && s.url;
     let html;
-    if (!s.installed && inst.phase === "downloading") {
+    if (s.viaRelay) {
+      html = `<p class="set-note">Tailscale 的链接只在家里那台电脑上显示。</p>`;
+    } else if (!s.installed && inst.phase === "downloading") {
       const pct = inst.total ? Math.round(inst.got / inst.total * 100) : 0;
       html = `<p>正在下载 Tailscale 安装包${inst.total ? `：${pct}%` : "…"}</p>
         <div class="ts-prog"><i style="width:${pct}%"></i></div>
@@ -4117,16 +4780,16 @@
         <details class="set-note"><summary>手机上怎么装</summary>
           <p>iPhone：App Store 搜 Tailscale，或者 <a href="${esc(s.phone.ios)}" target="_blank" rel="noopener">点这里</a>。</p>
           <p>安卓：去 <a href="${esc(s.phone.android)}" target="_blank" rel="noopener">这一页</a> 点最新的 apk 装上（国内手机没有 Google Play，直接装这个）。</p>
-          <p>装好后登<b>同一个账号</b>（微信、Google、GitHub 都行），把开关打开，再点上面那个链接。</p>
+          <p>装好后登<b>同一个账号</b>（Google、微软、GitHub、Apple 账号都行，Tailscale 不支持微信登录），把开关打开，再点上面那个链接。</p>
         </details>`;
     } else {
       html = `<p>Tailscale 装好了，还差登录。</p>
         <div class="set-row"><button class="rite-go" data-ts="login">登录 Tailscale</button></div>
-        <p class="set-note">会打开一个登录网页，用微信、Google 或 GitHub 账号都行。登完回到这一页，链接就会出现。手机上要登同一个账号。</p>`;
+        <p class="set-note">会打开一个登录网页，用 Google、微软、GitHub 或 Apple 账号都行（不支持微信）。登完回到这一页，链接就会出现。手机上要登同一个账号。</p>`;
     }
     box.innerHTML = html;
     clearTimeout(tsTimer);
-    if (view === "settings" && !ok) tsTimer = setTimeout(renderTs, busy ? 1500 : 4000);
+    if (view === "settings" && !ok && !s.viaRelay) tsTimer = setTimeout(renderTs, busy ? 1500 : 4000);
   }
   // 三个按钮都是动态画出来的，事件挂在整页上
   $("setBody").addEventListener("click", async e => {
@@ -4188,7 +4851,7 @@
   function setView(v) {
     view = v;
     if (v === "chat") checkKey();
-    if (v !== "settings") clearTimeout(tsTimer);   // 向导的轮询只在设置页活着
+    if (v !== "settings") { clearTimeout(tsTimer); clearTimeout(relayTimer); }   // 向导的轮询只在设置页活着
     document.body.className = "view-" + v;
     $("tabRead").classList.toggle("on", v === "read");
     $("tabChat").classList.toggle("on", v === "chat");

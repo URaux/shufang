@@ -1,6 +1,7 @@
-# dsh 大脑的模型覆盖：主模型对齐 claude 路径用的 deepseek-v4-pro
-# （dsh 默认 profile 是 v4-flash；翻译质量要 pro）
+# dsh 大脑的模型覆盖：主模型对齐 claude 路径用的默认（deepseek-v4-flash）
+# 原来钉在 v4-pro 上（翻译质量要 pro）；2026-09-28 站主拍板全部改用快模型，pro 这一版退化了。
+# 这份文件仍然要留着：dsh 自己的默认 profile 以后可能变，钉死才跟 ingest.js 的默认对得上。
 - id: agent-default-model
   config:
     provider: deepseek-official
-    model: deepseek-v4-pro
+    model: deepseek-v4-flash
