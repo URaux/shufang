@@ -761,6 +761,17 @@
   .course .c-cite { position: relative; display: inline-block; margin: 0 .15rem; padding: 0 .45rem; border-radius: 999px;
     font-size: .74rem; line-height: 1.55; vertical-align: .12em; color: var(--link); border: 1px solid var(--accent-soft); }
   .course .c-cite::after { content: ""; position: absolute; inset: -13px -8px; }
+  /* 「过短未校」：不是编的，只是短到没法核——中性的灰，不用「未核实」那种提醒的样子 */
+  .course .c-cite.c-short { color: var(--ink-mute); border-color: var(--line); border-style: dashed; }
+  /* 自查答案：默认收起，「看答案」一行就是点击区，手机上撑到 44px */
+  .course .c-ans { margin: .3rem 0 .6rem; }
+  .course .c-ans summary { display: inline-flex; align-items: center; min-height: 44px; padding: 0 .2rem; cursor: pointer;
+    color: var(--link); font-size: .88rem; list-style: none; }
+  .course .c-ans summary::-webkit-details-marker { display: none; }
+  .course .c-ans summary::before { content: "▸"; margin-right: .35rem; transition: transform .15s; }
+  .course .c-ans[open] summary::before { transform: rotate(90deg); }
+  .course .c-ans > div { border-left: 3px solid var(--accent-soft); padding: .2rem 0 .2rem .8rem; color: var(--ink-soft); line-height: 1.8; }
+  @media (prefers-reduced-motion: reduce) { .course .c-ans summary::before { transition: none; } }
   .course .c-unv { font-size: .72rem; color: var(--ink-mute); border: 1px dashed var(--line); border-radius: 999px;
     padding: 0 .4rem; margin: 0 .15rem; white-space: nowrap; }
   .course .c-pager { display: flex; flex-direction: column; gap: .5rem; margin-top: 2.6rem; }
@@ -773,6 +784,34 @@
     margin: -2.2rem -1.4rem 1rem; padding: 0 1rem; text-align: left; background: var(--card);
     border-bottom: 1px solid var(--line); color: var(--link); font-size: .95rem; }
   .side-item.course-entry { color: var(--ink); font-weight: 600; }
+  /* 「编成课程」页：编之前的说明、编的时候的七步进度、停下后的「接着编」。
+     跟课程页同一套手机先行的规矩：能点的都不低于 44px */
+  .course .cc-go { display: flex; gap: .6rem; flex-wrap: wrap; margin: 1.2rem 0; }
+  .course .cc-go button { min-height: 44px; padding: 0 1.1rem; border-radius: 10px; font-size: .95rem;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink-soft); }
+  .course .cc-go button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .course .cc-go button[disabled] { opacity: .5; cursor: default; }
+  .course .cc-box { border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: .8rem 1rem;
+    font-size: .92rem; line-height: 1.8; color: var(--ink-soft); margin: 1rem 0; }
+  .course .cc-box.warn { border-color: var(--accent-soft); }
+  .course .cc-pct { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; color: var(--ink-soft); font-size: .9rem; }
+  .course .cc-pct b { font-size: 1.6rem; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .course .prog { margin: .4rem 0 1rem; }
+  .course .cc-steps { list-style: none; padding: 0; margin: 0 0 1rem; }
+  #reader .course .cc-steps li { display: flex; gap: .7rem; align-items: baseline; margin: 0; padding: .35rem 0; color: var(--ink-mute); line-height: 1.6; }
+  .course .cc-steps .ic { flex: none; width: 1.4rem; text-align: center; }
+  #reader .course .cc-steps li.done { color: var(--ink-soft); }
+  #reader .course .cc-steps li.now { color: var(--ink); font-weight: 600; }
+  .course .cc-steps li small { font-weight: 400; color: var(--ink-mute); margin-left: .4rem; }
+  .course .cc-foot { color: var(--ink-mute); font-size: .84rem; line-height: 1.8; }
+  /* 估价弹窗 */
+  .modal .cc-scope label { display: flex; align-items: center; gap: .55rem; min-height: 44px; margin: 0; font-size: .92rem; color: var(--ink); }
+  .modal .cc-scope input[type=radio] { width: auto; flex: none; }
+  .modal .cc-scope select { flex: 1; min-width: 0; width: auto; min-height: 40px; }
+  .modal .cc-est { background: var(--paper); border-radius: 8px; padding: .7rem .9rem; margin: .8rem 0; line-height: 1.9; font-size: .92rem; }
+  .modal .cc-est b { color: var(--ink); }
+  .modal .cc-est .mute { color: var(--ink-mute); font-size: .84rem; }
+  .modal .row button.cc-btn { min-height: 44px; }
   /* 手机上正文左右边距是 1.1rem（见上面的窄屏分支），顶条要贴边就得跟着改；
      写在这里而不是那个分支里：那一段在前面，会被上面同权重的规则盖掉 */
   @media (max-width: 860px) {
@@ -1163,9 +1202,15 @@
       parts.push(`<form class="book-search" id="bookSearch"><input type="search" id="bookQ" placeholder="🔍 在原文里搜…" `
         + `value="${esc(lastQuery)}" enterkeyhint="search" autocomplete="off"></form>`);
     }
-    // 课程放在最上面：编过课的书，照着课学是主路，梗概和章节是查的时候才翻
+    // 课程放在最上面：编过课的书，照着课学是主路，梗概和章节是查的时候才翻。
+    // 没编过的书在同一个位置给「编成课程」：入口固定在一处，编好了它就地变成「课程」
+    const cj = courseJob();
+    const cjRun = cj && jobActive(cj);
+    const cjNote = cjRun ? (cj.state === "queued" ? "排着队" : `正在编 · ${(cj.progress && cj.progress.pct) || 0}%`) : "";
     if (b.course) parts.push(`<button class="side-item course-entry${coursePage !== null ? " on" : ""}" data-course="1">📚 课程`
-      + `<small>按课学这本书，引的原文都能点回去</small></button>`);
+      + `<small>${cjNote ? "重新编：" + cjNote : "按课学这本书，引的原文都能点回去"}</small></button>`);
+    else if (b.original.length) parts.push(`<button class="side-item course-entry${coursePage !== null ? " on" : ""}" data-course="1">✦ 编成课程`
+      + `<small>${cjNote || "把这本书编成一课一课，引的原文都核过"}</small></button>`);
     if (b.outline) parts.push(item(`Library/${b.name}/01-全书梗概.md`, "📖 全书梗概"));
     if (b.summary) parts.push(item(`Library/${b.name}/02-逐章摘要.md`, "🗂 逐章摘要"));
     if (b.translated.length) {
@@ -1707,6 +1752,9 @@
 
   async function openCourse() {
     if (!currentBook) return;
+    // 还没编过、或者正在编：先到「编成课程」那一页（说明、估价、进度都在那儿）
+    const cj = courseJob();
+    if (!currentBook.course || (cj && jobActive(cj))) return openCourseMake();
     let r;
     try { r = await getJson("/api/course/outline?book=" + encodeURIComponent(currentBook.name)); }
     catch (e) { toast(e.message); return; }
@@ -1716,9 +1764,181 @@
       + u.lessons.map(l => `<li><button class="c-lesson" data-cpage="${esc(l.file)}"><span class="c-ln">${++no}</span>`
         + `<span><b>${esc(l.title)}</b><small>${esc(l.goal || "")}</small></span></button></li>`).join("")
       + `</ol></section>`).join("");
+    // 「先试一章」编出来的课程要明说：不然读的人以为整本就这几课
+    const trial = r.scope && r.scope.length
+      ? `<div class="cc-box warn">这是试编的：只编了第 ${r.scope.map(esc).join("、")} 章。觉得好，再把整本编出来。`
+        + `<div class="cc-go" style="margin:.6rem 0 0"><button class="primary" data-cc="estimate" data-scope="all">编整本…</button></div></div>` : "";
+    // 「其余词汇」附录：哪一课都没讲到的词，列在最后，不让它们悄悄消失
+    const extras = r.extras && r.extras.count
+      ? `<section class="c-unit"><h2>附录</h2><ol class="c-lessons"><li><button class="c-lesson" data-cpage="${esc(r.extras.file)}"><span class="c-ln">词</span>`
+        + `<span><b>其余词汇</b><small>书里提到、没有哪一课专门讲的 ${r.extras.count} 个词，按拼音排</small></span></button></li></ol></section>` : "";
+    // 课程编纂从原文括注里收了几个译名，放在译名表的「待定」组里，等用户看一眼
+    const drafts = r.draftTerms
+      ? `<p class="cc-foot">发现 ${r.draftTerms} 个待定译名：课程编纂从原文的括注里收的，放在这本书译名表的「待定」组里，没盖掉你定过的。`
+        + `<button class="c-link" data-cc="terms" style="min-height:44px">去译名表看看</button></p>` : "";
     showCourse("", `<h1>课程</h1><p class="c-sub">${r.units.length} 个单元、${n} 课，${r.cards} 张知识卡。`
-      + `课里引的每一句原文都核对过出处，点句子后面的「原文」能跳回书里那一段。</p>${units}`, "课程");
+      + `课里引的每一句原文都核对过出处，点句子后面的「原文」能跳回书里那一段。</p>${drafts}${trial}${units}${extras}`
+      + (trial ? "" : `<p class="cc-foot" style="margin-top:2rem">原文改过、或者想换个编法，可以<button class="c-link" data-cc="estimate" data-scope="all" style="min-height:44px">重新编一遍</button>。没改过的部分不会重复花钱。</p>`)
+      // 「导出给自己」默认不给，配置里开了才出现（见 server.js /api/course/export）
+      + (r.exportEnabled ? `<p class="cc-foot"><button class="c-link" data-cc="export" style="min-height:44px">导出给自己</button>：写成普通的 markdown，每页开头标着「导出给自己用」。</p>` : ""), "课程");
     courseStack = [];
+  }
+
+  // ------------------------------------------------------------------ 编成课程
+  //
+  // 编纂是服务端的后台作业（kind=course，底下是 course/run.js），跟「翻译本章」同一套：
+  // 进度挂在 /api/jobs 上，刷新、换手机看都还在。这一页只做三件事：
+  //   开编前：说清楚会得到什么，点「编成课程…」弹出估价（花多少、多久、哪个模型），确认了才开始；
+  //   编的时候：七个人话步骤 + 真进度条 + 「停下」；
+  //   停下 / 出错后：「接着编」——同样再走一遍估价，做过的部分有缓存，估价里只算剩下的。
+  // 没填 key（订阅模式）不支持，按钮置灰并说清楚为什么、去哪儿填。
+  let coursePlan = null;    // 最近一次 /api/course/plan 的结果
+
+  function courseJob() {
+    if (!currentBook) return null;
+    return jobList.find(j => j.kind === "course" && j.book === currentBook.name && !j.dismissedLocal) || null;
+  }
+
+  async function openCourseMake() {
+    if (!currentBook) return;
+    try { coursePlan = await getJson("/api/course/plan?book=" + encodeURIComponent(currentBook.name)); }
+    catch (e) { toast(e.message); return; }
+    showCourse("@make", `<div data-ccmake="1">${courseMakeInner()}</div>`, "编成课程");
+  }
+
+  function courseMakeInner() {
+    const b = currentBook, p = coursePlan || {};
+    const steps = p.steps || [];
+    const j = courseJob();
+    const bar = currentBook.course ? courseBar("data-course", "") : "";
+    if (j && jobActive(j)) {
+      const pr = j.progress || {};
+      const pct = pr.pct || 0;
+      const mins = j.startedAt ? Math.floor((Date.now() - j.startedAt) / 60000) : 0;
+      const list = steps.map((s, i) => {
+        const cls = j.state === "queued" ? "" : i < pr.step ? "done" : i === pr.step ? "now" : "";
+        const ic = cls === "done" ? "✓" : cls === "now" ? "●" : "○";
+        return `<li class="${cls}"><span class="ic">${ic}</span><span>${esc(s)}${cls === "now" && pr.detail ? `<small>${esc(pr.detail)}</small>` : ""}</span></li>`;
+      }).join("");
+      const head = j.state === "queued" ? `排着队${j.ahead ? `，前面还有 ${j.ahead} 件` : "，马上开始"}`
+        : j.cancelling ? "正在停下…（等已经发出去的几问回来，结果存好，下次接着编就不重复花钱）"
+        : `第 ${(pr.step || 0) + 1}/${steps.length || 7} 步 · ${esc(pr.stepName || "")}`;
+      return bar + `<h1>正在编课程</h1>`
+        + `<p class="c-sub">${j.scope ? `先试一章：第 ${j.scope.map(esc).join("、")} 章` : "整本"}${mins >= 1 ? ` · 已经 ${mins} 分钟` : ""}${j.etaMin ? ` · 估计 ${esc(j.etaMin)} 分钟左右` : ""}</p>`
+        + `<div class="cc-pct"><span>${head}</span><b>${pct}%</b></div>`
+        + `<div class="prog${j.state === "queued" ? " wait" : ""}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>`
+        + `<ol class="cc-steps">${list}</ol>`
+        + `<div class="cc-go">${j.cancelling ? `<button disabled>正在停…</button>` : `<button data-cc="stop" data-id="${esc(j.id)}">停下</button>`}</div>`
+        + `<p class="cc-foot">可以关掉这一页去读书，编好了会在对话里告诉你。中途停下也不要紧：做完的部分都存着，接着编不重复花钱。</p>`;
+    }
+    if (j && j.state === "done") {
+      return `<h1>课程编好了</h1><p class="c-sub">${esc(j.units)} 个单元、${esc(j.lessons)} 课，${esc(j.cards)} 张知识卡。课里引的每一句原文都核对过出处。</p>`
+        + `<div class="cc-go"><button class="primary" data-course="1">去看课程</button></div>`;
+    }
+    const why = `<p class="c-sub">把《${esc(b.name)}》编成一个个单元、一课一课：先讲什么、后讲什么按概念的先后排好，`
+      + `每一课引的原文都由程序回书里核对过，点一下就跳回那一段。还附一套知识卡（概念、人物、技法……）。</p>`
+      + `<p class="cc-foot">编好的课程加密存在这本书的「课程」文件夹里，只能在群星回廊里打开；拷到别的电脑上打不开，在那边重新编一次就行。</p>`;
+    if (!p.keyed) {
+      return bar + `<h1>编成课程</h1>${why}<div class="cc-box warn">${esc(p.hint || "编纂课程要用 API key，在设置里填一个就能用。")}`
+        + `<br><span class="cc-foot">用自己订阅的助手（没填 key）时一问一答太慢，整本书要问上千次，暂时不支持。</span></div>`
+        + `<div class="cc-go"><button class="primary" data-cc="settings">去设置里填 key</button><button disabled>编成课程…</button></div>`;
+    }
+    // 别的电脑上编的、绑定过群星账号：先登录，不然开编会把做过的部分当没做、整本再花一遍钱
+    if (p.needAccount) {
+      return bar + `<h1>编成课程</h1>${why}<div class="cc-box warn">这本书是在别的电脑上编的，绑定过群星账号。`
+        + `在「设置 → 群星账号」里登录同一个账号，就能直接打开、接着用，不用重编。</div>`
+        + `<div class="cc-go"><button class="primary" data-cc="settings">去绑定群星账号</button></div>`;
+    }
+    const last = p.estimate && p.estimate.resume;
+    const failed = j && j.state === "failed";
+    let resume = "";
+    if (last || failed) {
+      const where = last ? `上次编到第 ${last.step + 1} 步「${esc(last.stepName)}」` : "上次没编完";
+      resume = `<div class="cc-box warn">${where}就停了${last && last.scope ? `（试编第 ${last.scope.map(esc).join("、")} 章）` : ""}。`
+        // 出错的原因要说（「账上没钱了」「连不上」），用户自己点的「停下」就不必再念一遍
+        + `已经做完的部分都存着，接着编不重复花钱。${failed && j.error && !/停下/.test(j.error) ? `<br><span class="cc-foot">${esc(j.error)}</span>` : ""}`
+        + `<div class="cc-go" style="margin:.6rem 0 0"><button class="primary" data-cc="estimate" data-scope="${last && last.scope ? esc(last.scope.join(",")) : "all"}">接着编…</button>`
+        + (failed ? `<button data-cc="dismiss" data-id="${esc(j.id)}">知道了</button>` : "") + `</div></div>`;
+    }
+    return bar + `<h1>编成课程</h1>${why}${resume}`
+      + (resume ? "" : `<div class="cc-go"><button class="primary" data-cc="estimate">编成课程…</button></div>`
+        + `<p class="cc-foot">点了先告诉你要花多少钱、多少时间，确认了才开始。也可以先拿一章试试。</p>`);
+  }
+
+  // 轮询回来只换这一页的内容，不重画别的
+  function refreshCourseMake() {
+    const box = coursePage === "@make" && reader.querySelector("[data-ccmake]");
+    if (box) box.innerHTML = courseMakeInner();
+  }
+
+  // 估价弹窗。scope: "all" | "3"（章号）| undefined（默认整本）
+  async function courseEstimate(scopeArg) {
+    if (!currentBook) return;
+    const book = currentBook.name;
+    const get = ch => getJson(`/api/course/plan?book=${encodeURIComponent(book)}${ch ? "&chapter=" + ch : ""}`);
+    let plan;
+    try { plan = await get(scopeArg && scopeArg !== "all" ? scopeArg.split(",")[0] : ""); }
+    catch (e) { toast(e.message); return; }
+    coursePlan = plan;
+    if (!plan.keyed) { refreshCourseMake(); return toast(plan.hint || "编纂课程要用 API key，在设置里填一个就能用。"); }
+    const chs = plan.chapters || [];
+    // 「先试一章」默认挑一章不太短的（一千五百字以上里最短的那章）：太短的章抽不出东西，看不出效果
+    const pick = (chs.filter(c => c.chars >= 1500).sort((a, b) => a.chars - b.chars)[0] || chs[0] || {}).no;
+    let scope = scopeArg && scopeArg !== "all" ? Number(scopeArg.split(",")[0]) : null;
+    const wan = n => n >= 10000 ? (n / 10000).toFixed(1).replace(/\.0$/, "") + " 万字" : n + " 字";
+    const resuming = !!(plan.estimate && plan.estimate.resume);
+    const m = modal(`<h3>把《${esc(book)}》编成课程</h3>
+      <div class="cc-scope">
+        <label><input type="radio" name="ccScope" value="all"${scope ? "" : " checked"}> 整本（${chs.length} 章，${wan(chs.reduce((n, c) => n + c.chars, 0))}）</label>
+        <label><input type="radio" name="ccScope" value="one"${scope ? " checked" : ""}> 先试一章：
+          <select id="ccCh">${chs.map(c => `<option value="${c.no}"${c.no === (scope || pick) ? " selected" : ""}>第 ${c.no} 章 ${esc(c.name).slice(0, 18)}（${wan(c.chars)}）</option>`).join("")}</select></label>
+      </div>
+      <div class="cc-est" id="ccEst">正在算…</div>
+      <p class="hint">编的时候随时可以停下；停下后做完的部分都存着，接着编不重复花钱。</p>
+      <div class="row"><button class="plain cc-btn" id="ccNo">算了</button><button class="primary cc-btn" id="ccGo" disabled>开始编</button></div>`);
+    const estBox = m.querySelector("#ccEst"), go = m.querySelector("#ccGo");
+    let cur = plan, seq = 0;
+    const draw = () => {
+      const e = cur.estimate;
+      const replacing = scope && cur.hasCourse && !cur.courseScope;
+      // 下限不到一毛（多半是做过的部分都有缓存）就只说上限，「¥0–0.3」看着像算错了
+      const yuan = e.yuan[0] < 0.1 ? `不到 ¥${e.yuan[1]}` : `¥${e.yuan[0]}–${e.yuan[1]}`;
+      estBox.innerHTML = `大约调用模型 <b>${e.calls}</b> 次 · 花 <b>${yuan}</b> · 用时 <b>${e.minutes[0]}–${e.minutes[1]} 分钟</b>`
+        + `<br><span class="mute">模型：${esc(e.modelNames.join("、"))}。${e.deepseek ? "按 DeepSeek 白天的价格估的，夜里跑大约便宜一半。" : "按 DeepSeek 的价格估的；你用的模型不同，实际以那边的账单为准。"}</span>`
+        + (e.chunks && e.chunksLeft < e.chunks ? `<br><span class="mute">其中 ${e.chunks - e.chunksLeft}/${e.chunks} 块上次已经读过，不再花钱。</span>` : "")
+        + (e.resumeStep ? `<br><span class="mute">上次编到第 ${e.resumeStep + 1} 步，前面几步做完了，只算剩下的。</span>` : "")
+        + (replacing ? `<br><b>注意：</b>这本书已经编好了整本课程，只试一章会把它换掉。` : "");
+      go.textContent = `${resuming && e.resume && e.resume.sameScope ? "接着编" : "开始编"}（最多约 ¥${e.yuan[1]}）`;
+      go.disabled = false;
+      go.dataset.replace = replacing ? "1" : "";
+      go.dataset.eta = e.minutes[1];
+    };
+    const reload = async () => {
+      const my = ++seq;
+      go.disabled = true; estBox.textContent = "正在算…";
+      try { const r = await get(scope || ""); if (my === seq) { cur = r; draw(); } }
+      catch (err) { if (my === seq) estBox.textContent = err.message; }
+    };
+    draw();
+    m.querySelectorAll("input[name=ccScope]").forEach(x => x.addEventListener("change", () => {
+      scope = x.value === "one" && x.checked ? Number(m.querySelector("#ccCh").value) : null; reload();
+    }));
+    m.querySelector("#ccCh").addEventListener("change", ev => {
+      m.querySelector("input[value=one]").checked = true; scope = Number(ev.target.value); reload();
+    });
+    m.querySelector("#ccNo").addEventListener("click", closeModal);
+    go.addEventListener("click", async () => {
+      go.disabled = true;
+      try {
+        const r = await api("/api/job", { kind: "course", book, confirm: true, chapters: scope ? [scope] : null,
+          replace: go.dataset.replace === "1", etaMin: Number(go.dataset.eta) || 0 });
+        closeModal();
+        if (r && r.job) jobList = [r.job, ...jobList.filter(x => x.id !== r.job.id)];
+        await openCourseMake();
+        renderJobs();
+      } catch (err) { go.disabled = false; toast(err.message); }
+      pollJobs();
+    });
   }
 
   async function openCoursePage(rel, back) {
@@ -2109,11 +2329,41 @@
     bindPager();
   }
 
+  async function courseAction(el) {
+    const act = el.dataset.cc;
+    if (act === "estimate") return courseEstimate(el.dataset.scope);
+    if (act === "settings") return setView("settings");
+    if (act === "terms") { $("tabBench").click(); return; }
+    if (act === "export") {
+      if (!confirm("把课程导出成普通的 markdown，放在这本书的「课程-导出给自己」文件夹里？\n\n每一页开头都会标明「导出给自己用」和这台电脑的标识，请勿外传。")) return;
+      try { const r = await api("/api/course/export", { book: currentBook.name }); toast(`导出好了，一共 ${r.files} 个文件，在这本书的「${r.folder}」文件夹里。`); }
+      catch (err) { toast(err.message); }
+      return;
+    }
+    el.disabled = true;
+    try {
+      if (act === "stop") {
+        const j = jobList.find(x => x.id === el.dataset.id);
+        if (j) j.cancelling = true;
+        refreshCourseMake();
+        await api("/api/job/cancel", { id: el.dataset.id });
+      }
+      if (act === "dismiss") {
+        const j = jobList.find(x => x.id === el.dataset.id);
+        if (j) j.dismissedLocal = true;
+        await api("/api/job/dismiss", { id: el.dataset.id });
+        return openCourseMake();
+      }
+    } catch (err) { toast(err.message); }
+    pollJobs();
+  }
+
   reader.addEventListener("click", e => {
-    const el = e.target.closest("[data-edit],[data-save],[data-cancel],[data-mark],[data-pid],[data-cpage],[data-course],[data-cup]");
+    const el = e.target.closest("[data-edit],[data-save],[data-cancel],[data-mark],[data-pid],[data-cpage],[data-course],[data-cup],[data-cc]");
     if (!el) return;
     if (el.dataset.cpage) return openCoursePage(el.dataset.cpage);
     if (el.hasAttribute("data-course")) return openCourse();
+    if (el.dataset.cc) return courseAction(el);
     if (el.hasAttribute("data-cup")) {
       const prev = courseStack.pop();
       return prev ? openCoursePage(prev, true) : openCourse();
@@ -2728,6 +2978,7 @@
   const jobDocks = new Map();          // host 元素 -> 它那份卡片容器
   let jobList = [];
   let jobTimer = null;
+  let lastCourseNote = "";   // 侧栏「编成课程」上次画的进度，见 renderJobs
 
   // 「这是本什么书」那段是当成正常助手消息发的，服务端也写进了聊天记录——
   // 刷新页面后历史里会再出现一次，所以记下已经显示过的作业号，别重复。
@@ -2766,6 +3017,18 @@
     const stop = j.cancelling
       ? `<button disabled>正在停…</button>`
       : `<button data-job="cancel" data-id="${id}">停下</button>`;
+    // 编成课程：主进度在「编成课程」那一页，这张卡让人在对话里也看得见它在跑
+    if (j.kind === "course") {
+      const p = j.progress || {};
+      const go = `<button class="primary" data-job="open" data-id="${id}">去看看</button>`;
+      const what = j.scope ? `《${name}》第 ${esc(j.scope.join("、"))} 章的试编课程` : `《${name}》的课程`;
+      if (j.state === "queued") return jobCardHtml("spin", `${what}排着队`, "", stop);
+      if (j.state === "running") return jobCardHtml("spin", `正在编${what}`,
+        j.cancelling ? "正在停下…" : `${p.pct || 0}% · 第 ${(p.step || 0) + 1}/7 步：${esc(p.stepName || "")}`, go + stop);
+      if (j.state === "done") return jobCardHtml("✓", `${what}编好了`, `${j.units} 个单元、${j.lessons} 课，${j.cards} 张知识卡`, go + dismiss);
+      return jobCardHtml("⚠️", `${what}没编完`, esc(j.error || "中途出岔子了。"),
+        `<button class="primary" data-job="open" data-id="${id}">接着编…</button>${dismiss}`);
+    }
     // 章首翻译：主进度条在那一章的章首，这张卡只是让人在对话里也看得见它在跑
     if (j.kind === "translate") {
       const where = `《${name}》第 ${esc(j.chapter)} 章`;
@@ -2820,6 +3083,12 @@
       lane.host.appendChild(d);            // 永远排在消息流最后
     }
     refreshChapterHead();
+    refreshCourseMake();
+    // 侧栏「编成课程」那一格带着进度百分比。只在字变了时重画侧栏：
+    // 轮询一秒半一次，每次都重画的话，正在侧栏搜索框里打字的人会被抢走光标
+    const cj = courseJob();
+    const note = cj ? `${cj.id}|${cj.state}|${(cj.progress && cj.progress.pct) || 0}` : "";
+    if (note !== lastCourseNote) { lastCourseNote = note; if (currentBook) renderBookMenu(); }
   }
 
   function showJobInfo(j) {
@@ -2854,10 +3123,11 @@
     const trDone = jobList.some(j => wasTr.has(j.id) && j.state === "done");
     if ((wasActive && !active) || trDone) {  // 刚有作业做完，书架上多了一本 / 多了一章译文
       loadShelf();
-      if (currentBook) openBook(currentBook.name, { keepChat: true }).catch(() => { });
+      // 刷完这本书再刷「编成课程」那一页：课程刚编好时，侧栏和那一页都要换成「编好了」
+      if (currentBook) openBook(currentBook.name, { keepChat: true }).then(refreshCourseMake).catch(() => { });
     }
     // 翻一章只要几十秒，四秒一刷进度条是一格一格跳的；有翻译在跑就刷勤一点
-    const trActive = jobList.some(j => j.kind === "translate" && jobActive(j));
+    const trActive = jobList.some(j => (j.kind === "translate" || j.kind === "course") && jobActive(j));
     scheduleJobPoll(trActive ? 1500 : active ? 4000 : 20000);
   }
 
@@ -2872,6 +3142,12 @@
         if (!j.book) return;
         setView("read");
         await loadShelf();
+        if (j.kind === "course") {
+          // 编着的、没编完的到「编成课程」那一页（进度、接着编都在那儿）；编好的直接看课程
+          if (!currentBook || currentBook.name !== j.book) await openBook(j.book);
+          if (j.state === "failed") return openCourseMake().then(() => courseEstimate(j.scope ? j.scope.join(",") : "all"));
+          return openCourse();
+        }
         if (j.kind === "translate") {
           // 直接翻到那一章（按当前显示方式：单栏打开译文，双列就是双列）
           if (!currentBook || currentBook.name !== j.book) await openBook(j.book);
@@ -4162,6 +4438,14 @@
         </details>
       </div>
       <div class="rite-card">
+        <h3>群星账号</h3>
+        <p>绑定 gnosaria.com 的群星账号之后，这台电脑上编好的课程换电脑、重装系统也能打开，不用重编。
+          不绑也完全能用：课程只在这台电脑上打开。</p>
+        <div id="acctBox"><p class="set-note">…</p></div>
+        <p class="set-note">绑定只是让群星网站替你保管一把「课程钥匙」：新电脑登录同一个账号时取回它，解开旧课程。
+          网站那边能解开你绑定过的课程；绑定的电脑在网站的账号页里都看得到、能移除。不会把你在浏览器里的登录挤掉。</p>
+      </div>
+      <div class="rite-card">
         <h3>端口</h3>
         <div class="set-row">
           <input id="setPort" class="rite-q" type="number" min="1024" max="65535" />
@@ -4659,6 +4943,46 @@
     $("setVault").textContent = s.vaultPath || "—";
   }
 
+  // 「群星账号」：设备码绑定（见 docs/course-account-key.md）。状态全从 /api/account 来；
+  // 等批准的时候两秒问一次，批准了这一页自己换成「绑定好了」——人在浏览器那边点完不会回来点刷新。
+  let acctTimer = 0;
+  async function renderAccount() {
+    const box = $("acctBox");
+    if (!box) return;
+    let s;
+    try { s = await fetch("/api/account").then(r => r.json()); }
+    catch { box.innerHTML = `<p class="set-note">现在读不到状态，过一会儿再打开这一页。</p>`; return; }
+    let html = s.message ? `<p class="relay-ok">${esc(s.message)}</p>` : "";
+    if (!s.local) html = `<p class="set-note">绑定、解除群星账号，要在家里那台电脑上点。</p>`;
+    else if (s.bound) {
+      html += `<p>已绑定：<b>${esc(s.email)}</b><span class="set-note">　${esc(s.deviceName)}</span></p>`
+        + (s.hasAck ? "" : `<p class="set-note err">这台电脑还没取到账号的课程钥匙。</p>`)
+        + `<div class="set-row">${s.hasAck ? "" : `<button class="rite-go" data-acct="pull">再取一次</button>`}`
+        + `<button class="set-plain danger" data-acct="unbind">解除绑定</button></div>`;
+    } else if (s.pending) {
+      const left = Math.max(0, Math.ceil((s.pending.expiresAt - Date.now()) / 60000));
+      html += `<p>在已经登录群星账号的浏览器里打开下面这个链接，核对码是 <span class="relay-fp">${esc(s.pending.userCode)}</span>，点「允许」：</p>`
+        + `<div class="set-box">${esc(s.pending.verifyUrl)}</div>`
+        + `<div class="set-row"><a class="rite-go" href="${esc(s.pending.verifyUrl)}" target="_blank" rel="noopener" style="text-decoration:none">在浏览器里打开</a>`
+        + `<button class="set-plain" data-acct="cancel">不绑了</button></div>`
+        + `<p class="set-note">${left} 分钟内有效。批准之后这里几秒内会显示绑定成功。</p>`;
+    } else {
+      html += `<div class="set-row"><button class="rite-go" data-acct="bind">绑定群星账号</button></div>`;
+    }
+    box.innerHTML = html;
+    clearTimeout(acctTimer);
+    if (view === "settings" && s.pending) acctTimer = setTimeout(renderAccount, 2000);
+  }
+  $("setBody").addEventListener("click", async e => {
+    const b = e.target.closest("button[data-acct]");
+    if (!b) return;
+    const act = b.dataset.acct;
+    if (act === "unbind" && !confirm("解除绑定群星账号？\n\n这台电脑上的课程照常能打开；以后换电脑就要重新编了（除非再绑回来）。")) return;
+    b.disabled = true;
+    try { await api("/api/account/" + act, {}); } catch (err) { toast(err.message); }
+    renderAccount();
+  });
+
   // 「在外面也能用」：扫码配手机（自家中转，见 relay.js）。状态全从 /api/relay 来。
   // 二维码只在点了「用手机扫码」的这一页上显示；配上以后接口里的 pending 会消失、
   // 列表多一部手机，这一页隔两秒问一次，自己换成「配好了」——扫码的人手里拿着手机，
@@ -4823,6 +5147,7 @@
 
   async function loadSettings() {
     if (!setReady) { renderSettings(); setReady = true; fillTools(); }
+    renderAccount();
     // 这个 catch 曾经是光秃秃的 {}，代价是：fillSettings 里一句 ReferenceError
     // 被它整个吞掉，设置页所有已存的值都不显示，而页面一声不吭，整整一版没人发现。
     // 现在至少往控制台留一行——排错的人打开 F12 就看得见。
