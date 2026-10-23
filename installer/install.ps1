@@ -51,6 +51,24 @@ function Invoke-NativeSay {
   } finally { $ErrorActionPreference = $old }
 }
 
+# pip 装组件：国内直连 PyPI 常常卡死（--quiet 加输出被收走，屏幕上就停在那一步不动）。
+# 所以每个源只给短超时、少重试，官方源不通就换清华、阿里镜像；开始前先说一声在下什么。
+function Install-PyPkgs {
+  param([Parameter(Mandatory = $true)][string]$Py, [string[]]$Pkgs, [string]$What = "组件")
+  $sources = @("", "https://pypi.tuna.tsinghua.edu.cn/simple", "https://mirrors.aliyun.com/pypi/simple/")
+  $res = $null
+  foreach ($src in $sources) {
+    $name = if ($src) { ([uri]$src).Host } else { "官方源" }
+    Write-Host "   正在下载$What（$name）…" -ForegroundColor DarkGray
+    $pipArgs = @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "--disable-pip-version-check", "--timeout", "20", "--retries", "1")
+    if ($src) { $pipArgs += @("-i", $src) }
+    $res = Invoke-NativeSay $Py ($pipArgs + $Pkgs)
+    if ($res.Code -eq 0) { return $res }
+    Write-Host "   这个源没下成，换一个试试。" -ForegroundColor DarkGray
+  }
+  return $res
+}
+
 # 出错时把原文摊出来（掐到前几行，别刷屏）。英文看不懂不要紧，
 # 用户把这几行发给站长，站长一眼就知道是缺运行库、是网不通、还是版本不对。
 function Show-Why {
@@ -811,7 +829,8 @@ if ($PyExe) {
   # 结果是 import 直接崩、PDF 支持静默消失，报错用户完全看不懂。0.0.27 不碰它。
   # 底座也一起钉：只钉 pymupdf4llm 的话 pymupdf 会浮动到新版，等于没钉。
   # --user：装进用户自己的包目录，不碰系统站点目录，也不需要管理员。
-  $pipPdf = Invoke-NativeSay $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "pymupdf4llm==0.0.27", "pymupdf==1.26.3")
+  $pdfHave = Invoke-NativeSay $PyExe @("-c", "import pymupdf4llm; print('ok')")
+  if ($pdfHave.Code -ne 0) { $pipPdf = Install-PyPkgs $PyExe @("pymupdf4llm==0.0.27", "pymupdf==1.26.3") "PDF 组件（约 25 MB）" }
   # 装完真 import 一次再说「就绪」—— 上面那个 onnxruntime 的坑正是「装上了但 import 就崩」
   # 直接拿返回码判，别再指望 $LASTEXITCODE 跨过函数调用还是原来那个
   $pdfProbe = Invoke-NativeSay $PyExe @("-c", "import pymupdf4llm; print('ok')")
@@ -846,7 +865,7 @@ if ($PyExe) {
       # 1.4.4 拉下来的是 onnxruntime 1.18.1，项目机上实测能起
       # （引擎 0.7s，一页 1.4s，中英文都认得出）。不钉的话今天装能跑、
       # 过几个月新装的人拉到坏的那版，症状跟当年一模一样。
-      Invoke-Native $PyExe @("-m", "pip", "install", "--quiet", "--user", "--no-warn-script-location", "rapidocr-onnxruntime==1.4.4", "onnxruntime>=1.18.1,<1.22", "opencv-python<5") | Out-Null
+      Install-PyPkgs $PyExe @("rapidocr-onnxruntime==1.4.4", "onnxruntime>=1.18.1,<1.22", "opencv-python<5") "认字组件" | Out-Null
       $ocrProbe = Invoke-NativeSay $PyExe @("-c", "import rapidocr_onnxruntime; print('ok')")
       if ($ocrProbe.Code -eq 0) {
         Ok "扫描版 PDF 也能读了"

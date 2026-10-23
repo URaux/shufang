@@ -1167,6 +1167,23 @@
 
   // 「读一遍插图」。要花钱，所以先问一句——问的时候把张数说出来，
   // 用户对「120 张」的感觉比对「一点钱」准得多。
+  async function exportBook(btn) {
+    if (!currentBook || btn.disabled) return;
+    const small = btn.querySelector("small"), was = small.textContent;
+    btn.disabled = true; small.textContent = "正在合成，书大的话要一两分钟…";
+    try {
+      let r;
+      try { r = await fetch(`/api/book/export?name=${encodeURIComponent(currentBook.name)}`); }
+      catch { toast("跟「群星回廊」断了联系。看看电脑上的启动窗口还开着没有，然后再导一次。"); return; }
+      if (!r.ok) { toast((await r.text().catch(() => "")) || "这本书没导出来，过一会儿再试。"); return; }
+      const url = URL.createObjectURL(await r.blob());
+      const a = Object.assign(document.createElement("a"), { href: url, download: `${currentBook.name}.epub` });
+      document.body.appendChild(a); a.click(); a.remove();
+      // 立刻 revoke 的话有的浏览器还没开始存就断了
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } finally { btn.disabled = false; small.textContent = was; }
+  }
+
   async function captionBook() {
     const b = currentBook;
     if (!b || !b.name) return;
@@ -1217,7 +1234,9 @@
       parts.push('<div class="side-h">译文</div>');
       for (const f of b.translated) parts.push(item(`Library/${b.name}/译文/${f}`, f.replace(/\.md$/, "")));
       // 翻好的拿去别的阅读器看：浏览器直接下载，手机上也一样
-      parts.push(`<a class="side-item" href="/api/book/export?name=${encodeURIComponent(b.name)}" download style="text-decoration:none;color:var(--ink-soft)">📦 导出成 epub<small>丢进微信读书、Kindle 都能看</small></a>`);
+      // 不用 <a download> 直接链：导失败时浏览器会把那句中文报错存成一个打不开的 export.txt（2026-10-23 用户截图），
+      // 用户看不到原因。先 fetch，成了再交给浏览器下载，没成就弹那句话。
+      parts.push(`<button class="side-item" id="exportBook">📦 导出成 epub<small>丢进微信读书、Kindle 都能看</small></button>`);
     }
     if (b.original.length) {
       parts.push('<div class="side-h">原文</div>');
@@ -2401,7 +2420,7 @@
   });
 
   sidebar.addEventListener("click", e => {
-    const el = e.target.closest("[data-book],[data-file],[data-course],[data-sug],[data-jump],[data-unmark],[data-hl-jump],[data-hl-del],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook,#delBook,#capBook");
+    const el = e.target.closest("[data-book],[data-file],[data-course],[data-sug],[data-jump],[data-unmark],[data-hl-jump],[data-hl-del],#backShelf,#joinShared,#shareBook,#showInvite,#syncNow,#uploadBook,#delBook,#capBook,#exportBook");
     if (!el) return;
     // 删按钮压在跳转按钮上面，先判它，否则点叉会顺带跳过去
     if (el.dataset.unmark) { removeMark(el.dataset.unmark); return; }
@@ -2412,6 +2431,7 @@
     if (el.id === "backShelf") { currentBook = null; currentFile = null; collabState = null; loadHistory(null); loadShelf(); return; }
     if (el.id === "delBook") { deleteBook(); return; }
     if (el.id === "capBook") { captionBook(); return; }
+    if (el.id === "exportBook") { exportBook(el); return; }
     if (el.id === "joinShared") { joinWizard(); return; }
     if (el.id === "shareBook") { shareWizard(); return; }
     if (el.id === "showInvite") { showInvite(); return; }
