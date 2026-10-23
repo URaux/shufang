@@ -4504,13 +4504,18 @@
       </div>
       <div class="rite-card">
         <h3>出问题了？</h3>
-        <p>点一下，把程序版本、设置和最近的运行记录复制到剪贴板，然后粘贴给站长。</p>
+        <p>把程序版本、设置和最近的运行记录直接发给站长。发之前已经抹掉密钥、口令、电脑名和用户名。</p>
+        <textarea id="setRepNote" rows="2" maxlength="2000" placeholder="一句话说说出了什么事（可以不写）" style="width:100%;box-sizing:border-box"></textarea>
+        <label class="set-note" id="setRepBookRow" hidden><input type="checkbox" id="setRepBook"> 附上《<span id="setRepBookName"></span>》的译文（这本书出的问题，站长要拿到书才查得出来时勾上）</label>
+        <div class="set-row"><button id="setReport" class="rite-go">发给站长</button></div>
+        <p class="set-note" id="setRepNote2">要先在上面绑定群星账号。发完会给你一个短号，告诉站长这个号就行。</p>
+        <p class="set-note">发不了的话，也可以存成文件自己发：</p>
         <div class="set-row">
-          <button id="setDiagDesk" class="rite-go">存到桌面</button>
+          <button id="setDiagDesk" class="set-plain">存到桌面</button>
           <button id="setDiag" class="set-plain">复制诊断日志</button>
           <a id="setDiagFile" class="set-plain" href="/api/diag/download" download>导出成文件</a>
         </div>
-        <p class="set-note" id="setDiagNote">日志里不含密钥和口令，可以放心发。<b>要发给站长就点「存到桌面」</b>——日志有好几千字，粘进 QQ 会被嫌太长，当文件发才行。手机上用「导出成文件」。</p>
+        <p class="set-note" id="setDiagNote">日志有好几千字，粘进 QQ 会被嫌太长，当文件发才行。手机上用「导出成文件」。</p>
       </div>
       <div class="rite-card">
         <h3>接口和模型</h3>
@@ -4836,6 +4841,24 @@
         visNote(r.hint || (r.ok ? "能看图。" : "看不了。"), !r.ok, true);
       } catch (e) { visNote(e.message || "没测成。", true, true); }
       finally { $("setVisTest").disabled = false; }
+    });
+    // 发给站长（/api/report）：绑过群星账号才发得出去。打开着一本书时多一个「附上译文」的勾，默认不勾。
+    if (currentBook && currentBook.translated && currentBook.translated.length) {
+      $("setRepBookName").textContent = currentBook.name;
+      $("setRepBookRow").hidden = false;
+    }
+    $("setReport").addEventListener("click", async () => {
+      const note = $("setRepNote2");
+      $("setReport").disabled = true;
+      note.classList.remove("err");
+      note.textContent = $("setRepBook").checked ? "正在发（带着译文，要一会儿）…" : "正在发…";
+      try {
+        const r = await fetch("/api/report", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note: $("setRepNote").value, book: $("setRepBook").checked && currentBook ? currentBook.name : "" }) })
+          .then(x => x.json()).catch(() => ({ ok: false, hint: "跟「群星回廊」断了联系，刷新一下再试。" }));
+        if (r.ok) { note.innerHTML = `发好了。告诉站长这个号：<span class="relay-fp">${esc(r.id)}</span>`; $("setRepNote").value = ""; }
+        else { note.textContent = r.hint || "没发出去，过一会儿再试。"; note.classList.add("err"); }
+      } finally { $("setReport").disabled = false; }
     });
     // 存到桌面：写成文件 + 打开文件夹选中它。用户下一步就是拖进 QQ。
     $("setDiagDesk").addEventListener("click", async () => {
