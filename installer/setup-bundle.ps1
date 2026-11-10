@@ -615,6 +615,12 @@ Ok "运行环境就绪（$NodeDir，Node $nodeVer）"
 Step "安放程序本体"
 RemoveWithRetry $AppRepo
 CopyTreeLong (Join-Path $Payload "app") $AppRepo
+# 包里的程序是打包那天的快照，上一次安装留下的 .app-sha 却记着更新过的版本号。
+# 不删的话更新器一比「已是最新」，用户就永远停在包里那一版（11-09 有人重装后机器人、深色模式全没了）。
+# 删掉 = 下次有网启动时更新器当作未知版本，拉一次最新。
+foreach ($stale in @((Join-Path $AppDir ".app-sha"), (Join-Path $env:USERPROFILE ".shufang\.app-sha"))) {
+  if (Test-Path $stale) { Remove-Item -Force $stale -ErrorAction SilentlyContinue }
+}
 Ok "程序就绪（$AppRepo）"
 
 Step "建书库"

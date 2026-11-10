@@ -4398,6 +4398,7 @@
   });
 
   // QQ 机器人。密钥只写不读——服务端只回「填没填过」，不回明文。
+  let qqTimer = null;
   const qqNote = (x, err, sticky) => {
     const el = $("setQqNote"); if (!el) return;
     el.textContent = x; el.classList.toggle("err", !!err);
@@ -4405,22 +4406,51 @@
   };
   function fillQq(s) {
     if (!$("setQqId")) return;
+    if (!$("setQqMode").dataset.dirty) {
+      $("setQqMode").value = s.qqMode || "official";
+      showQqMode();
+    }
+    if (document.activeElement !== $("setQqUrl") && !$("setQqUrl").dataset.dirty) $("setQqUrl").value = s.qqWsUrl || "";
+    $("setQqToken").placeholder = s.qqNapcatTokenSet ? "已填过，留空保留；要换就填新的" : "没填过；NapCat 没设口令就留空";
+    $("setQqClearTokenRow").hidden = !s.qqNapcatTokenSet;
     if (document.activeElement !== $("setQqId")) $("setQqId").value = s.qqAppId || "";
     if (s.qqSecretSet && document.activeElement !== $("setQqSecret")) {
       $("setQqSecret").placeholder = "已经存过一把（要换就填新的）";
     }
     const q = s.qq || {};
+    // NapCat 会在后台退避重连，保存时的「正在连」不能一直停在屏幕上。
+    clearTimeout(qqTimer);
+    if (view === "settings" && s.qqMode === "napcat" && q.configured) qqTimer = setTimeout(async () => {
+      if (view !== "settings") return;
+      try { fillQq(await fetch("/api/settings").then(r => r.json())); } catch { }
+    }, 2000);
     $("setQqUnbind").hidden = !q.bound;
     if ($("setQqNote").dataset.sticky) return;
     // 状态直说，别让用户猜「保存了到底连上没有」
     const words = {
-      off: s.qqAppId ? "还没保存密钥，填上再点保存。" : "没开。填 AppID 和密钥就开。",
+      off: s.qqMode === "napcat" ? "没开。填好 NapCat 的连接地址再保存；清空地址再保存就关闭。"
+        : (s.qqAppId ? "还没保存密钥，填上再点保存。" : "没开。填 AppID 和密钥就开。"),
       connecting: "正在连…" + (q.detail ? "（" + q.detail + "）" : ""),
       online: q.bound ? "连上了，也认过主人了。直接在 QQ 上给它发消息。"
         : "连上了，还没认主人——去 QQ 上给它发一句话，第一个说话的人就是主人。",
       error: "连不上：" + (q.detail || "不知道为什么"),
     };
     qqNote(words[q.phase] || "");
+  }
+
+  function showQqMode() {
+    const nap = $("setQqMode").value === "napcat";
+    $("setQqOfficial").hidden = nap;
+    $("setQqNapcat").hidden = !nap;
+  }
+
+  function qqForm() {
+    const qqMode = $("setQqMode").value;
+    if (qqMode !== "napcat") return { qqMode, qqAppId: $("setQqId").value, qqSecret: $("setQqSecret").value };
+    const body = { qqMode, qqWsUrl: $("setQqUrl").value };
+    if ($("setQqClearToken").checked) body.qqNapcatToken = "";
+    else if ($("setQqToken").value.trim()) body.qqNapcatToken = $("setQqToken").value;
+    return body;
   }
 
   function renderSettings() {
@@ -4575,16 +4605,36 @@
         </div>
         <p class="set-note" id="setVisNote"></p>
       </div>
-      <div class="rite-card">
+      <div class="rite-card" id="setQqCard">
         <h3>在 QQ 上跟书房说话</h3>
-        <p class="set-note" style="margin:0 0 .6rem">连上你自己的 QQ 机器人，在手机上随时问自己的书——不用同一个 Wi-Fi、不用装别的东西。去 QQ 开放平台建一个机器人，把 AppID 和密钥填在这里。不填就当没有这功能。</p>
         <div class="set-row">
-          <input id="setQqId" class="rite-q" placeholder="AppID" />
-          <input id="setQqSecret" class="rite-q" type="password" placeholder="AppSecret（只写一次，不回显）" />
+          <label for="setQqMode">怎么连接</label>
+          <select id="setQqMode" class="rite-q">
+            <option value="official">QQ 官方机器人</option>
+            <option value="napcat">NapCat（自己挂的 QQ 号）</option>
+          </select>
         </div>
+        <div id="setQqOfficial">
+          <p class="set-note">去 QQ 开放平台建一个机器人，把 AppID 和密钥填在这里。连上后，就能在手机 QQ 上问自己的书，不用同一个 Wi-Fi。不填就不开。</p>
+          <div class="set-row">
+            <input id="setQqId" class="rite-q" placeholder="AppID" aria-label="机器人 AppID" />
+            <input id="setQqSecret" class="rite-q" type="password" placeholder="AppSecret（只写一次，不回显）" aria-label="机器人密钥" />
+          </div>
+        </div>
+        <div id="setQqNapcat" hidden>
+          <p class="set-note">要先自己安装 NapCat，扫码登录一个 QQ 小号。小号可能被风控，别用主号；书房和 NapCat 都要保持运行。</p>
+          <p class="set-note">在 NapCat 的「网络配置」里添加并启用「WebSocket 服务端」，把它的地址和连接口令填在下面。</p>
+          <div class="set-row">
+            <input id="setQqUrl" class="rite-q" placeholder="连接地址，例如 ws://127.0.0.1:3001" aria-label="NapCat 连接地址" />
+            <input id="setQqToken" class="rite-q" type="password" autocomplete="new-password" placeholder="连接口令（可空，对应 access token）" aria-label="NapCat 连接口令（access token）" />
+          </div>
+          <label id="setQqClearTokenRow" class="set-note" hidden><input id="setQqClearToken" type="checkbox" /> 清除已存的连接口令</label>
+          <p class="set-note">连接口令对应 NapCat 的 access token，保存后不回显。清空连接地址再保存，就关闭这条连接。</p>
+        </div>
+        <p class="set-note">只接私聊，不接群消息。第一个发来私聊的人就是主人；换连法后要重新认主人。</p>
         <div class="set-row">
           <button id="setQqSave" class="rite-go">保存</button>
-          <button id="setQqTest" class="set-plain">试一下</button>
+          <button id="setQqTest" class="set-plain">测试连接</button>
           <button id="setQqUnbind" class="set-plain" hidden>解除绑定</button>
         </div>
         <p class="set-note" id="setQqNote"></p>
@@ -4889,26 +4939,36 @@
     // addEventListener 当场抛异常，**后面整段启动代码一句都不会再跑**——
     // 包括加载书架。症状是界面打得开、书架空的、哪本书都点不开，
     // 而控制台之外没有任何提示。真发出去过一版，用户报的就是这个。
+    $("setQqMode").addEventListener("change", () => {
+      $("setQqMode").dataset.dirty = "1";
+      showQqMode();
+      qqNote("选好后先测试连接，再保存。换连法后要重新认主人。", false, true);
+    });
+    $("setQqUrl").addEventListener("input", () => { $("setQqUrl").dataset.dirty = "1"; });
     $("setQqSave").addEventListener("click", async () => {
       $("setQqSave").disabled = true;
       qqNote("正在保存…", false, true);
       try {
-        const r = await api("/api/settings", { qqAppId: $("setQqId").value, qqSecret: $("setQqSecret").value });
+        const r = await api("/api/settings", qqForm());
         if (r && r.error) qqNote(r.hint || r.error, true, true);
         else {
           $("setQqSecret").value = "";
+          $("setQqToken").value = "";
+          $("setQqClearToken").checked = false;
+          $("setQqMode").dataset.dirty = "";
+          $("setQqUrl").dataset.dirty = "";
           $("setQqNote").dataset.sticky = "";
           fillQq(r);
-          qqNote("存好了，正在连。连上之后去 QQ 上给你的机器人发一句话。", false, true);
+          if (r.qqMode !== "napcat") qqNote("存好了，正在连。连上之后去 QQ 上给你的机器人发一句话。", false, true);
         }
       } catch (e) { qqNote(e.message || "没保存成。", true, true); }
       finally { $("setQqSave").disabled = false; }
     });
     $("setQqTest").addEventListener("click", async () => {
       $("setQqTest").disabled = true;
-      qqNote("正在问开放平台…", false, true);
+      qqNote($("setQqMode").value === "napcat" ? "正在连接 NapCat，看看登录的是哪个号…" : "正在问开放平台…", false, true);
       try {
-        const r = await api("/api/settings/test-qq", { qqAppId: $("setQqId").value, qqSecret: $("setQqSecret").value });
+        const r = await api("/api/settings/test-qq", qqForm());
         qqNote(r.hint || (r.ok ? "通了。" : "不通。"), !r.ok, true);
       } catch (e) { qqNote(e.message || "没测成。", true, true); }
       finally { $("setQqTest").disabled = false; }
@@ -5219,7 +5279,7 @@
   function setView(v) {
     view = v;
     if (v === "chat") checkKey();
-    if (v !== "settings") { clearTimeout(tsTimer); clearTimeout(relayTimer); }   // 向导的轮询只在设置页活着
+    if (v !== "settings") { clearTimeout(tsTimer); clearTimeout(relayTimer); clearTimeout(qqTimer); }   // 向导的轮询只在设置页活着
     document.body.className = "view-" + v;
     $("tabRead").classList.toggle("on", v === "read");
     $("tabChat").classList.toggle("on", v === "chat");

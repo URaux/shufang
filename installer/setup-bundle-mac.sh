@@ -120,6 +120,8 @@ ok "运行环境就绪（Node ${NODE_VER}）"
 step "安放程序本体"
 rm -rf "$APP_REPO"
 cp -R "$PAYLOAD/app" "$APP_REPO" || die "复制程序失败"
+# 包里是打包那天的快照；上次安装留下的 .app-sha 记着更新过的版本，不删更新器会以为已是最新，永远停在包里那版
+rm -f "$APP_DIR/.app-sha" "$HOME/.shufang/.app-sha"
 ok "程序就绪"
 
 step "建书库"
